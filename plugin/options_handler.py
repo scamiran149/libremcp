@@ -30,7 +30,8 @@ if _parent not in sys.path:
 
 import unohelper
 from com.sun.star.awt import (
-    XContainerWindowEventHandler, XActionListener, XItemListener)
+    XContainerWindowEventHandler, XActionListener, XItemListener,
+    XAdjustmentListener)
 from com.sun.star.lang import XServiceInfo
 
 log = logging.getLogger("nelson.options")
@@ -247,6 +248,30 @@ class _BrowseListener(unohelper.Base, XActionListener):
         pass
 
 
+# ── Scroll listener ──────────────────────────────────────────────────
+
+
+_PAGE_WIDTH = 260
+_PAGE_HEIGHT = 260
+_SCROLLBAR_WIDTH = 12
+
+
+class _ScrollListener(unohelper.Base, XAdjustmentListener):
+    """Repositions controls when the scrollbar value changes."""
+
+    def __init__(self, original_positions):
+        # original_positions: list of (control_model, original_posY)
+        self._positions = original_positions
+
+    def adjustmentValueChanged(self, evt):
+        scroll_val = evt.Value
+        for model, orig_y in self._positions:
+            model.PositionY = orig_y - scroll_val
+
+    def disposing(self, evt):
+        pass
+
+
 # ── Main handler ─────────────────────────────────────────────────────
 
 
@@ -331,6 +356,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     xWindow, child_name, child_config, config_svc,
                     prefix=child_safe + "__")
 
+        self._setup_scroll(xWindow)
+
     def _load_module_fields(self, xWindow, module_name, mod_config,
                             config_svc, prefix=""):
         """Load config fields into controls, with optional ID prefix."""
@@ -366,6 +393,10 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             val = config_svc.get(full_key) if config_svc else None
             if val is None:
                 val = schema.get("default")
+
+            # If value is empty and a default_provider is defined, use it
+            if not val and schema.get("default_provider"):
+                val = self._call_default_provider(schema["default_provider"])
 
             self._cached_values[full_key] = val
 
@@ -579,6 +610,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 btn.addActionListener(_BrowseListener(
                     ctrl, fschema["widget"], fschema.get("file_filter", "")))
 
+        self._setup_scroll(xWindow)
+
         log.info("List-detail initialized: %s (%d items)", full_key, len(items))
 
     def _ld_on_ok(self, xWindow, module_name, field_name):
@@ -777,6 +810,75 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             log.exception("Failed to resolve label_func: %s", func_path)
             return None
 
+    # ── Scroll support ────────────────────────────────────────────────
+
+    def _setup_scroll(self, xWindow):
+        """Add a scrollbar if the page content exceeds _PAGE_HEIGHT."""
+        content_height = self._detect_content_height(xWindow)
+        if content_height is None or content_height <= _PAGE_HEIGHT:
+            return
+
+        try:
+            peer = xWindow.getPeer()
+            if peer is None:
+                return
+
+            # Collect original positions for all controls
+            scroll_id = "__scrollbar__"
+            original_positions = []
+            controls = xWindow.getControls()
+            for ctrl in controls:
+                model = ctrl.getModel()
+                name = getattr(model, "Name", "")
+                if name == scroll_id:
+                    continue
+                original_positions.append((model, model.PositionY))
+
+            # Create scrollbar model — placed at the right edge of
+            # the content area (PAGE_WIDTH), outside usable width
+            dialog_model = xWindow.getModel()
+            if dialog_model.hasByName(scroll_id):
+                dialog_model.removeByName(scroll_id)
+
+            sb_model = dialog_model.createInstance(
+                "com.sun.star.awt.UnoControlScrollBarModel")
+            sb_model.Name = scroll_id
+            sb_model.Orientation = 1  # vertical
+            sb_model.PositionX = _PAGE_WIDTH
+            sb_model.PositionY = 0
+            sb_model.Width = _SCROLLBAR_WIDTH
+            sb_model.Height = _PAGE_HEIGHT
+            sb_model.ScrollValueMin = 0
+            sb_model.ScrollValueMax = content_height - _PAGE_HEIGHT
+            sb_model.LineIncrement = 10
+            sb_model.BlockIncrement = 50
+
+            dialog_model.insertByName(scroll_id, sb_model)
+
+            # Attach listener
+            sb_ctrl = xWindow.getControl(scroll_id)
+            if sb_ctrl:
+                sb_ctrl.addAdjustmentListener(
+                    _ScrollListener(original_positions))
+
+            log.debug("Scrollbar added: content_height=%d page=%d",
+                      content_height, _PAGE_HEIGHT)
+        except Exception:
+            log.exception("_setup_scroll failed")
+
+    def _detect_content_height(self, xWindow):
+        """Read the hidden __content_height__ control. Returns int or None."""
+        try:
+            ctrl = xWindow.getControl("__content_height__")
+            if ctrl:
+                model = ctrl.getModel()
+                raw = getattr(model, "Label", "") or getattr(model, "Text", "")
+                if raw:
+                    return int(raw)
+        except Exception:
+            pass
+        return None
+
     # ── Helpers ──────────────────────────────────────────────────────
 
     def _read_control(self, ctrl, widget, field_type, schema):
@@ -862,6 +964,19 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             if m.get("name") == module_name:
                 return m.get("config", {})
         return {}
+
+    def _call_default_provider(self, provider_path):
+        """Call a default_provider function to get a fallback value."""
+        try:
+            module_path, func_name = provider_path.rsplit(":", 1)
+            import importlib
+            mod = importlib.import_module(module_path)
+            func = getattr(mod, func_name)
+            from plugin.main import get_services
+            return func(get_services())
+        except Exception:
+            log.exception("Failed to call default_provider: %s", provider_path)
+            return None
 
     def _resolve_options(self, schema):
         """If schema has an options_provider, call it to get dynamic options."""

@@ -99,6 +99,11 @@ class ClaudeProvider:
                 log.exception("Failed to copy %s", filename)
 
 
+def get_default_cwd(services):
+    """Return the default working directory for Claude Code."""
+    return _DEFAULT_CWD
+
+
 def on_install():
     """Callback for the Install button in Options."""
     from plugin.modules.launcher import run_install_for_provider

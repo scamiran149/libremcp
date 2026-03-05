@@ -1,15 +1,16 @@
 name: launcher.claude
 title: Claude Code CLI provider
 requires: [launcher_manager]
-config_inline: true
+config_inline: false
 
 config:
   cwd:
     type: string
     default: ""
+    default_provider: "plugin.modules.launcher_claude:get_default_cwd"
     widget: folder
     label: Working Directory
-    helper: "Directory to launch Claude Code in. Empty = ~/.local/share/nelson/cli/claude/"
+    helper: "Directory to launch Claude Code in. Clear to restore default."
   args:
     type: string
     default: ""

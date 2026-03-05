@@ -409,27 +409,51 @@ class GetRecentDocuments(ToolBase):
         try:
             uno_ctx = get_ctx()
             smgr = uno_ctx.ServiceManager
-            recent = smgr.createInstanceWithContext(
-                "com.sun.star.frame.RecentDocumentList", uno_ctx
+            cfg_provider = smgr.createInstanceWithContext(
+                "com.sun.star.configuration.ConfigurationProvider", uno_ctx)
+            arg = PropertyValue()
+            arg.Name = "nodepath"
+            arg.Value = (
+                "/org.openoffice.Office.Histories/Histories"
+                "/org.openoffice.Office.Histories:HistoryInfo['PickList']"
             )
-            items = recent.getRecentDocumentList()
+            cfg = cfg_provider.createInstanceWithArguments(
+                "com.sun.star.configuration.ConfigurationAccess", (arg,))
+
+            order_list = cfg.getByName("OrderList")
+            item_list = cfg.getByName("ItemList")
+
             docs = []
-            for item in items[:max_count]:
-                docs.append({"url": item})
+            names = order_list.getElementNames()
+            # Names are string indices — sort numerically
+            sorted_names = sorted(names, key=lambda n: int(n))
+            for name in sorted_names[:max_count]:
+                entry = order_list.getByName(name)
+                url = entry.getPropertyValue("HistoryItemRef")
+                title = ""
+                try:
+                    item = item_list.getByName(url)
+                    title = item.getPropertyValue("Title")
+                except Exception:
+                    pass
+                try:
+                    path = uno.fileUrlToSystemPath(url)
+                except Exception:
+                    path = url
+                doc = {"url": url, "path": path}
+                if title:
+                    doc["title"] = title
+                docs.append(doc)
+
             return {
                 "status": "ok",
                 "documents": docs,
                 "count": len(docs),
             }
-        except Exception:
-            # RecentDocumentList service is not reliably available on all
-            # LO versions. Return a clear message instead of crashing.
+        except Exception as e:
             return {
                 "status": "error",
-                "error": (
-                    "Recent documents list not available via UNO API. "
-                    "Use File > Recent Documents in LibreOffice instead."
-                ),
+                "error": "Failed to read recent documents: %s" % e,
             }
 
 

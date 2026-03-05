@@ -1,15 +1,16 @@
 name: launcher.opencode
 title: OpenCode CLI provider
 requires: [launcher_manager]
-config_inline: true
+config_inline: false
 
 config:
   cwd:
     type: string
     default: ""
+    default_provider: "plugin.modules.launcher_opencode:get_default_cwd"
     widget: folder
     label: Working Directory
-    helper: "Directory to launch OpenCode in. Empty = ~/.local/share/nelson/cli/opencode/"
+    helper: "Directory to launch OpenCode in. Clear to restore default."
   args:
     type: string
     default: ""
@@ -31,9 +32,10 @@ config:
   ollama_model:
     type: string
     default: "qwen3:8b"
-    widget: text
+    widget: select
+    options_provider: "plugin.modules.launcher_opencode:get_ollama_models"
     label: Ollama Model
-    helper: "Model name as known by Ollama (e.g. qwen3:8b, mistral:7b, llama3.1:8b)."
+    helper: "Select an installed model. Custom values are preserved if typed in config."
   install:
     widget: button
     label: Install OpenCode

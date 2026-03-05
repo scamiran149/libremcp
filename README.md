@@ -27,7 +27,7 @@ Nelson MCP runs an HTTP server inside LibreOffice and speaks the [Model Context 
 
 ## Install
 
-1. Download the latest `.oxt` from the [releases page](https://github.com/quazardous/localwriter/releases)
+1. Download the latest `.oxt` from the [releases page](https://github.com/quazardous/nelson-mcp/releases)
 2. In LibreOffice: **Tools > Extension Manager > Add**
 3. Restart LibreOffice
 4. The MCP server starts automatically (default: `http://localhost:8765/mcp`)

@@ -31,7 +31,13 @@ class OpenCodeProvider:
     default_cwd = _DEFAULT_CWD
 
     def get_args(self, mcp_url, config):
-        return []
+        return [
+            "--prompt", "You are helping the user work with a LibreOffice "
+            "document through Nelson MCP. Start by calling get_document_info "
+            "to see the current document. If no document is open, use "
+            "list_open_documents or get_recent_documents to find one, "
+            "then open_document to open it.",
+        ]
 
     def setup_env(self, mcp_url, env, cwd, config):
         """Write opencode.json and AGENTS.md into the working directory."""
@@ -89,6 +95,41 @@ class OpenCodeProvider:
                 log.info("Copied %s to %s", filename, dst)
             except Exception:
                 log.exception("Failed to copy %s", filename)
+
+
+def get_default_cwd(services):
+    """Return the default working directory for OpenCode."""
+    return _DEFAULT_CWD
+
+
+def get_ollama_models(services):
+    """Query Ollama API for installed models. Returns options list."""
+    import urllib.request
+    import json as _json
+
+    # Read ollama_url from config, fallback to default
+    url = "http://localhost:11434"
+    try:
+        if services:
+            cfg = services.config.proxy_for("launcher.opencode")
+            raw = cfg.get("ollama_url") or ""
+            if raw:
+                # Strip /v1 suffix if present
+                url = raw.replace("/v1", "").rstrip("/")
+    except Exception:
+        pass
+
+    try:
+        req = urllib.request.urlopen(url + "/api/tags", timeout=3)
+        data = _json.loads(req.read())
+        models = data.get("models", [])
+        return [
+            {"value": m["name"], "label": m["name"]}
+            for m in models
+        ]
+    except Exception:
+        log.debug("Could not query Ollama models at %s", url)
+        return []
 
 
 def on_install():

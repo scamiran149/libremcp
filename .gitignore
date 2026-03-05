@@ -4,8 +4,6 @@ build/
 plugin/_manifest.py
 extension/META-INF/manifest.xml
 extension/description.xml
-extension/assets/icon_*.png
-extension/assets/logo.png
 
 # Vendored dependencies (make vendor)
 vendor/

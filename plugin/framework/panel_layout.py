@@ -20,7 +20,26 @@ def create_panel_window(ctx, parent_window):
     smgr = ctx.getServiceManager()
     model = smgr.createInstanceWithContext(
         "com.sun.star.awt.UnoControlContainerModel", ctx)
-    model.BackgroundColor = -1  # inherit / transparent
+
+    # Use the system dialog background color; -1 renders black on Windows
+    try:
+        cfg_prov = smgr.createInstanceWithContext(
+            "com.sun.star.configuration.ConfigurationProvider", ctx)
+        import uno
+        from com.sun.star.beans import PropertyValue
+        arg = PropertyValue()
+        arg.Name = "nodepath"
+        arg.Value = "/org.openoffice.Office.UI/ColorScheme"
+        cfg = cfg_prov.createInstanceWithArguments(
+            "com.sun.star.configuration.ConfigurationAccess", (arg,))
+        scheme_name = cfg.getPropertyValue("CurrentColorScheme")
+        schemes = cfg.getByName("ColorSchemes")
+        scheme = schemes.getByName(scheme_name)
+        bg_color = scheme.getPropertyValue("DialogColor")
+        model.BackgroundColor = bg_color
+    except Exception:
+        # Fallback: standard light gray background
+        model.BackgroundColor = 0xF0F0F0
 
     container = smgr.createInstanceWithContext(
         "com.sun.star.awt.UnoControlContainer", ctx)

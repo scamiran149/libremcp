@@ -129,7 +129,7 @@ vendor:
 	uv pip install --target vendor -r requirements-vendor.txt
 
 docker-build:
-	UID=$$(id -u) GID=$$(id -g) docker compose -f builder/docker-compose.yml up --build
+	DOCKER_UID=$$(id -u) DOCKER_GID=$$(id -g) docker compose -f builder/docker-compose.yml up --build
 	@echo "Done: build/nelson.oxt"
 
 # ── RDB (UNO type library) ────────────────────────────────────────────────
@@ -148,19 +148,23 @@ $(RDB_TARGET): $(RDB_SOURCE)
 
 # ── Icons (SVG → PNG) ────────────────────────────────────────────────────
 ICON_SVG    = extension/assets/icon.svg
-ICON_PNGS   = extension/assets/icon_16.png extension/assets/icon_24.png extension/assets/logo.png
+ICON_DIR    = build/generated/assets
+ICON_PNGS   = $(ICON_DIR)/icon_16.png $(ICON_DIR)/icon_24.png $(ICON_DIR)/logo.png
 MAGICK      ?= magick
 
 icons: $(ICON_PNGS)
 
-extension/assets/icon_16.png: $(ICON_SVG)
+$(ICON_DIR)/icon_16.png: $(ICON_SVG) | $(ICON_DIR)
 	$(MAGICK) -background none -density 256 $< -resize 16x16 $@
 
-extension/assets/icon_24.png: $(ICON_SVG)
+$(ICON_DIR)/icon_24.png: $(ICON_SVG) | $(ICON_DIR)
 	$(MAGICK) -background none -density 256 $< -resize 24x24 $@
 
-extension/assets/logo.png: $(ICON_SVG)
+$(ICON_DIR)/logo.png: $(ICON_SVG) | $(ICON_DIR)
 	$(MAGICK) -background none -density 256 $< -resize 42x42 $@
+
+$(ICON_DIR):
+	$(MKDIR) $(ICON_DIR)
 
 ifeq ($(USE_DOCKER),1)
 build:

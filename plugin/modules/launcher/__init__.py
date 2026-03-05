@@ -22,8 +22,8 @@ from plugin.framework.module_base import ModuleBase
 
 log = logging.getLogger("nelson.launcher")
 
-# Windows: hide subprocess console window
-_CREATION_FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+# Windows: open subprocess in a new console window (not hidden)
+_CREATION_FLAGS = getattr(subprocess, "CREATE_NEW_CONSOLE", 0) if sys.platform == "win32" else 0
 
 def check_cli_installed(services):
     """Check if the selected CLI binary is available in PATH."""
@@ -90,28 +90,30 @@ def run_install_for_provider(provider_name):
                "Install script not found:\n%s" % script_path)
         return
 
-    # Detect terminal
-    cfg = services.config.proxy_for("launcher")
-    terminal = cfg.get("terminal") or ""
-    try:
-        term = _find_terminal(terminal)
-    except Exception:
-        log.exception("Terminal detection failed")
-        msgbox(ctx, "Nelson", "Could not find a terminal emulator.")
-        return
-
     # Build command: run the script then wait for user input
     if sys.platform == "win32":
-        cli_cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-NoExit",
-                    "-File", script_path]
+        # On Windows, CREATE_NEW_CONSOLE opens a new window — no terminal wrapper needed
+        full_cmd = [
+            "powershell", "-ExecutionPolicy", "Bypass", "-Command",
+            "& '%s'; Write-Host; Write-Host 'Installation complete. Press Enter to close.';"
+            " Read-Host" % script_path.replace("'", "''"),
+        ]
     else:
+        cfg = services.config.proxy_for("launcher")
+        terminal = cfg.get("terminal") or ""
+        try:
+            term = _find_terminal(terminal)
+        except Exception:
+            log.exception("Terminal detection failed")
+            msgbox(ctx, "Nelson", "Could not find a terminal emulator.")
+            return
+
         cli_cmd = [
             "bash", "-c",
             "bash %s; echo; echo 'Installation complete. Press Enter to close.'; read"
             % shlex.quote(script_path),
         ]
-
-    full_cmd = _build_terminal_cmd(term, cli_cmd)
+        full_cmd = _build_terminal_cmd(term, cli_cmd)
 
     try:
         log.info("Running install script: %s", " ".join(str(c) for c in full_cmd))
@@ -158,6 +160,12 @@ def _find_terminal(configured):
     if env_term and shutil.which(env_term):
         return env_term
 
+    if sys.platform == "win32":
+        # Windows Terminal, then fallback to conhost
+        if shutil.which("wt"):
+            return "wt"
+        return "conhost"
+
     if sys.platform == "darwin":
         return "open"  # handled specially in _build_terminal_cmd
 
@@ -186,6 +194,13 @@ def _build_terminal_cmd(terminal, cli_cmd):
                 'tell app "Terminal" to do script "%s"' % shell_cmd.replace('"', '\\"')]
 
     base = os.path.basename(terminal)
+
+    # Windows terminals
+    if base == "wt" or base == "wt.exe":
+        return [terminal, "new-tab", "--", *cli_cmd]
+
+    if base in ("conhost", "conhost.exe"):
+        return [terminal, *cli_cmd]
 
     if base in ("gnome-terminal", "mate-terminal"):
         return [terminal, "--", *cli_cmd]
@@ -350,20 +365,6 @@ class LauncherModule(ModuleBase):
                    % provider.binary_name)
             return
 
-        # Detect terminal
-        try:
-            term = _find_terminal(terminal)
-        except Exception:
-            log.exception("Terminal detection failed")
-            msgbox(ctx, "Nelson", "Could not find a terminal emulator.")
-            return
-
-        if not shutil.which(term) and not (sys.platform == "darwin" and term == "open"):
-            msgbox(ctx, "Nelson",
-                   "Terminal '%s' not found.\n"
-                   "Install it or set a different one in Options." % term)
-            return
-
         # Build CLI command
         cli_cmd = [provider.binary_name]
 
@@ -390,14 +391,42 @@ class LauncherModule(ModuleBase):
                 log.exception("Auto-config failed for %s", provider.name)
 
         # Wrap CLI command so the terminal stays open on exit/crash
-        shell_str = " ".join(shlex.quote(c) for c in cli_cmd)
-        cli_cmd = [
-            "bash", "-c",
-            "%s; echo; echo 'CLI exited. Press Enter to close.'; read" % shell_str,
-        ]
+        if sys.platform == "win32":
+            # On Windows, CREATE_NEW_CONSOLE opens a new window — no terminal wrapper
+            # Quote args containing spaces for PowerShell
+            ps_parts = []
+            for c in cli_cmd:
+                if " " in c or "'" in c:
+                    ps_parts.append("'%s'" % c.replace("'", "''"))
+                else:
+                    ps_parts.append(c)
+            inner = "& " + " ".join(ps_parts)
+            full_cmd = [
+                "powershell", "-Command",
+                "%s; Write-Host; Write-Host 'CLI exited. Press Enter to close.';"
+                " Read-Host" % inner,
+            ]
+        else:
+            # Detect terminal (Linux/macOS only)
+            try:
+                term = _find_terminal(terminal)
+            except Exception:
+                log.exception("Terminal detection failed")
+                msgbox(ctx, "Nelson", "Could not find a terminal emulator.")
+                return
 
-        # Build full terminal command
-        full_cmd = _build_terminal_cmd(term, cli_cmd)
+            if not shutil.which(term) and not (sys.platform == "darwin" and term == "open"):
+                msgbox(ctx, "Nelson",
+                       "Terminal '%s' not found.\n"
+                       "Install it or set a different one in Options." % term)
+                return
+
+            shell_str = " ".join(shlex.quote(c) for c in cli_cmd)
+            cli_cmd = [
+                "bash", "-c",
+                "%s; echo; echo 'CLI exited. Press Enter to close.'; read" % shell_str,
+            ]
+            full_cmd = _build_terminal_cmd(term, cli_cmd)
 
         # Launch
         try:

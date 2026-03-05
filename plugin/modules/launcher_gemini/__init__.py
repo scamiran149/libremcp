@@ -49,6 +49,11 @@ class GeminiProvider:
             log.exception("Failed to write gemini config")
 
 
+def get_default_cwd(services):
+    """Return the default working directory for Gemini CLI."""
+    return _DEFAULT_CWD
+
+
 def on_install():
     """Callback for the Install button in Options."""
     from plugin.modules.launcher import run_install_for_provider

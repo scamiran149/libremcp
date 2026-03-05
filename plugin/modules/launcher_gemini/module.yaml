@@ -1,15 +1,16 @@
 name: launcher.gemini
 title: Gemini CLI provider
 requires: [launcher_manager]
-config_inline: true
+config_inline: false
 
 config:
   cwd:
     type: string
     default: ""
+    default_provider: "plugin.modules.launcher_gemini:get_default_cwd"
     widget: folder
     label: Working Directory
-    helper: "Directory to launch Gemini CLI in. Empty = ~/.local/share/nelson/cli/gemini/"
+    helper: "Directory to launch Gemini CLI in. Clear to restore default."
   args:
     type: string
     default: ""

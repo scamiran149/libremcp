@@ -51,8 +51,11 @@ gh release upload v1.x.y build/nelson.oxt
 
 ```
 module.yaml -> generate_manifest.py -> _manifest.py + XCS/XCU + XDL
-extension/ + plugin/ + vendor/ -> build_oxt.py -> .oxt
+icon.svg    -> magick (ImageMagick)  -> build/generated/assets/*.png
+extension/ + plugin/ + vendor/ + build/generated/ -> build_oxt.py -> .oxt
 ```
+
+**Icons**: PNGs are generated from `extension/assets/icon.svg` into `build/generated/assets/` (requires ImageMagick `magick`). The Docker builder includes ImageMagick — use `make docker-build` if `magick` is not installed locally.
 
 ## Module structure
 

@@ -1,11 +1,13 @@
 # install.ps1 — Set up the Nelson MCP development environment (Windows).
 #
 # Usage:
-#   .\install.ps1          Install dev dependencies
-#   .\install.ps1 -Check   Verify environment only
+#   .\install.ps1                  Install dev dependencies
+#   .\install.ps1 -Check           Verify environment only
+#   .\install.ps1 -Docker          Also install Docker Desktop
 
 param(
-    [switch]$Check
+    [switch]$Check,
+    [switch]$Docker
 )
 
 $ErrorActionPreference = "Stop"
@@ -143,6 +145,40 @@ if (Get-Command make -ErrorAction SilentlyContinue) {
     } else {
         Write-Warn "make install failed -- install manually: winget install GnuWin32.Make"
     }
+}
+
+# -- Docker Desktop (optional, via -Docker flag) ---------------------------
+
+$dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+if ($dockerCmd) {
+    $dockerVer = & docker --version 2>&1 | Select-Object -First 1
+    Write-Ok "Docker found: $dockerVer"
+    if ($Docker -and -not $Check) {
+        $makefileLocal = Join-Path $PSScriptRoot "Makefile.local"
+        if (-not (Test-Path $makefileLocal) -or -not (Select-String -Path $makefileLocal -Pattern "USE_DOCKER" -Quiet)) {
+            "USE_DOCKER = 1" | Out-File -Append -Encoding utf8 $makefileLocal
+            Write-Ok "Makefile.local: USE_DOCKER = 1"
+        } else {
+            Write-Ok "Makefile.local already has USE_DOCKER"
+        }
+    }
+} elseif ($Docker -and -not $Check) {
+    Write-Host "Installing Docker Desktop via winget..."
+    Start-Process -FilePath winget -ArgumentList "install","--id","Docker.DockerDesktop","--accept-package-agreements","--accept-source-agreements" -Wait -PassThru -NoNewWindow 2>$null
+    $makefileLocal = Join-Path $PSScriptRoot "Makefile.local"
+    if (-not (Test-Path $makefileLocal) -or -not (Select-String -Path $makefileLocal -Pattern "USE_DOCKER" -Quiet)) {
+        "USE_DOCKER = 1" | Out-File -Append -Encoding utf8 $makefileLocal
+        Write-Ok "Makefile.local: USE_DOCKER = 1"
+    }
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        Write-Ok "Docker Desktop installed"
+    } else {
+        Write-Warn "Docker Desktop installed -- restart your terminal (or reboot) to use it"
+    }
+} elseif ($Docker -and $Check) {
+    Write-Warn "Docker not found (install with: .\install.ps1 -Docker)"
+} else {
+    # Docker not requested, skip silently
 }
 
 # -- openssl ---------------------------------------------------------------

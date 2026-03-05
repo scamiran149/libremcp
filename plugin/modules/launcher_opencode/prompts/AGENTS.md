@@ -1,47 +1,107 @@
-You are working with a LibreOffice document through **Nelson MCP**.
+# Nelson MCP — How to work with LibreOffice documents
 
-## Quick start
+You have access to Nelson MCP tools. These tools let you read, edit, and manage documents open in LibreOffice.
 
-1. Call `get_document_info` to know the document type (writer, calc, draw).
-2. For **Writer** documents, call `get_document_tree` (depth=0) to see the full heading structure. Use the returned `_mcp_` bookmarks for stable addressing — prefer `bookmark:_mcp_xxx` locators over paragraph indices.
-3. Drill into sections with `get_heading_children` or `read_paragraphs`.
-4. Use `search_fulltext` for boolean queries (AND, OR, NOT, NEAR/N).
+## Step 1: Find the document
 
-## Document management
+First, check if a document is already open:
 
-- **`get_recent_documents`** — List recently opened documents from LibreOffice history.
-- **`open_document`** — Open a file by its absolute path.
-- **`create_document`** — Create a new empty document (writer, calc, draw, impress).
-- **`save_document`** — Save the current document (must already have a file path).
-- **`save_document_as`** — Save a copy to a new path (also works for unsaved documents).
-- **`export_pdf`** — Export the current document as PDF.
-- **`close_document`** — Close the current document.
-- **`list_open_documents`** — See all currently open documents.
+```
+get_document_info()
+```
 
-You can work with unsaved documents — just use `save_document_as` to save them when needed.
+If no document is open, find one to work with:
 
-## Exploring large documents
+```
+list_open_documents()        # see all open documents
+get_recent_documents()       # see recently opened files
+open_document(file_path="/home/user/mydoc.odt")   # open a file
+create_document(doc_type="writer")                 # create new empty document
+```
 
-For large documents, use a top-down approach to avoid reading too much content at once:
+## Step 2: Read the document
 
-1. `get_document_tree(depth=1)` — Get top-level headings only (with `_mcp_` bookmarks).
-2. `get_heading_children(locator="bookmark:_mcp_xxx")` — Drill into a specific section.
-3. `get_heading_content(heading_path="2.3")` — Read content under a heading by path (e.g., 3rd child of 2nd heading).
-4. `search_fulltext(query="...")` — Search across the entire document without reading it all.
-5. `get_document_stats` — Check document size (word count, page count) before deciding how to read.
+For Writer documents, get the structure first:
 
-This lets you navigate documents of any size efficiently without hitting context limits.
+```
+get_document_tree(depth=0)   # shows all headings with bookmark IDs
+```
 
-## Key concepts
+This returns headings with `_mcp_` bookmark IDs like `_mcp_h1`, `_mcp_h2`, etc. Use these IDs to read specific sections:
 
-- **Locators** — Most tools accept a `locator` parameter. Prefer stable forms: `bookmark:_mcp_xxx` or `heading_text:Title`. Use `paragraph:N` only as a fallback.
-- **Tool tiers** — Core tools are always available. Extended tools require activation: call `list_available_tools` then `request_tools(intent="edit")` to unlock editing tools.
-- **Intent groups** — `navigate`, `edit`, `review`, `media`. Request the group you need.
-- **Batch operations** — Use `execute_batch` to chain multiple edits efficiently. Use `$last` to reference the previous step's paragraph index.
+```
+get_heading_content(heading_path="1")        # read first heading section
+read_paragraphs(start=0, count=20)           # read first 20 paragraphs
+read_paragraphs(locator="heading_text:Annexes", count=10)  # read from a heading by name
+read_paragraphs(locator="bookmark:_mcp_h3", count=10)      # read from a bookmark ID
+search_in_document(query="budget")           # find text in document
+```
 
-## Common patterns
+## Step 3: Edit the document
 
-- **Read before edit** — Always read the target content before modifying it.
-- **Track changes** — For significant edits, enable `set_track_changes(enabled=true)` first.
-- **Style names are localized** — Call `list_styles` to discover exact names before applying styles.
-- **Tables** — Use `list_tables` → `read_table` → `write_table_cell` (Excel-style A1 refs).
+Before editing, you need to unlock edit tools:
+
+```
+request_tools(intent="edit")
+```
+
+Now you can edit:
+
+```
+set_paragraph_text(index=5, text="New text here")
+insert_at_paragraph(index=10, text="Inserted paragraph")
+delete_paragraph(index=3)
+replace_in_document(find="old text", replace="new text")
+```
+
+## Step 4: Save
+
+```
+save_document()                                    # save to current file
+save_document_as(target_path="/home/user/new.odt") # save as new file
+export_pdf(path="/home/user/output.pdf")           # export as PDF
+```
+
+## Important rules
+
+1. **Always call `get_document_info` first** to know what document you are working with. If no document is open, call `get_recent_documents` to find one, then `open_document` to open it.
+2. **Read before you edit.** Always read the content before changing it.
+3. **Use locators for navigation.** Many tools accept a `locator` parameter. Use `bookmark:_mcp_h1` (from `get_document_tree`) or `heading_text:Introduction` (by heading name). These are more reliable than paragraph numbers.
+4. **Call `request_tools(intent="edit")` before editing.** Edit tools are not available by default.
+5. **Style names depend on language.** Call `list_styles(family="paragraph")` to see available style names before applying styles.
+
+## Working with tables
+
+```
+list_tables()                          # see all tables
+read_table(table_index=0)             # read first table
+write_table_cell(table_index=0, cell="A1", value="Hello")  # write to cell
+```
+
+## Searching
+
+```
+search_in_document(query="word")                # simple text search
+search_fulltext(query="budget AND 2024")        # advanced search with AND, OR, NOT
+find_text(search_string="exact phrase")         # find exact text with position
+```
+
+## Batch edits
+
+To make multiple changes at once, use `execute_batch`:
+
+```
+execute_batch(operations=[
+  {"tool": "set_paragraph_text", "args": {"index": 0, "text": "Title"}},
+  {"tool": "set_paragraph_text", "args": {"index": 1, "text": "Subtitle"}},
+  {"tool": "insert_at_paragraph", "args": {"index": 2, "text": "New paragraph"}}
+])
+```
+
+## Other useful tools
+
+- `get_document_stats()` — word count, page count, paragraph count
+- `list_images()` / `insert_image()` — work with images
+- `list_comments()` / `add_comment()` — work with comments
+- `set_track_changes(enabled=true)` — enable change tracking before big edits
+- `list_bookmarks()` — see all bookmarks in the document

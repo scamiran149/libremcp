@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] — 2026-03-05
+
+### Added
+
+- **Options page scrollbar** — pages with overflowing content now get a vertical scrollbar at runtime
+- **Ollama model selector** — OpenCode config has a dropdown populated from installed Ollama models
+
+### Changed
+
+- **Windows launcher fixes** — proper `CREATE_NEW_CONSOLE` subprocess, PowerShell quoting for args with spaces, "Press Enter to close" on exit
+- **Recent documents tool** — rewritten to use LO configuration registry (`PickList` history)
+- **Sidebar panel background** — reads system DialogColor from LO theme instead of hardcoded value (fixes black background on Windows)
+- **Launcher CWD defaults** — empty CWD field now shows the default path via `default_provider`; helper says "Clear to restore default"
+- **OpenCode AGENTS.md** — rewritten for small local models: step-by-step workflow, concrete tool call examples, locator patterns (`bookmark:`, `heading_text:`)
+
+### Removed
+
+- `--continue` flag from OpenCode default args (caused stale session issues)
+
 ## [0.2.0] — 2026-03-05
 
 ### Added

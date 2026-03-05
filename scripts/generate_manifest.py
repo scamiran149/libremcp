@@ -210,6 +210,7 @@ import xml.etree.ElementTree as ET
 # Layout constants for XDL pages (dialog units)
 _PAGE_WIDTH = 260
 _PAGE_HEIGHT = 260
+_SCROLLBAR_WIDTH = 12
 _MARGIN = 6
 _LABEL_WIDTH = 100
 _FIELD_X = 110
@@ -735,6 +736,18 @@ def generate_xdl(module_name, config_fields, title=None,
                 prefixed = "%s__%s" % (child_safe, field_name)
                 y = _emit_field(board, prefixed, widget, schema, y)
 
+    # If content exceeds page height, store final y for runtime scrollbar
+    # and widen the window so the scrollbar sits outside the content area
+    if y > _PAGE_HEIGHT:
+        window.set(_dlg("width"), str(_PAGE_WIDTH + _SCROLLBAR_WIDTH))
+        ET.SubElement(board, _dlg("text"), {
+            _dlg("id"): "__content_height__",
+            _dlg("tab-index"): "0",
+            _dlg("left"): "0", _dlg("top"): "0",
+            _dlg("width"): "0", _dlg("height"): "0",
+            _dlg("value"): str(y),
+        })
+
     return _xdl_to_string(window)
 
 
@@ -848,6 +861,18 @@ def generate_list_detail_xdl(module_name, field_name, schema):
         ctrl_id = "%s__%s" % (field_name, item_fname)
         widget = item_schema.get("widget", "text")
         y = _emit_field(board, ctrl_id, widget, item_schema, y)
+
+    # If content exceeds page height, store final y for runtime scrollbar
+    # and widen the window so the scrollbar sits outside the content area
+    if y > _PAGE_HEIGHT:
+        window.set(_dlg("width"), str(_PAGE_WIDTH + _SCROLLBAR_WIDTH))
+        ET.SubElement(board, _dlg("text"), {
+            _dlg("id"): "__content_height__",
+            _dlg("tab-index"): "0",
+            _dlg("left"): "0", _dlg("top"): "0",
+            _dlg("width"): "0", _dlg("height"): "0",
+            _dlg("value"): str(y),
+        })
 
     return _xdl_to_string(window)
 

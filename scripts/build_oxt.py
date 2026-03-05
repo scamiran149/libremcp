@@ -79,6 +79,7 @@ EXCLUDE_PATTERNS = (
 GENERATED_INCLUDES = [
     "build/generated/registry/",
     "build/generated/dialogs/",
+    "build/generated/assets/",
     "build/generated/OptionsDialog.xcu",
     "build/generated/Addons.xcu",
     "build/generated/Accelerators.xcu",
