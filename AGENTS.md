@@ -36,6 +36,8 @@ make set-config             # List all config keys
 make help                   # All targets
 ```
 
+> **AI agent note:** `make deploy` takes 60–120 seconds (kills LO, reinstalls extension, restarts LO, waits for bootstrap). **Do not** pipe its output (`| tail`, `| grep`) — this causes buffering freezes. Run it plain with a long timeout (300s+). The `OSError: Address already in use` on port 8766 after repeated deploys is benign.
+
 ## Release
 
 ```bash

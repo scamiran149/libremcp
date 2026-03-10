@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Doc-type parameter namespacing** — `_flatten_doc_type_params()` in `ToolRegistry` allows tools to declare doc-type-specific params as nested objects (`"writer": {...}`, `"calc": {...}`) that are auto-flattened before execution
 - **`get_draw_page()` bridge function** — resolves the correct `DrawPage` for any document type (Writer single page, Calc per-sheet, Draw/Impress multi-page)
 - **Tool coverage analysis** — `docs/analysis/tool-coverage.md` with UNO API overlap research, unification roadmap, and doc-type namespacing design
+- **Calc search tools** — `search_in_spreadsheet` and `replace_in_spreadsheet` with per-sheet and all-sheets modes
+- **Calc comment tools** — `list_cell_comments`, `add_cell_comment`, `delete_cell_comment` via `XSheetAnnotation` API
+- **Calc navigation tools** — `list_named_ranges` and `get_sheet_overview` (used area, charts, annotations, shapes)
+- **Impress speaker notes** — `get_speaker_notes` and `set_speaker_notes` (first Impress-only tools)
+- **Print tool** — `print_document` for all document types via `XPrintable`
+- **Undo/Redo tools** — `undo` and `redo` for all document types via `XUndoManager`
 
 ### Changed
 
