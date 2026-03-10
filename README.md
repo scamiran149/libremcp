@@ -18,8 +18,8 @@ Nelson MCP runs an HTTP server inside LibreOffice and speaks the [Model Context 
 
 ## Features
 
-- **40+ document tools** — read content, edit text, manage styles, insert images, handle tables, track changes, navigate headings, search, and more
-- **Writer, Calc, Draw** — tools adapt to the active document type
+- **100+ document tools** — read content, edit text, manage styles, insert images, handle tables, charts, conditional formatting, hyperlinks, track changes, navigate headings, search, and more
+- **Writer, Calc, Draw, Impress** — tools adapt to the active document type
 - **Calc `=PROMPT()`** — call an LLM directly from a spreadsheet cell
 - **Built-in launchers** — launch Claude Code, Gemini CLI, or OpenCode directly from LibreOffice with one click. Nelson handles MCP config, prompt injection, and working directory setup automatically
 - **AI image generation** — generate and edit images from text prompts using Stable Diffusion (A1111/Forge), OpenAI, or AI Horde. One-click detect/install/launch for Automatic1111
@@ -33,7 +33,7 @@ Nelson MCP runs an HTTP server inside LibreOffice and speaks the [Model Context 
 1. Download the latest `.oxt` from the [releases page](https://github.com/quazardous/nelson-mcp/releases)
 2. In LibreOffice: **Tools > Extension Manager > Add**
 3. Restart LibreOffice
-4. The MCP server starts automatically (default: `http://localhost:8765/mcp`)
+4. The MCP server starts automatically (default: `http://localhost:8766/mcp`)
 
 ## Quick start
 
@@ -43,7 +43,7 @@ Once installed, point your MCP client at the server:
 {
   "mcpServers": {
     "nelson": {
-      "url": "http://localhost:8765/mcp"
+      "url": "http://localhost:8766/mcp"
     }
   }
 }
@@ -59,8 +59,8 @@ Open a document in LibreOffice, then ask your AI client to read or edit it.
 | `writer` | Content editing, comments, styles, tables, change tracking |
 | `writer.nav` | Heading tree, bookmarks, proximity navigation |
 | `writer.index` | Full-text search with Snowball stemming |
-| `calc` | Cells, sheets, formulas, charts |
-| `draw` | Shapes, pages, slides (Draw and Impress) |
+| `calc` | Cells, sheets, formulas, charts, conditional formatting, comments |
+| `draw` | Shapes, pages, slides, placeholders, master slides, transitions (Draw and Impress) |
 | `images` | Image generation and editing (pluggable providers) |
 | `batch` | Multi-tool execution with variable chaining |
 | `http` | Shared HTTP server with optional SSL |
