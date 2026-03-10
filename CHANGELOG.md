@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.3] — 2026-03-10
+
+### Added
+
+- **Slide placeholders** — `list_placeholders`, `get_placeholder_text`, `set_placeholder_text` for Impress/Draw with role detection (title, subtitle, body) via ClassName or positional heuristic
+- **`write_cell_range`** — bulk-write a 2D array of values to Calc cells (strings, numbers, booleans, formulas, null)
+- **Hyperlink edit/remove** — `edit_hyperlink` and `remove_hyperlink` for Writer (inline HyperLinkURL + TextField.URL) and Calc (cell text fields)
+- **`requires_doc` attribute** — `ToolBase.requires_doc = False` allows `create_document`, `open_document`, `list_open_documents`, `get_recent_documents` to work when no document is open
+
+### Fixed
+
+- **`create_document` with no doc open** — MCP protocol no longer blocks tools when no document is open; checks `requires_doc` attribute before rejecting
+- **`insert_hyperlink` Writer** — fixed `IllegalArgumentException` by using inline `HyperLinkURL` property instead of `TextField.URL` via `insertTextContent()`
+- **`insert_hyperlink` Calc double kwargs** — filtered shared params from kwargs to avoid `got multiple values` error
+- **Conditional formatting entry parsing** — `_entry_to_dict()` now uses `XSheetCondition` interface methods (getOperator/getFormula1/getFormula2) instead of broken `getPropertyValues()`
+
 ## [0.3.2] — 2026-03-10
 
 ### Added

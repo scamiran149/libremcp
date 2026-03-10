@@ -457,6 +457,104 @@ class ImportCsv(ToolBase):
             return {"status": "error", "error": str(e)}
 
 
+class WriteCellRangeFromLists(ToolBase):
+    """Write a 2D array of values to a cell range."""
+
+    name = "write_cell_range"
+    intent = "edit"
+    description = (
+        "Write a 2D array of values to cells starting at a given cell. "
+        "Each inner array is a row. Values can be strings, numbers, or "
+        "formulas (starting with '='). "
+        "Example: values=[[\"Name\",\"Age\"],[\"Alice\",30]] at start_cell='A1'."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "start_cell": {
+                "type": "string",
+                "description": "Top-left cell to start writing (e.g. 'A1').",
+            },
+            "values": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": ["string", "number", "boolean", "null"],
+                    },
+                },
+                "description": (
+                    "2D array of values. Each inner array is a row. "
+                    "Strings starting with '=' are treated as formulas."
+                ),
+            },
+            "sheet_name": {
+                "type": "string",
+                "description": "Sheet name (active sheet if omitted).",
+            },
+        },
+        "required": ["start_cell", "values"],
+    }
+    doc_types = ["calc"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        from plugin.modules.calc.address_utils import column_to_index, parse_range_string
+        doc = ctx.doc
+        start_cell = kwargs["start_cell"]
+        values = kwargs["values"]
+        sheet_name = kwargs.get("sheet_name")
+
+        try:
+            if sheet_name:
+                sheets = doc.getSheets()
+                if not sheets.hasByName(sheet_name):
+                    return {"status": "error", "message": "Sheet not found: %s" % sheet_name}
+                sheet = sheets.getByName(sheet_name)
+            else:
+                sheet = doc.getCurrentController().getActiveSheet()
+
+            # Parse start cell
+            (start_col, start_row), _ = parse_range_string(start_cell)
+
+            rows_written = 0
+            cols_written = 0
+            for r_idx, row in enumerate(values):
+                if not isinstance(row, (list, tuple)):
+                    continue
+                for c_idx, val in enumerate(row):
+                    cell = sheet.getCellByPosition(
+                        start_col + c_idx, start_row + r_idx
+                    )
+                    if val is None or val == "":
+                        cell.setString("")
+                    elif isinstance(val, str) and val.startswith("="):
+                        cell.setFormula(val)
+                    elif isinstance(val, (int, float)):
+                        cell.setValue(float(val))
+                    elif isinstance(val, bool):
+                        cell.setValue(1.0 if val else 0.0)
+                    else:
+                        # Try numeric conversion
+                        try:
+                            cell.setValue(float(val))
+                        except (ValueError, TypeError):
+                            cell.setString(str(val))
+                    if c_idx + 1 > cols_written:
+                        cols_written = c_idx + 1
+                rows_written = r_idx + 1
+
+            return {
+                "status": "ok",
+                "message": "Wrote %d rows, %d cols starting at %s." % (
+                    rows_written, cols_written, start_cell
+                ),
+            }
+        except Exception as e:
+            logger.exception("write_cell_range failed")
+            return {"status": "error", "error": str(e)}
+
+
 class DeleteStructure(ToolBase):
     """Delete rows or columns."""
 

@@ -343,7 +343,7 @@ class MCPProtocolHandler:
 
         # Resolve active document
         doc = None
-        doc_type = "writer"
+        doc_type = None
         try:
             doc_svc = svc_registry.document
             doc = doc_svc.get_active_document()
@@ -352,7 +352,9 @@ class MCPProtocolHandler:
         except Exception:
             pass
 
-        if doc is None:
+        # Check if tool requires an open document
+        tool = registry._tools.get(tool_name)
+        if doc is None and (tool is None or tool.requires_doc):
             return {"status": "error",
                     "message": "No document open in LibreOffice."}
 

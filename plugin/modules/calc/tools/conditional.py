@@ -83,11 +83,17 @@ def _entry_to_dict(entry, idx):
             result["formula2"] = f2
     except Exception:
         pass
-    # XPropertySet property
+    # StyleName — try XPropertySet, then direct attribute
     try:
-        result["style_name"] = entry.getPropertyValue("StyleName")
+        sn = entry.getPropertyValue("StyleName")
+        if sn:
+            result["style_name"] = sn
     except Exception:
-        pass
+        try:
+            if hasattr(entry, "StyleName") and entry.StyleName:
+                result["style_name"] = entry.StyleName
+        except Exception:
+            log.debug("Could not read StyleName from conditional entry %d", idx)
     return result
 
 

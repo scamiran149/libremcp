@@ -31,6 +31,9 @@ class ToolBase(ABC):
         is_mutation:  Whether the tool mutates the document.  ``None``
                      means auto-detect from name prefix.
         long_running: Hint that the tool may take a while (e.g. image gen).
+        requires_doc: Whether the tool needs an open document.  Set to
+                     False for tools like create_document, open_document
+                     that should work without any document open.
     """
 
     name: Optional[str] = None
@@ -41,6 +44,7 @@ class ToolBase(ABC):
     intent: Optional[str] = None
     is_mutation: Optional[bool] = None
     long_running: bool = False
+    requires_doc: bool = True
 
     def detects_mutation(self) -> bool:
         """Return True if the tool mutates the document."""

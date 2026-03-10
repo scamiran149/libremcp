@@ -211,6 +211,7 @@ class CreateDocument(ToolBase):
     }
     doc_types = None
     is_mutation = False
+    requires_doc = False
 
     def execute(self, ctx, **kwargs):
         doc_type = kwargs["doc_type"]
@@ -260,6 +261,7 @@ class OpenDocument(ToolBase):
     }
     doc_types = None
     is_mutation = False
+    requires_doc = False
 
     def execute(self, ctx, **kwargs):
         file_path = kwargs["file_path"]
@@ -393,6 +395,7 @@ class ListOpenDocuments(ToolBase):
         "required": [],
     }
     doc_types = None
+    requires_doc = False
 
     def execute(self, ctx, **kwargs):
         try:
@@ -479,6 +482,7 @@ class GetRecentDocuments(ToolBase):
         "required": [],
     }
     doc_types = None
+    requires_doc = False
 
     def execute(self, ctx, **kwargs):
         max_count = kwargs.get("max_count", 20)

@@ -5,8 +5,8 @@
 
 """Cross-document hyperlink tools.
 
-Writer: inserts via XTextField (URL field) or sets HyperLinkURL on text range.
-Calc: sets HyperLinkURL property on cell.
+Writer: inserts via HyperLinkURL on text range, scans text portions.
+Calc: uses TextField.URL on cells.
 Draw/Impress: not supported (shapes have their own URL interaction).
 """
 
@@ -292,3 +292,348 @@ class InsertHyperlink(ToolBase):
             return {"status": "ok", "cell": cell_ref, "url": url, "text": text}
         except Exception as e:
             return {"status": "error", "error": str(e)}
+
+
+class RemoveHyperlink(ToolBase):
+    """Remove a hyperlink from the document."""
+
+    name = "remove_hyperlink"
+    intent = "edit"
+    description = (
+        "Remove a hyperlink by index (from list_hyperlinks). "
+        "In Writer, clears HyperLinkURL on the text portion. "
+        "In Calc, removes the URL text field from the cell. "
+        "The display text is preserved."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "index": {
+                "type": "integer",
+                "description": "Hyperlink index (from list_hyperlinks).",
+            },
+            "calc": {
+                "type": "object",
+                "description": "Calc options",
+                "properties": {
+                    "sheet_name": {
+                        "type": "string",
+                        "description": "Sheet name (active sheet if omitted).",
+                    },
+                },
+            },
+        },
+        "required": ["index"],
+    }
+    doc_types = ["writer", "calc"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        target_index = kwargs["index"]
+        if ctx.doc_type == "writer":
+            return self._remove_writer(ctx, target_index)
+        return self._remove_calc(ctx, target_index, kwargs.get("sheet_name"))
+
+    def _remove_writer(self, ctx, target_index):
+        """Remove a hyperlink in Writer by clearing HyperLinkURL."""
+        doc = ctx.doc
+        idx = 0
+
+        # Scan text fields first
+        try:
+            fields = doc.getTextFields()
+            enum = fields.createEnumeration()
+            while enum.hasMoreElements():
+                field = enum.nextElement()
+                try:
+                    if field.supportsService("com.sun.star.text.TextField.URL"):
+                        url = field.getPropertyValue("URL")
+                        if url:
+                            if idx == target_index:
+                                # Remove the text field, replace with plain text
+                                anchor = field.getAnchor()
+                                text_content = anchor.getString()
+                                doc.getText().removeTextContent(field)
+                                return {
+                                    "status": "ok",
+                                    "removed_index": target_index,
+                                    "type": "field",
+                                    "preserved_text": text_content,
+                                }
+                            idx += 1
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Scan inline hyperlinks
+        try:
+            text = doc.getText()
+            enum = text.createEnumeration()
+            while enum.hasMoreElements():
+                para = enum.nextElement()
+                if not hasattr(para, "createEnumeration"):
+                    continue
+                portions = para.createEnumeration()
+                while portions.hasMoreElements():
+                    portion = portions.nextElement()
+                    try:
+                        url = portion.getPropertyValue("HyperLinkURL")
+                        if url:
+                            if idx == target_index:
+                                portion.setPropertyValue("HyperLinkURL", "")
+                                portion.setPropertyValue("HyperLinkName", "")
+                                portion.setPropertyValue("HyperLinkTarget", "")
+                                return {
+                                    "status": "ok",
+                                    "removed_index": target_index,
+                                    "type": "inline",
+                                    "preserved_text": portion.getString(),
+                                }
+                            idx += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+
+    def _remove_calc(self, ctx, target_index, sheet_name=None):
+        """Remove a hyperlink in Calc by clearing the URL field."""
+        doc = ctx.doc
+        if sheet_name:
+            sheets = doc.getSheets()
+            if not sheets.hasByName(sheet_name):
+                return {"status": "error", "message": "Sheet not found: %s" % sheet_name}
+            sheet = sheets.getByName(sheet_name)
+        else:
+            sheet = doc.getCurrentController().getActiveSheet()
+
+        try:
+            cursor = sheet.createCursor()
+            cursor.gotoStartOfUsedArea(False)
+            cursor.gotoEndOfUsedArea(True)
+            ra = cursor.getRangeAddress()
+
+            from plugin.modules.calc.address_utils import index_to_column
+            idx = 0
+            for r in range(ra.StartRow, ra.EndRow + 1):
+                for c in range(ra.StartColumn, ra.EndColumn + 1):
+                    cell = sheet.getCellByPosition(c, r)
+                    try:
+                        tf = cell.getTextFields()
+                        if tf and tf.getCount() > 0:
+                            for fi in range(tf.getCount()):
+                                field = tf.getByIndex(fi)
+                                url = field.getPropertyValue("URL")
+                                if url:
+                                    if idx == target_index:
+                                        # Keep the display text, remove the field
+                                        display = cell.getString()
+                                        cell_text = cell.getText()
+                                        cell_text.removeTextContent(field)
+                                        cell.setString(display)
+                                        cell_ref = "%s%d" % (index_to_column(c), r + 1)
+                                        return {
+                                            "status": "ok",
+                                            "removed_index": target_index,
+                                            "cell": cell_ref,
+                                            "preserved_text": display,
+                                        }
+                                    idx += 1
+                    except Exception:
+                        pass
+        except Exception as e:
+            log.debug("remove_hyperlink calc: %s", e)
+
+        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+
+
+class EditHyperlink(ToolBase):
+    """Edit an existing hyperlink."""
+
+    name = "edit_hyperlink"
+    intent = "edit"
+    description = (
+        "Edit an existing hyperlink by index (from list_hyperlinks). "
+        "Can change the URL and/or display text."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "index": {
+                "type": "integer",
+                "description": "Hyperlink index (from list_hyperlinks).",
+            },
+            "url": {
+                "type": "string",
+                "description": "New URL (unchanged if omitted).",
+            },
+            "text": {
+                "type": "string",
+                "description": "New display text (unchanged if omitted).",
+            },
+            "calc": {
+                "type": "object",
+                "description": "Calc options",
+                "properties": {
+                    "sheet_name": {
+                        "type": "string",
+                        "description": "Sheet name (active sheet if omitted).",
+                    },
+                },
+            },
+        },
+        "required": ["index"],
+    }
+    doc_types = ["writer", "calc"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        target_index = kwargs["index"]
+        new_url = kwargs.get("url")
+        new_text = kwargs.get("text")
+        if new_url is None and new_text is None:
+            return {"status": "error", "message": "Specify url and/or text to change."}
+
+        if ctx.doc_type == "writer":
+            return self._edit_writer(ctx, target_index, new_url, new_text)
+        return self._edit_calc(ctx, target_index, new_url, new_text,
+                               kwargs.get("sheet_name"))
+
+    def _edit_writer(self, ctx, target_index, new_url, new_text):
+        """Edit a hyperlink in Writer."""
+        doc = ctx.doc
+        idx = 0
+
+        # Scan text fields
+        try:
+            fields = doc.getTextFields()
+            enum = fields.createEnumeration()
+            while enum.hasMoreElements():
+                field = enum.nextElement()
+                try:
+                    if field.supportsService("com.sun.star.text.TextField.URL"):
+                        url = field.getPropertyValue("URL")
+                        if url:
+                            if idx == target_index:
+                                if new_url is not None:
+                                    field.setPropertyValue("URL", new_url)
+                                if new_text is not None:
+                                    field.setPropertyValue("Representation", new_text)
+                                return {
+                                    "status": "ok",
+                                    "index": target_index,
+                                    "type": "field",
+                                    "url": new_url or url,
+                                    "text": new_text or field.getPropertyValue("Representation"),
+                                }
+                            idx += 1
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Scan inline hyperlinks
+        try:
+            text = doc.getText()
+            enum = text.createEnumeration()
+            while enum.hasMoreElements():
+                para = enum.nextElement()
+                if not hasattr(para, "createEnumeration"):
+                    continue
+                portions = para.createEnumeration()
+                while portions.hasMoreElements():
+                    portion = portions.nextElement()
+                    try:
+                        url = portion.getPropertyValue("HyperLinkURL")
+                        if url:
+                            if idx == target_index:
+                                if new_url is not None:
+                                    portion.setPropertyValue("HyperLinkURL", new_url)
+                                if new_text is not None:
+                                    # For inline links, we need to change the text content
+                                    portion.setString(new_text)
+                                    portion.setPropertyValue("HyperLinkName", new_text)
+                                return {
+                                    "status": "ok",
+                                    "index": target_index,
+                                    "type": "inline",
+                                    "url": new_url or url,
+                                    "text": new_text or portion.getString(),
+                                }
+                            idx += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+
+    def _edit_calc(self, ctx, target_index, new_url, new_text, sheet_name=None):
+        """Edit a hyperlink in Calc."""
+        doc = ctx.doc
+        if sheet_name:
+            sheets = doc.getSheets()
+            if not sheets.hasByName(sheet_name):
+                return {"status": "error", "message": "Sheet not found: %s" % sheet_name}
+            sheet = sheets.getByName(sheet_name)
+        else:
+            sheet = doc.getCurrentController().getActiveSheet()
+
+        try:
+            cursor = sheet.createCursor()
+            cursor.gotoStartOfUsedArea(False)
+            cursor.gotoEndOfUsedArea(True)
+            ra = cursor.getRangeAddress()
+
+            from plugin.modules.calc.address_utils import index_to_column
+            idx = 0
+            for r in range(ra.StartRow, ra.EndRow + 1):
+                for c in range(ra.StartColumn, ra.EndColumn + 1):
+                    cell = sheet.getCellByPosition(c, r)
+                    try:
+                        tf = cell.getTextFields()
+                        if tf and tf.getCount() > 0:
+                            for fi in range(tf.getCount()):
+                                field = tf.getByIndex(fi)
+                                url = field.getPropertyValue("URL")
+                                if url:
+                                    if idx == target_index:
+                                        if new_url is not None:
+                                            field.setPropertyValue("URL", new_url)
+                                        if new_text is not None:
+                                            field.setPropertyValue("Representation", new_text)
+                                            cell.setString(new_text)
+                                            # Re-insert field after text change
+                                            cell_text = cell.getText()
+                                            cur = cell_text.createTextCursor()
+                                            cur.gotoStart(False)
+                                            cur.gotoEnd(True)
+                                            new_field = doc.createInstance(
+                                                "com.sun.star.text.TextField.URL"
+                                            )
+                                            new_field.setPropertyValue(
+                                                "URL", new_url or url
+                                            )
+                                            new_field.setPropertyValue(
+                                                "Representation", new_text
+                                            )
+                                            cell_text.insertTextContent(
+                                                cur, new_field, True
+                                            )
+                                        cell_ref = "%s%d" % (index_to_column(c), r + 1)
+                                        return {
+                                            "status": "ok",
+                                            "index": target_index,
+                                            "cell": cell_ref,
+                                            "url": new_url or url,
+                                            "text": new_text or cell.getString(),
+                                        }
+                                    idx += 1
+                    except Exception:
+                        pass
+        except Exception as e:
+            log.debug("edit_hyperlink calc: %s", e)
+
+        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
