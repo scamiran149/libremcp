@@ -43,6 +43,7 @@ Once installed, point your MCP client at the server:
 {
   "mcpServers": {
     "nelson": {
+      "type": "http",
       "url": "http://localhost:8766/mcp"
     }
   }
