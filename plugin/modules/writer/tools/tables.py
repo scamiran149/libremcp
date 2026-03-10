@@ -273,6 +273,481 @@ class CreateTable(ToolBase):
 
 
 # ------------------------------------------------------------------
+# DeleteTable
+# ------------------------------------------------------------------
+
+class DeleteTable(ToolBase):
+    """Delete a table from the document."""
+
+    name = "delete_table"
+    intent = "edit"
+    description = "Delete a named table from the Writer document."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name from list_tables.",
+            },
+        },
+        "required": ["table_name"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        try:
+            anchor = table.getAnchor()
+            text = anchor.getText()
+            text.removeTextContent(table)
+            return {"status": "ok", "deleted": table_name}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+
+# ------------------------------------------------------------------
+# SetTableProperties
+# ------------------------------------------------------------------
+
+class SetTableProperties(ToolBase):
+    """Set table layout properties: width, alignment, equal columns."""
+
+    name = "set_table_properties"
+    intent = "edit"
+    description = (
+        "Set layout properties on a Writer table: width, alignment, "
+        "equal-width columns, repeat header row, background color. "
+        "Use equal_columns=true to make all columns the same width."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name from list_tables.",
+            },
+            "width_mm": {
+                "type": "number",
+                "description": "Table width in millimetres.",
+            },
+            "equal_columns": {
+                "type": "boolean",
+                "description": "Set all columns to equal width (default: false).",
+            },
+            "column_widths": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": (
+                    "Relative column widths (e.g. [1, 2, 1] = 25%/50%/25%). "
+                    "Number of values must match number of columns."
+                ),
+            },
+            "alignment": {
+                "type": "string",
+                "enum": ["left", "center", "right", "full"],
+                "description": "Horizontal alignment (default: full = stretch to margins).",
+            },
+            "repeat_header": {
+                "type": "boolean",
+                "description": "Repeat first row as header on each page.",
+            },
+            "header_rows": {
+                "type": "integer",
+                "description": "Number of header rows to repeat (default: 1).",
+            },
+            "bg_color": {
+                "type": "string",
+                "description": "Background color as hex (#RRGGBB) or name.",
+            },
+        },
+        "required": ["table_name"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        updated = []
+
+        # Width
+        width_mm = kwargs.get("width_mm")
+        if width_mm is not None:
+            table.setPropertyValue("Width", int(width_mm * 100))
+            updated.append("width")
+
+        # Alignment
+        alignment = kwargs.get("alignment")
+        if alignment is not None:
+            # HoriOrientation: 0=NONE, 1=RIGHT, 2=CENTER, 3=LEFT, 4=FULL
+            align_map = {"left": 3, "center": 2, "right": 1, "full": 4, "none": 0}
+            if alignment in align_map:
+                table.setPropertyValue("HoriOrient", align_map[alignment])
+                updated.append("alignment")
+
+        # Column widths (equal or custom ratios)
+        equal = kwargs.get("equal_columns", False)
+        custom_widths = kwargs.get("column_widths")
+
+        if equal or custom_widths:
+            try:
+                cols = table.getColumns().getCount()
+                rel_sum = table.getPropertyValue("TableColumnRelativeSum")
+                seps = list(table.getPropertyValue("TableColumnSeparators"))
+
+                if cols < 2:
+                    pass  # single column, nothing to adjust
+                elif equal:
+                    # Equal-width: place separators at even intervals
+                    for i in range(len(seps)):
+                        seps[i].Position = int(rel_sum * (i + 1) / cols)
+                    table.setPropertyValue("TableColumnSeparators", tuple(seps))
+                    updated.append("equal_columns")
+                elif custom_widths and len(custom_widths) == cols:
+                    # Custom ratios
+                    total = sum(custom_widths)
+                    cumulative = 0
+                    for i in range(len(seps)):
+                        cumulative += custom_widths[i]
+                        seps[i].Position = int(rel_sum * cumulative / total)
+                    table.setPropertyValue("TableColumnSeparators", tuple(seps))
+                    updated.append("column_widths")
+                elif custom_widths:
+                    return {
+                        "status": "error",
+                        "message": "column_widths length (%d) != column count (%d)" % (
+                            len(custom_widths), cols),
+                    }
+            except Exception as e:
+                log.debug("set_table_properties: column adjust failed: %s", e)
+
+        # Repeat header
+        repeat = kwargs.get("repeat_header")
+        if repeat is not None:
+            table.setPropertyValue("RepeatHeadline", bool(repeat))
+            updated.append("repeat_header")
+
+        header_rows = kwargs.get("header_rows")
+        if header_rows is not None:
+            try:
+                table.setPropertyValue("HeaderRowCount", int(header_rows))
+                updated.append("header_rows")
+            except Exception:
+                pass
+
+        # Background color
+        bg_color = kwargs.get("bg_color")
+        if bg_color is not None:
+            color_val = _parse_color(bg_color)
+            if color_val is not None:
+                table.setPropertyValue("BackTransparent", False)
+                table.setPropertyValue("BackColor", color_val)
+                updated.append("bg_color")
+
+        return {"status": "ok", "table_name": table_name, "updated": updated}
+
+
+# ------------------------------------------------------------------
+# AddTableRows / AddTableColumns
+# ------------------------------------------------------------------
+
+class AddTableRows(ToolBase):
+    """Add rows to a Writer table."""
+
+    name = "add_table_rows"
+    intent = "edit"
+    description = "Insert one or more rows into a Writer table at a given position."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name.",
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of rows to add (default: 1).",
+            },
+            "at_index": {
+                "type": "integer",
+                "description": "Row index to insert before (appends at end if omitted).",
+            },
+        },
+        "required": ["table_name"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        rows = table.getRows()
+        count = kwargs.get("count", 1)
+        at_index = kwargs.get("at_index")
+        if at_index is None:
+            at_index = rows.getCount()
+
+        try:
+            rows.insertByIndex(at_index, count)
+            return {
+                "status": "ok",
+                "table_name": table_name,
+                "rows_added": count,
+                "at_index": at_index,
+                "total_rows": rows.getCount(),
+            }
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+
+class AddTableColumns(ToolBase):
+    """Add columns to a Writer table."""
+
+    name = "add_table_columns"
+    intent = "edit"
+    description = "Insert one or more columns into a Writer table at a given position."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name.",
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of columns to add (default: 1).",
+            },
+            "at_index": {
+                "type": "integer",
+                "description": "Column index to insert before (appends at end if omitted).",
+            },
+        },
+        "required": ["table_name"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        cols = table.getColumns()
+        count = kwargs.get("count", 1)
+        at_index = kwargs.get("at_index")
+        if at_index is None:
+            at_index = cols.getCount()
+
+        try:
+            cols.insertByIndex(at_index, count)
+            return {
+                "status": "ok",
+                "table_name": table_name,
+                "columns_added": count,
+                "at_index": at_index,
+                "total_columns": cols.getCount(),
+            }
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+
+# ------------------------------------------------------------------
+# DeleteTableRows / DeleteTableColumns
+# ------------------------------------------------------------------
+
+class DeleteTableRows(ToolBase):
+    """Delete rows from a Writer table."""
+
+    name = "delete_table_rows"
+    intent = "edit"
+    description = "Delete one or more rows from a Writer table."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name.",
+            },
+            "at_index": {
+                "type": "integer",
+                "description": "First row index to delete.",
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of rows to delete (default: 1).",
+            },
+        },
+        "required": ["table_name", "at_index"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        rows = table.getRows()
+        at_index = kwargs["at_index"]
+        count = kwargs.get("count", 1)
+
+        try:
+            rows.removeByIndex(at_index, count)
+            return {
+                "status": "ok",
+                "table_name": table_name,
+                "rows_deleted": count,
+                "total_rows": rows.getCount(),
+            }
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+
+class DeleteTableColumns(ToolBase):
+    """Delete columns from a Writer table."""
+
+    name = "delete_table_columns"
+    intent = "edit"
+    description = "Delete one or more columns from a Writer table."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name.",
+            },
+            "at_index": {
+                "type": "integer",
+                "description": "First column index to delete.",
+            },
+            "count": {
+                "type": "integer",
+                "description": "Number of columns to delete (default: 1).",
+            },
+        },
+        "required": ["table_name", "at_index"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        cols = table.getColumns()
+        at_index = kwargs["at_index"]
+        count = kwargs.get("count", 1)
+
+        try:
+            cols.removeByIndex(at_index, count)
+            return {
+                "status": "ok",
+                "table_name": table_name,
+                "columns_deleted": count,
+                "total_columns": cols.getCount(),
+            }
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+
+# ------------------------------------------------------------------
+# WriteTableRow (batch write)
+# ------------------------------------------------------------------
+
+class WriteTableRow(ToolBase):
+    """Write a full row of values to a Writer table."""
+
+    name = "write_table_row"
+    intent = "edit"
+    description = (
+        "Write a full row of values to a Writer table in one call. "
+        "More efficient than calling write_table_cell for each cell."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "table_name": {
+                "type": "string",
+                "description": "The table name.",
+            },
+            "row": {
+                "type": "integer",
+                "description": "0-based row index.",
+            },
+            "values": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Values for each column (left to right).",
+            },
+        },
+        "required": ["table_name", "row", "values"],
+    }
+    doc_types = ["writer"]
+    is_mutation = True
+
+    def execute(self, ctx, **kwargs):
+        table_name = kwargs.get("table_name", "")
+        row_idx = kwargs.get("row", 0)
+        values = kwargs.get("values", [])
+
+        doc = ctx.doc
+        tables_sup = doc.getTextTables()
+        if not tables_sup.hasByName(table_name):
+            return {"status": "error", "message": "Table '%s' not found." % table_name}
+
+        table = tables_sup.getByName(table_name)
+        cols = table.getColumns().getCount()
+
+        written = 0
+        for c in range(min(len(values), cols)):
+            col_letter = _col_letter(c)
+            cell_ref = "%s%d" % (col_letter, row_idx + 1)
+            cell_obj = table.getCellByName(cell_ref)
+            if cell_obj is None:
+                continue
+            val = values[c]
+            try:
+                cell_obj.setValue(float(val))
+            except (ValueError, TypeError):
+                cell_obj.setString(str(val))
+            written += 1
+
+        return {
+            "status": "ok",
+            "table_name": table_name,
+            "row": row_idx,
+            "cells_written": written,
+        }
+
+
+# ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 
@@ -281,3 +756,23 @@ def _col_letter(c):
     if c < 26:
         return chr(ord("A") + c)
     return "A" + chr(ord("A") + c - 26)
+
+
+def _parse_color(color_str):
+    """Parse a color string (hex or name) to integer."""
+    if not color_str:
+        return None
+    color_str = color_str.strip().lower()
+    names = {
+        "red": 0xFF0000, "green": 0x00FF00, "blue": 0x0000FF,
+        "yellow": 0xFFFF00, "white": 0xFFFFFF, "black": 0x000000,
+        "orange": 0xFF8C00, "gray": 0x808080,
+    }
+    if color_str in names:
+        return names[color_str]
+    if color_str.startswith("#"):
+        try:
+            return int(color_str[1:], 16)
+        except ValueError:
+            return None
+    return None

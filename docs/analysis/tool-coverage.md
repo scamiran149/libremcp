@@ -263,76 +263,99 @@ For complex Writer-specific image manipulation (anchor types, orientation, frame
 
 ### Quick wins (low effort, high impact)
 
-#### 7.1 Styles tools → all doc types — DONE (v0.3.1)
+#### 7.1 Styles tools → all doc types — DONE (v0.3.2)
 
 `list_styles` and `get_style_info` now use `doc_types = None` with auto-discovery of available style families.
 
-#### 7.2 Shape tools → add Writer + Calc — DONE (v0.3.1)
+#### 7.2 Shape tools → add Writer + Calc — DONE (v0.3.2)
 
 `create_shape`, `edit_shape`, `delete_shape`, `get_draw_summary` now use `doc_types = None` with `get_draw_page(ctx)` bridge helper and doc-type namespacing.
 
-#### 7.3 download_image → all types — DONE (v0.3.1)
+#### 7.3 download_image → all types — DONE (v0.3.2)
 
 Trivial change: `doc_types = None` (no UNO dependency).
 
-#### 7.4 Search → Calc — DONE (v0.3.1)
+#### 7.4 Search → Calc — DONE (v0.3.2)
 
 Separate Calc tools (`search_in_spreadsheet`, `replace_in_spreadsheet`) using `XReplaceable` on sheets. Supports per-sheet and all-sheets modes.
 
-#### 7.5 Annotations → Calc — DONE (v0.3.1)
+#### 7.5 Annotations → Calc — DONE (v0.3.2)
 
 `list_cell_comments`, `add_cell_comment`, `delete_cell_comment` via `XSheetAnnotation` API.
 
-#### 7.6 Calc navigation tools — DONE (v0.3.1)
+#### 7.6 Calc navigation tools — DONE (v0.3.2)
 
 `list_named_ranges` and `get_sheet_overview` (used area, charts, annotations, shapes).
 
-#### 7.7 Impress speaker notes — DONE (v0.3.1)
+#### 7.7 Impress speaker notes — DONE (v0.3.2)
 
 `get_speaker_notes` and `set_speaker_notes` — first Impress-only tools.
 
-#### 7.8 Print tool — DONE (v0.3.1)
+#### 7.8 Print tool — DONE (v0.3.2)
 
 `print_document` for all doc types via `XPrintable`.
 
-#### 7.9 Undo/Redo — DONE (v0.3.1)
+#### 7.9 Undo/Redo — DONE (v0.3.2)
 
 `undo` and `redo` for all doc types via `XUndoManager`.
 
-#### 7.10 Image tools — unify insert/list/info/delete — DONE (v0.3.1)
+#### 7.10 Image tools — unify insert/list/info/delete — DONE (v0.3.2)
 
 Created `framework/graphic_query.py` with cross-doc image query helpers. `insert_image`, `list_images`, `get_image_info`, `delete_image` now work on all doc types. Writer uses `getGraphicObjects()`, Calc/Draw/Impress use DrawPage shape iteration. Non-Writer tools support `shape_index` for lookup (Draw shapes often have empty names). Doc-type namespacing for `insert_image` (`writer: {locator, paragraph_index}`, `draw: {page_index, x, y}`, `calc: {sheet_name}`).
 
 Also fixed: validation now runs before `_flatten_doc_type_params()` so nested doc-type params validate against the schema correctly.
 
-#### 7.11 Impress transitions/layouts — DONE (v0.3.1)
+#### 7.11 Impress transitions/layouts — DONE (v0.3.2)
 
 `get_slide_transition`, `set_slide_transition` via `FadeEffect`/`AnimationSpeed`/`Change`/`Duration` properties. `get_slide_layout`, `set_slide_layout` via `Layout` property with 30 named layouts.
 
-### Remaining work
+### Additional tools (v0.3.2 continued)
 
-*(None — all planned items complete.)*
+#### 7.12 Writer table management tools — DONE (v0.3.2)
+
+`delete_table`, `set_table_properties` (equal columns, custom column widths, alignment, repeat header, background color, width), `add_table_rows`, `add_table_columns`, `delete_table_rows`, `delete_table_columns`, `write_table_row`. Key feature: equal column sizing via `TableColumnSeparators` with relative positions.
+
+#### 7.13 Calc chart tools — DONE (v0.3.2)
+
+`list_charts`, `get_chart_info`, `edit_chart`, `delete_chart`. Accesses embedded chart document directly via `getEmbeddedObject()` (no queryInterface needed in Python-UNO).
+
+#### 7.14 Calc conditional formatting — DONE (v0.3.2)
+
+`list_conditional_formats`, `add_conditional_format`, `remove_conditional_format`, `clear_conditional_formats` via `XSheetConditionalEntries` API. Supports operators: EQUAL, NOT_EQUAL, GREATER, LESS, BETWEEN, NOT_BETWEEN, FORMULA.
+
+#### 7.15 Master slides — DONE (v0.3.2)
+
+`list_master_slides`, `get_slide_master`, `set_slide_master` for Draw/Impress master page management.
+
+#### 7.16 Hyperlinks — DONE (v0.3.2)
+
+`list_hyperlinks` and `insert_hyperlink` for Writer and Calc. Writer scans TextField.URL and inline HyperLinkURL. Calc scans cell text fields.
 
 ---
 
-## 8. Summary matrix — current state (v0.3.1)
+## 8. Summary matrix — current state (v0.3.2)
 
 | Capability | Writer | Calc | Draw | Impress | Notes |
 |------------|:------:|:----:|:----:|:-------:|:------|
 | Content read/write | deep | basic | basic | basic | — |
-| Search/replace | yes | yes | no | no | Calc added v0.3.1 |
-| Comments/annotations | yes | yes | no | no | Calc added v0.3.1 |
-| Styles | yes | yes | yes | yes | Unified v0.3.1 |
-| Images (insert) | yes | yes | yes | yes | Unified v0.3.1 |
-| Images (list/manage) | yes | yes | yes | yes | Unified v0.3.1 |
-| Shapes | yes | yes | yes | yes | Unified v0.3.1 |
-| Navigation/outline | deep | basic | no | no | Calc added v0.3.1 |
+| Search/replace | yes | yes | no | no | Calc added v0.3.2 |
+| Comments/annotations | yes | yes | no | no | Calc added v0.3.2 |
+| Styles | yes | yes | yes | yes | Unified v0.3.2 |
+| Images (insert) | yes | yes | yes | yes | Unified v0.3.2 |
+| Images (list/manage) | yes | yes | yes | yes | Unified v0.3.2 |
+| Shapes | yes | yes | yes | yes | Unified v0.3.2 |
+| Navigation/outline | deep | basic | no | no | Calc added v0.3.2 |
 | Tracked changes | yes | no | no | no | Writer-specific |
-| Speaker notes | — | — | — | yes | Added v0.3.1 |
-| Transitions/layouts | — | — | — | yes | Added v0.3.1 |
-| Named ranges | — | yes | — | — | Added v0.3.1 |
-| Undo/redo | yes | yes | yes | yes | Added v0.3.1 |
-| Print | yes | yes | yes | yes | Added v0.3.1 |
+| Speaker notes | — | — | — | yes | Added v0.3.2 |
+| Transitions/layouts | — | — | — | yes | Added v0.3.2 |
+| Named ranges | — | yes | — | — | Added v0.3.2 |
+| Undo/redo | yes | yes | yes | yes | Added v0.3.2 |
+| Print | yes | yes | yes | yes | Added v0.3.2 |
+| Tables (manage) | yes | — | — | — | Enhanced v0.3.2 |
+| Charts | — | yes | — | — | Added v0.3.2 |
+| Conditional formatting | — | yes | — | — | Added v0.3.2 |
+| Master slides | — | — | yes | yes | Added v0.3.2 |
+| Hyperlinks | yes | yes | — | — | Added v0.3.2 |
 
 **Bold** = remaining gaps.
 
@@ -342,18 +365,23 @@ Also fixed: validation now runs before `_flatten_doc_type_params()` so nested do
 
 | # | Action | Status |
 |---|--------|--------|
-| 1 | Fix Impress/Draw detection | **DONE** v0.3.1 |
-| 2 | Delete broker.py | **DONE** v0.3.1 |
-| 3 | Add `_flatten_doc_type_params` to `ToolRegistry` | **DONE** v0.3.1 |
-| 4 | Unify styles → all doc types | **DONE** v0.3.1 |
-| 5 | Unify shapes → all doc types (with namespacing) | **DONE** v0.3.1 |
-| 6 | Unlock `download_image` → all types | **DONE** v0.3.1 |
-| 7 | Add Calc search/replace | **DONE** v0.3.1 |
-| 8 | Add Calc comments | **DONE** v0.3.1 |
-| 9 | Add Calc navigation (named ranges, overview) | **DONE** v0.3.1 |
-| 10 | Add Impress speaker notes editing | **DONE** v0.3.1 |
-| 11 | Add print tool (XPrintable, all types) | **DONE** v0.3.1 |
-| 12 | Add undo/redo tool (all types) | **DONE** v0.3.1 |
-| 13 | Unify image tools (insert/list/info/delete) | **DONE** v0.3.1 |
-| 14 | Fix validation order (validate before flatten) | **DONE** v0.3.1 |
-| 15 | Add Impress transitions/layouts | **DONE** v0.3.1 |
+| 1 | Fix Impress/Draw detection | **DONE** v0.3.2 |
+| 2 | Delete broker.py | **DONE** v0.3.2 |
+| 3 | Add `_flatten_doc_type_params` to `ToolRegistry` | **DONE** v0.3.2 |
+| 4 | Unify styles → all doc types | **DONE** v0.3.2 |
+| 5 | Unify shapes → all doc types (with namespacing) | **DONE** v0.3.2 |
+| 6 | Unlock `download_image` → all types | **DONE** v0.3.2 |
+| 7 | Add Calc search/replace | **DONE** v0.3.2 |
+| 8 | Add Calc comments | **DONE** v0.3.2 |
+| 9 | Add Calc navigation (named ranges, overview) | **DONE** v0.3.2 |
+| 10 | Add Impress speaker notes editing | **DONE** v0.3.2 |
+| 11 | Add print tool (XPrintable, all types) | **DONE** v0.3.2 |
+| 12 | Add undo/redo tool (all types) | **DONE** v0.3.2 |
+| 13 | Unify image tools (insert/list/info/delete) | **DONE** v0.3.2 |
+| 14 | Fix validation order (validate before flatten) | **DONE** v0.3.2 |
+| 15 | Add Impress transitions/layouts | **DONE** v0.3.2 |
+| 16 | Writer table management tools | **DONE** v0.3.2 |
+| 17 | Calc chart tools | **DONE** v0.3.2 |
+| 18 | Calc conditional formatting | **DONE** v0.3.2 |
+| 19 | Master slides (Draw/Impress) | **DONE** v0.3.2 |
+| 20 | Hyperlinks (Writer/Calc) | **DONE** v0.3.2 |

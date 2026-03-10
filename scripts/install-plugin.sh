@@ -272,6 +272,14 @@ install_to_cache() {
         deployed=$((deployed + 1))
     fi
 
+    # Generated assets (PNG icons from SVG)
+    if [ -d "$PROJECT_ROOT/build/generated/assets" ]; then
+        mkdir -p "$ext_dir/assets"
+        rsync -av "$PROJECT_ROOT/build/generated/assets/" "$ext_dir/assets/"
+        echo "    generated assets/ synced"
+        deployed=$((deployed + 1))
+    fi
+
     # Clean __pycache__
     find "$ext_dir" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 

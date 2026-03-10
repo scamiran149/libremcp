@@ -296,11 +296,87 @@ class CloseDocument(ToolBase):
     is_mutation = True
 
     def execute(self, ctx, **kwargs):
+        desktop = _get_desktop()
+        closing_doc = ctx.doc
+
+        # Collect other document frames before closing
+        next_frame = None
         try:
-            ctx.doc.close(False)
+            frames = desktop.getFrames()
+            frame_count = frames.getCount()
+            log.debug(
+                "close_document: %d frames before close", frame_count
+            )
+            for i in range(frame_count):
+                frame = frames.getByIndex(i)
+                try:
+                    controller = frame.getController()
+                    if controller is None:
+                        log.debug("  frame %d: no controller", i)
+                        continue
+                    model = controller.getModel()
+                    if model is None:
+                        log.debug("  frame %d: no model", i)
+                        continue
+                    frame_title = frame.getTitle()
+                    # Skip the document we're about to close
+                    # Use URL + title comparison (UNO proxy identity is unreliable)
+                    is_closing = False
+                    try:
+                        is_closing = (
+                            model.getURL() == closing_doc.getURL()
+                            and frame_title == closing_doc.getCurrentController().getFrame().getTitle()
+                        )
+                    except Exception:
+                        is_closing = (model is closing_doc)
+                    if is_closing:
+                        log.debug("  frame %d: closing doc (%s)", i, frame_title)
+                        continue
+                    # Skip non-document components (Start Center, Basic IDE)
+                    if not hasattr(model, "supportsService"):
+                        log.debug("  frame %d: not a document (%s)", i, frame_title)
+                        continue
+                    is_doc = (
+                        model.supportsService("com.sun.star.text.TextDocument")
+                        or model.supportsService("com.sun.star.sheet.SpreadsheetDocument")
+                        or model.supportsService("com.sun.star.drawing.DrawingDocument")
+                        or model.supportsService("com.sun.star.presentation.PresentationDocument")
+                    )
+                    if is_doc:
+                        log.debug("  frame %d: next doc candidate (%s)", i, frame_title)
+                        next_frame = frame
+                        break
+                    else:
+                        log.debug("  frame %d: not a supported doc (%s)", i, frame_title)
+                except Exception:
+                    log.debug("  frame %d: exception during inspection", i, exc_info=True)
+                    continue
+        except Exception:
+            log.info("Could not enumerate frames for next-doc activation", exc_info=True)
+
+        # Close the document
+        try:
+            closing_doc.close(False)
+            log.info("close_document: document closed successfully")
         except Exception as exc:
             log.exception("CloseDocument failed: %s", exc)
             return {"status": "error", "error": str(exc)}
+
+        # Activate the next document so getCurrentComponent() returns it
+        if next_frame is not None:
+            try:
+                next_frame.activate()
+                next_title = next_frame.getTitle()
+                log.info("close_document: activated next doc: %s", next_title)
+                return {
+                    "status": "ok",
+                    "message": "Document closed.",
+                    "active_document": next_title,
+                }
+            except Exception:
+                log.warning("close_document: failed to activate next frame", exc_info=True)
+        else:
+            log.info("close_document: no next frame found")
 
         return {"status": "ok", "message": "Document closed."}
 

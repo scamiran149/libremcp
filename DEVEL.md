@@ -120,17 +120,36 @@ Both do the same thing (build + unopkg remove/add), just with different levels o
 
 ## Config overrides
 
-Pass config at deploy time via `NELSON_SET_CONFIG`:
+Nelson config can be overridden at launch time via the `NELSON_SET_CONFIG` environment variable. This avoids changing persistent settings in LO's Options dialog.
+
+**Format:** `"key=value,key=value,..."` — values are auto-coerced to the type declared in the module schema (boolean, integer, string).
 
 ```bash
-make deploy NELSON_SET_CONFIG="mcp.port=9000,ai_openai.timeout=30"
+# Via make (any target that starts LO)
+make deploy NELSON_SET_CONFIG="core.log_level=DEBUG"
+make lo-start NELSON_SET_CONFIG="mcp.port=9000,core.log_level=DEBUG"
+
+# Or via environment variable directly
+NELSON_SET_CONFIG="core.log_level=DEBUG" make lo-start
 ```
 
-List all available config keys:
+### Common overrides
+
+| Key | Values | Description |
+|-----|--------|-------------|
+| `core.log_level` | `DEBUG`, `INFO`, `WARN`, `ERROR` | Plugin log verbosity (default: `WARN`). Set to `DEBUG` for full diagnostics in `~/nelson.log`. |
+| `mcp.port` | integer | MCP server port (default: `2044`) |
+| `mcp.host` | string | MCP server bind address (default: `127.0.0.1`) |
+| `http.port` | integer | HTTP API port |
+| `debug.enable_api` | `true`/`false` | Enable `/api/debug` endpoint |
+
+### List all available config keys
 
 ```bash
 make set-config
 ```
+
+This shows all module config keys with their types and defaults.
 
 ## Cross-renderer testing
 
@@ -194,6 +213,14 @@ If the requested backend is not installed, LO silently falls back to the default
 | `~/soffice-debug.log` | LO internal errors |
 
 Symlinks exist in the project root for convenience (`./nelson.log`, `./soffice-debug.log`). Created by `scripts/check-setup.sh`.
+
+**Enable verbose logging** for a session (default is `WARN`):
+
+```bash
+make lo-start NELSON_SET_CONFIG="core.log_level=DEBUG"
+```
+
+This logs tool discovery, frame enumeration, config reads, and all tool executions to `~/nelson.log`.
 
 ```bash
 make log          # Show plugin log

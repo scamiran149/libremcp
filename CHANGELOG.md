@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.3.1] — 2026-03-10
+## [0.3.2] — 2026-03-10
 
 ### Added
 
@@ -22,6 +22,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Print tool** — `print_document` for all document types via `XPrintable`
 - **Undo/Redo tools** — `undo` and `redo` for all document types via `XUndoManager`
 - **`graphic_query.py` framework helper** — cross-document image listing/lookup via `getGraphicObjects()` (Writer) and DrawPage shape iteration (Calc/Draw/Impress)
+- **Writer table tools** — `delete_table`, `set_table_properties` (equal columns, custom column widths, alignment, repeat header, background color, width), `add_table_rows`, `add_table_columns`, `delete_table_rows`, `delete_table_columns`, `write_table_row`
+- **Calc chart tools** — `list_charts`, `get_chart_info`, `edit_chart`, `delete_chart` for managing embedded charts on sheets
+- **Calc conditional formatting** — `list_conditional_formats`, `add_conditional_format`, `remove_conditional_format`, `clear_conditional_formats` via `XSheetConditionalEntries`
+- **Impress/Draw master slides** — `list_master_slides`, `get_slide_master`, `set_slide_master` for master page management
+- **Hyperlink tools** — `list_hyperlinks` and `insert_hyperlink` for Writer (URL text fields + inline HyperLinkURL) and Calc (cell text fields)
 
 ### Changed
 
@@ -32,6 +37,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Shape tools unified** — `create_shape`, `edit_shape`, `delete_shape`, `get_draw_summary` now work on all document types with drawing layer support; use doc-type namespacing for page/sheet selection
 - **Draw tools support Impress** — all `doc_types = ["draw"]` updated to `["draw", "impress"]` for pages and slide tools
 - **`download_image` unlocked** — now available on all document types (no UNO dependency)
+
+### Fixed
+
+- **close_document context loss** — closing a document no longer loses MCP context; `CloseDocument` now enumerates remaining frames and activates the next document via `frame.activate()`
+- **Cache deploy missing icons** — `make cache` now syncs `build/generated/assets/` (PNG icons generated from SVG) into the extension cache
 
 ### Removed
 

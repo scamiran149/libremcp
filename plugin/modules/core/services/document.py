@@ -77,10 +77,23 @@ class DocumentService(ServiceBase):
         """Return the active UNO document model, or None."""
         desktop = self._get_desktop()
         if desktop is None:
+            log.warning("get_active_document: desktop is None")
             return None
         try:
-            return desktop.getCurrentComponent()
+            comp = desktop.getCurrentComponent()
+            if comp is None:
+                log.warning("get_active_document: getCurrentComponent() returned None")
+            elif not hasattr(comp, "supportsService"):
+                log.warning(
+                    "get_active_document: getCurrentComponent() returned "
+                    "non-document: %s", type(comp).__name__
+                )
+                return None
+            else:
+                log.debug("get_active_document: %s", type(comp).__name__)
+            return comp
         except Exception:
+            log.exception("get_active_document failed")
             return None
 
     # ── Type detection ────────────────────────────────────────────────
