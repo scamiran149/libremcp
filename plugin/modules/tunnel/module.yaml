@@ -3,6 +3,21 @@ title: Tunnel providers for external MCP access
 requires: [config, events, http_routes]
 provides_services: [tunnel_manager]
 
+actions:
+  toggle_tunnel:
+    title: "Start Tunnel"
+    icon: stopped
+  tunnel_status:
+    title: "Tunnel Status"
+    icon: stopped
+
+menus:
+  - title: "Tunnel"
+    context: [writer, calc, draw]
+    submenu:
+      - action: toggle_tunnel
+      - action: tunnel_status
+
 config:
   auto_start:
     type: boolean

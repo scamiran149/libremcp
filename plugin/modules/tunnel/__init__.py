@@ -324,3 +324,132 @@ class TunnelModule(ModuleBase):
 
     def shutdown(self):
         self._manager.stop_tunnel()
+
+    # ── Action dispatch ──────────────────────────────────────────────
+
+    def on_action(self, action):
+        if action == "toggle_tunnel":
+            self._action_toggle()
+        elif action == "tunnel_status":
+            self._action_status()
+        else:
+            super().on_action(action)
+
+    def get_menu_text(self, action):
+        if action == "toggle_tunnel":
+            return "Stop Tunnel" if self._manager.is_running else "Start Tunnel"
+        return None
+
+    def get_menu_icon(self, action):
+        running = self._manager.is_running
+        if action == "toggle_tunnel":
+            return "stopped" if running else "running"
+        if action == "tunnel_status":
+            return "running" if running else "stopped"
+        return None
+
+    def _action_toggle(self):
+        from plugin.framework.dialogs import msgbox
+        from plugin.framework.uno_context import get_ctx
+
+        ctx = get_ctx()
+        if self._manager.is_running:
+            self._manager.stop_tunnel()
+            msgbox(ctx, "Nelson", "Tunnel stopped.")
+        else:
+            cfg = self._services.config.proxy_for(self.name)
+            provider_name = cfg.get("provider")
+            if not provider_name:
+                msgbox(ctx, "Nelson",
+                       "No tunnel provider configured.\n"
+                       "Select one in Options > Nelson MCP > Tunnel.")
+                return
+            self._manager.start_tunnel()
+            # Give it a moment to connect
+            import time
+            time.sleep(2)
+            if self._manager.public_url:
+                msgbox(ctx, "Nelson",
+                       "Tunnel started.\nURL: %s" % self._manager.public_url)
+            elif self._manager.is_running:
+                msgbox(ctx, "Nelson",
+                       "Tunnel starting...\n"
+                       "Use Tunnel Status to check when ready.")
+            else:
+                msgbox(ctx, "Nelson",
+                       "Tunnel failed to start.\nCheck ~/nelson.log")
+
+    def _action_status(self):
+        from plugin.framework.uno_context import get_ctx
+
+        ctx = get_ctx()
+        running = self._manager.is_running
+        url = self._manager.public_url or ""
+        provider = self._manager._active_provider
+
+        if not running:
+            from plugin.framework.dialogs import msgbox
+            cfg = self._services.config.proxy_for(self.name)
+            provider_name = cfg.get("provider") or "(none)"
+            msgbox(ctx, "Nelson",
+                   "Tunnel is not running.\nProvider: %s" % provider_name)
+            return
+
+        provider_name = provider.name if provider else "unknown"
+        msg = "Tunnel running via %s" % provider_name
+
+        # Show dialog with copyable URL field
+        try:
+            smgr = ctx.ServiceManager
+
+            dlg_model = smgr.createInstanceWithContext(
+                "com.sun.star.awt.UnoControlDialogModel", ctx)
+            dlg_model.Title = "Tunnel Status"
+            dlg_model.Width = 260
+            dlg_model.Height = 80
+
+            lbl = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlFixedTextModel")
+            lbl.Name = "Msg"
+            lbl.PositionX = 10
+            lbl.PositionY = 6
+            lbl.Width = 240
+            lbl.Height = 20
+            lbl.MultiLine = True
+            lbl.Label = msg
+            dlg_model.insertByName("Msg", lbl)
+
+            url_field = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlEditModel")
+            url_field.Name = "UrlField"
+            url_field.PositionX = 10
+            url_field.PositionY = 30
+            url_field.Width = 240
+            url_field.Height = 14
+            url_field.ReadOnly = True
+            url_field.Text = url if url else "(URL not yet available)"
+            dlg_model.insertByName("UrlField", url_field)
+
+            ok_btn = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlButtonModel")
+            ok_btn.Name = "OKBtn"
+            ok_btn.PositionX = 200
+            ok_btn.PositionY = 58
+            ok_btn.Width = 50
+            ok_btn.Height = 14
+            ok_btn.Label = "OK"
+            ok_btn.PushButtonType = 1
+            dlg_model.insertByName("OKBtn", ok_btn)
+
+            dlg = smgr.createInstanceWithContext(
+                "com.sun.star.awt.UnoControlDialog", ctx)
+            dlg.setModel(dlg_model)
+            toolkit = smgr.createInstanceWithContext(
+                "com.sun.star.awt.Toolkit", ctx)
+            dlg.createPeer(toolkit, None)
+            dlg.execute()
+            dlg.dispose()
+        except Exception:
+            log.exception("Tunnel status dialog error")
+            from plugin.framework.dialogs import msgbox
+            msgbox(ctx, "Nelson", "%s\nURL: %s" % (msg, url))

@@ -1,6 +1,7 @@
 name: mcp
 title: MCP protocol endpoint
 requires: [document, config, events, http_routes]
+config_inline: main
 
 config:
   enabled:
