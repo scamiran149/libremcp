@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Seed LibreOffice profile with default registry settings (suppress first-run wizard, etc.)."""
+
+import re
+from pathlib import Path
+
+PROFILE_DIR = Path("/tmp/lo_dev_profile")
+
+# Settings to pre-seed
+ITEMS = [
+    ("/org.openoffice.Office.Common/Misc", "FirstRun", "false"),
+    ("/org.openoffice.Office.Common/Misc", "ShowTipOfTheDay", "false"),
+]
+
+
+def seed_registry():
+    user_dir = PROFILE_DIR / "user"
+    user_dir.mkdir(parents=True, exist_ok=True)
+    reg_file = user_dir / "registrymodifications.xcu"
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<oor:items xmlns:oor="http://openoffice.org/2001/registry"'
+        ' xmlns:xs="http://www.w3.org/2001/XMLSchema"'
+        ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
+    ]
+
+    existing_keys: set[tuple[str, str]] = set()
+    if reg_file.exists():
+        content = reg_file.read_text()
+        for m in re.finditer(
+            r'<item oor:path="([^"]*)">\s*<prop oor:name="([^"]*)"[^>]*>'
+            r'\s*<value>([^<]*)</value>',
+            content,
+        ):
+            existing_keys.add((m.group(1), m.group(2)))
+            lines.append(
+                f'<item oor:path="{m.group(1)}">'
+                f'<prop oor:name="{m.group(2)}" oor:op="fuse">'
+                f'<value>{m.group(3)}</value></prop></item>'
+            )
+
+    for path, prop_name, value in ITEMS:
+        if (path, prop_name) in existing_keys:
+            continue
+        lines.append(
+            f'<item oor:path="{path}">'
+            f'<prop oor:name="{prop_name}" oor:op="fuse">'
+            f'<value>{value}</value></prop></item>'
+        )
+
+    lines.append("</oor:items>")
+    reg_file.write_text("\n".join(lines) + "\n")
+    print(f"Seeded registry: {reg_file}")
+
+
+if __name__ == "__main__":
+    seed_registry()

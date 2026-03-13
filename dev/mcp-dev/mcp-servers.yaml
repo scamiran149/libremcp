@@ -1,0 +1,9 @@
+# Authorized MCP servers for dev testing.
+# Used by mcp-test.py to resolve server names to commands.
+
+lo-wbox:
+  command:
+    - "wbox-mcp"
+    - "serve"
+    - "config.yaml"
+  cwd: "lo-wbox"
