@@ -277,39 +277,46 @@ class DocumentService(ServiceBase):
     def annotate_pages(self, nodes, model):
         """Recursively add 'page' field to heading tree nodes.
 
-        Uses lockControllers + cursor save/restore to prevent
-        visible viewport jumping while resolving page numbers.
+        Uses a single lockControllers cycle with cached para_ranges
+        for O(1) lookups. Restore happens AFTER unlockControllers
+        so the viewport actually scrolls back.
         """
         try:
             controller = model.getCurrentController()
             vc = controller.getViewCursor()
             saved = model.getText().createTextCursorByRange(vc.getStart())
+            saved_page = vc.getPage()
+            para_ranges = self.get_paragraph_ranges(model)
             model.lockControllers()
             try:
-                self._annotate_pages_inner(nodes, model)
+                self._annotate_pages_inner(nodes, vc, para_ranges)
             finally:
-                vc.gotoRange(saved, False)
                 model.unlockControllers()
+            # Restore AFTER unlock so viewport actually scrolls back
+            vc.jumpToPage(saved_page)
+            vc.gotoRange(saved, False)
         except Exception:
             pass
 
-    def _annotate_pages_inner(self, nodes, model):
+    def _annotate_pages_inner(self, nodes, vc, para_ranges):
         for node in nodes:
             try:
                 pi = node.get("para_index")
-                if pi is not None:
-                    node["page"] = self.get_page_for_paragraph(model, pi)
+                if pi is not None and pi < len(para_ranges):
+                    vc.gotoRange(para_ranges[pi].getStart(), False)
+                    node["page"] = vc.getPage()
             except Exception:
                 pass
             if "children" in node:
-                self._annotate_pages_inner(node["children"], model)
+                self._annotate_pages_inner(node["children"], vc, para_ranges)
 
     # ── Locator resolution ─────────────────────────────────────────
 
     def resolve_locator(self, model, locator):
         """Parse 'type:value' locator and resolve to document position.
 
-        Returns dict with at least ``para_index``.
+        Returns dict with at least ``para_index``, plus enriched metadata:
+            locator_type, locator_value, confidence, canonical, heading.
         Simple locators handled here; Writer-specific ones are
         delegated to writer_tree service (from writer_nav module).
         """
@@ -319,17 +326,20 @@ class DocumentService(ServiceBase):
                 "Invalid locator format: '%s'. Expected 'type:value'."
                 % locator)
 
+        result = {"locator_type": loc_type, "locator_value": loc_value,
+                  "confidence": "exact"}
+
         if loc_type == "paragraph":
-            return {"para_index": int(loc_value)}
+            result["para_index"] = int(loc_value)
 
-        if loc_type == "first":
-            return {"para_index": 0}
+        elif loc_type == "first":
+            result["para_index"] = 0
 
-        if loc_type == "last":
+        elif loc_type == "last":
             para_ranges = self.get_paragraph_ranges(model)
-            return {"para_index": max(0, len(para_ranges) - 1)}
+            result["para_index"] = max(0, len(para_ranges) - 1)
 
-        if loc_type == "cursor":
+        elif loc_type == "cursor":
             try:
                 controller = model.getCurrentController()
                 vc = controller.getViewCursor()
@@ -337,16 +347,17 @@ class DocumentService(ServiceBase):
                 para_ranges = self.get_paragraph_ranges(model)
                 idx = self.find_paragraph_for_range(
                     vc.getStart(), para_ranges, text_obj)
-                return {"para_index": max(0, idx)}
+                result["para_index"] = max(0, idx)
             except Exception as e:
                 raise ValueError("Cannot resolve cursor locator: %s" % e)
 
-        if loc_type == "regex":
-            return self._resolve_regex_locator(model, loc_value)
+        elif loc_type == "regex":
+            r = self._resolve_regex_locator(model, loc_value)
+            result.update(r)
 
-        # Writer-specific: delegate to writer_tree service
-        if loc_type in ("bookmark", "page", "section",
-                        "heading", "heading_text"):
+        elif loc_type in ("bookmark", "page", "section",
+                          "heading", "heading_text"):
+            # Writer-specific: delegate to writer_tree service
             from plugin.main import get_services
             svc = get_services().get("writer_tree")
             if svc is None:
@@ -354,7 +365,26 @@ class DocumentService(ServiceBase):
                     "writer_nav module not loaded for locator '%s'" % loc_type)
             return svc.resolve_writer_locator(model, loc_type, loc_value)
 
-        raise ValueError("Unknown locator type: '%s'" % loc_type)
+        else:
+            raise ValueError("Unknown locator type: '%s'" % loc_type)
+
+        # Enrich simple locators with heading context if tree available
+        pi = result.get("para_index")
+        if pi is not None:
+            try:
+                from plugin.main import get_services
+                tree_svc = get_services().get("writer_tree")
+                if tree_svc:
+                    heading = tree_svc.find_heading_for_paragraph(model, pi)
+                    if heading:
+                        result["heading"] = heading
+                        bm = heading.get("bookmark")
+                        if bm:
+                            result["canonical"] = "bookmark:%s" % bm
+            except Exception:
+                pass  # tree service not available, skip enrichment
+
+        return result
 
     def _resolve_regex_locator(self, model, pattern):
         """Resolve regex:/<pattern>/ to the first matching paragraph."""
@@ -380,26 +410,25 @@ class DocumentService(ServiceBase):
     def get_page_for_paragraph(self, model, para_index):
         """Return page number for a paragraph by index.
 
-        Uses lockControllers + cursor save/restore to prevent
-        visible viewport jumping.
+        Uses cached para_ranges for O(1) lookup and saves/restores
+        both cursor position and page to prevent viewport jumping.
         """
         try:
-            text = model.getText()
             controller = model.getCurrentController()
             vc = controller.getViewCursor()
-            saved = text.createTextCursorByRange(vc.getStart())
+            saved_page = vc.getPage()
+            para_ranges = self.get_paragraph_ranges(model)
+            if para_index >= len(para_ranges):
+                return 1
             model.lockControllers()
             try:
-                cursor = text.createTextCursor()
-                cursor.gotoStart(False)
-                for _ in range(para_index):
-                    if not cursor.gotoNextParagraph(False):
-                        break
-                vc.gotoRange(cursor, False)
+                vc.gotoRange(para_ranges[para_index].getStart(), False)
                 page = vc.getPage()
             finally:
-                vc.gotoRange(saved, False)
                 model.unlockControllers()
+            # Restore viewport to original page
+            if vc.getPage() != saved_page:
+                vc.jumpToPage(saved_page)
             return page
         except Exception:
             return 1
@@ -407,20 +436,44 @@ class DocumentService(ServiceBase):
     def get_page_count(self, model):
         """Return page count of a Writer document."""
         try:
-            text = model.getText()
+            # Use document property — no cursor movement needed
+            return model.getPropertyValue("PageCount") or 0
+        except Exception:
+            pass
+        # Fallback: use view cursor with save/restore
+        try:
             controller = model.getCurrentController()
             vc = controller.getViewCursor()
-            saved = text.createTextCursorByRange(vc.getStart())
+            saved = model.getText().createTextCursorByRange(vc.getStart())
+            saved_page = vc.getPage()
             model.lockControllers()
             try:
                 vc.jumpToLastPage()
                 count = vc.getPage()
             finally:
-                vc.gotoRange(saved, False)
                 model.unlockControllers()
+            # Restore AFTER unlock
+            vc.jumpToPage(saved_page)
+            vc.gotoRange(saved, False)
             return count
         except Exception:
             return 0
+
+    def goto_paragraph(self, model, para_index):
+        """Move the view cursor to a paragraph, scrolling the viewport.
+
+        This is the intentional "follow activity" navigation — it DOES
+        move the viewport (unlike get_page_for_paragraph which preserves it).
+        """
+        try:
+            para_ranges = self.get_paragraph_ranges(model)
+            if para_index >= len(para_ranges):
+                return
+            controller = model.getCurrentController()
+            vc = controller.getViewCursor()
+            vc.gotoRange(para_ranges[para_index].getStart(), False)
+        except Exception:
+            log.debug("goto_paragraph(%d) failed", para_index, exc_info=True)
 
     def doc_key(self, model):
         """Stable key for a document (URL or id)."""

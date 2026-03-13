@@ -14,7 +14,7 @@ class ActionEntry:
 
     __slots__ = (
         "timestamp", "tool_name", "caller", "status", "error",
-        "duration", "params_snippet", "image_path",
+        "duration", "params_snippet", "image_path", "paragraph_index",
     )
 
     def __init__(self, tool_name, caller=""):
@@ -26,6 +26,7 @@ class ActionEntry:
         self.duration = None
         self.params_snippet = ""
         self.image_path = None
+        self.paragraph_index = None
 
 
 class ActionLog:
@@ -41,22 +42,44 @@ class ActionLog:
         self._lock = threading.Lock()
         self._on_change = None  # optional callback for UI refresh
 
-    def on_executing(self, name="", caller="", **kw):
+    def on_executing(self, name="", caller="", kwargs=None, **kw):
         """Called when a tool starts executing."""
         entry = ActionEntry(name, caller)
+        if kwargs:
+            # Build params snippet (truncated)
+            parts = []
+            for k, v in kwargs.items():
+                s = "%s=%s" % (k, v)
+                if len(s) > 40:
+                    s = s[:37] + "..."
+                parts.append(s)
+            entry.params_snippet = ", ".join(parts)[:120]
+            # Extract paragraph_index from input args
+            pi = kwargs.get("paragraph_index")
+            if pi is None:
+                pi = kwargs.get("locator")  # store locator for later
+            if isinstance(pi, int):
+                entry.paragraph_index = pi
         with self._lock:
             self._entries.insert(0, entry)
             if len(self._entries) > self._max_size:
                 self._entries.pop()
         self._notify()
 
-    def on_completed(self, name="", caller="", **kw):
+    def on_completed(self, name="", caller="", result=None, **kw):
         """Called when a tool completes successfully."""
         with self._lock:
             entry = self._find(name, caller)
             if entry:
                 entry.status = "ok"
                 entry.duration = time.time() - entry.timestamp
+                # Extract paragraph_index from result if not already set
+                if entry.paragraph_index is None and isinstance(result, dict):
+                    pi = result.get("paragraph_index")
+                    if pi is None:
+                        pi = result.get("para_index")
+                    if isinstance(pi, int):
+                        entry.paragraph_index = pi
         self._notify()
 
     def on_failed(self, name="", error="", caller="", **kw):

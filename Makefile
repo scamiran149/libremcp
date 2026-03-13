@@ -299,10 +299,11 @@ lo-restart:
 	rm -f $(LO_CONF)/.lock $(LO_CONF)/user/.lock
 	$(MAKE) lo-start
 
-deploy: build
+deploy:
 	$(MAKE) lo-kill
 	@sleep 3
 	@rm -f $(LO_CONF)/.lock $(LO_CONF)/user/.lock
+	$(MAKE) build
 	-unopkg remove org.extension.nelson 2>/dev/null; sleep 1
 	unopkg add build/$(EXTENSION_NAME).oxt
 	@rm -f $(HOME_DIR)/nelson.log

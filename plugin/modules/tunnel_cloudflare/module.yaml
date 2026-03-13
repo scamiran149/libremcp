@@ -2,6 +2,7 @@ name: tunnel.cloudflare
 title: Cloudflare tunnel provider
 requires: [tunnel_manager]
 config_inline: true
+#config_disposition: tab
 
 config:
   tunnel_name:

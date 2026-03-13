@@ -8,6 +8,7 @@
 Ported from mcp-libre services/writer/tree.py.
 """
 
+import bisect
 import logging
 
 log = logging.getLogger("nelson.writer.nav.tree")
@@ -102,6 +103,81 @@ class TreeService:
             if found is not None:
                 return found
         return None
+
+    # ── Heading lookup for search results ──────────────────────────
+
+    def _get_flat_headings(self, doc):
+        """Return sorted list of {para_index, level, text} for all headings.
+
+        Cached alongside tree — invalidated together.
+        """
+        root = self.build_heading_tree(doc)
+        headings = []
+        self._collect_headings(root["children"], headings)
+        headings.sort(key=lambda h: h["para_index"])
+        return headings
+
+    def _collect_headings(self, children, result):
+        for child in children:
+            result.append({
+                "para_index": child["para_index"],
+                "level": child["level"],
+                "text": child["text"],
+            })
+            if child.get("children"):
+                self._collect_headings(child["children"], result)
+
+    def find_heading_for_paragraph(self, doc, para_index):
+        """Find the parent heading for a paragraph index.
+
+        Returns {"text": str, "level": int, "para_index": int,
+                 "bookmark": str|None} or None if before first heading.
+        Uses bisect on cached flat heading list — O(log n).
+        """
+        headings = self._get_flat_headings(doc)
+        if not headings:
+            return None
+        indexes = [h["para_index"] for h in headings]
+        pos = bisect.bisect_right(indexes, para_index) - 1
+        if pos < 0:
+            return None
+        h = headings[pos]
+        bookmark_map = self._bm_svc.get_mcp_bookmark_map(doc)
+        return {
+            "text": h["text"],
+            "level": h["level"],
+            "para_index": h["para_index"],
+            "bookmark": bookmark_map.get(h["para_index"]),
+        }
+
+    def enrich_search_results(self, doc, matches):
+        """Add heading context to a list of search result dicts.
+
+        Each match dict must have a "paragraph_index" key.
+        Adds a "heading" key with {text, level, para_index, bookmark}.
+        Efficient: builds flat heading list + bookmark map once,
+        then bisects for each match — O(n log h) where h = heading count.
+        """
+        headings = self._get_flat_headings(doc)
+        if not headings:
+            return
+        indexes = [h["para_index"] for h in headings]
+        bookmark_map = self._bm_svc.get_mcp_bookmark_map(doc)
+
+        for match in matches:
+            pi = match.get("paragraph_index")
+            if pi is None:
+                continue
+            pos = bisect.bisect_right(indexes, pi) - 1
+            if pos < 0:
+                continue
+            h = headings[pos]
+            match["heading"] = {
+                "text": h["text"],
+                "level": h["level"],
+                "para_index": h["para_index"],
+                "bookmark": bookmark_map.get(h["para_index"]),
+            }
 
     # ── Content strategies ─────────────────────────────────────────
 
@@ -490,35 +566,53 @@ class TreeService:
     # ── Locator resolution (called by document.resolve_locator) ────
 
     def resolve_writer_locator(self, doc, loc_type, loc_value):
-        """Resolve Writer-specific locators to {para_index: N}."""
-        if loc_type == "bookmark":
-            return self._resolve_bookmark_locator(doc, loc_value)
+        """Resolve Writer-specific locators to enriched result.
 
-        if loc_type == "page":
+        Returns dict with:
+            para_index: int
+            locator_type: str
+            locator_value: str
+            confidence: "exact" | "prefix" | "substring" | "ambiguous"
+            canonical: str (bookmark locator if available)
+            heading: {text, level, para_index, bookmark} or None
+            alternatives: list (only for ambiguous heading_text)
+        """
+        result = {"locator_type": loc_type, "locator_value": loc_value}
+
+        if loc_type == "bookmark":
+            r = self._resolve_bookmark_locator(doc, loc_value)
+            result.update(r)
+            result["confidence"] = "exact"
+
+        elif loc_type == "page":
             page_num = int(loc_value)
             try:
                 controller = doc.getCurrentController()
                 vc = controller.getViewCursor()
                 saved = doc.getText().createTextCursorByRange(
                     vc.getStart())
+                saved_page = vc.getPage()
                 doc.lockControllers()
                 try:
                     vc.jumpToPage(page_num)
                     vc.jumpToStartOfPage()
                     anchor = vc.getStart()
                 finally:
-                    vc.gotoRange(saved, False)
                     doc.unlockControllers()
+                # Restore AFTER unlock so viewport actually scrolls back
+                vc.jumpToPage(saved_page)
+                vc.gotoRange(saved, False)
                 para_ranges = self._doc_svc.get_paragraph_ranges(doc)
                 text_obj = doc.getText()
                 para_idx = self._doc_svc.find_paragraph_for_range(
                     anchor, para_ranges, text_obj)
-                return {"para_index": para_idx}
+                result["para_index"] = para_idx
+                result["confidence"] = "exact"
             except Exception as e:
                 raise ValueError(
                     "Cannot resolve page:%s — %s" % (loc_value, e))
 
-        if loc_type == "section":
+        elif loc_type == "section":
             if not hasattr(doc, "getTextSections"):
                 raise ValueError("Document does not support sections")
             sections = doc.getTextSections()
@@ -530,9 +624,11 @@ class TreeService:
             text_obj = doc.getText()
             para_idx = self._doc_svc.find_paragraph_for_range(
                 anchor, para_ranges, text_obj)
-            return {"para_index": para_idx, "section_name": loc_value}
+            result["para_index"] = para_idx
+            result["section_name"] = loc_value
+            result["confidence"] = "exact"
 
-        if loc_type == "heading":
+        elif loc_type == "heading":
             parts = [int(p) for p in loc_value.split(".")]
             tree = self.build_heading_tree(doc)
             node = tree
@@ -543,16 +639,32 @@ class TreeService:
                         "Heading index %d out of range (1..%d) "
                         "in 'heading:%s'" % (part, len(children), loc_value))
                 node = children[part - 1]
-            return {"para_index": node["para_index"]}
+            result["para_index"] = node["para_index"]
+            result["confidence"] = "exact"
 
-        if loc_type == "heading_text":
-            result = self._find_heading_by_text(doc, loc_value)
-            if result is None:
+        elif loc_type == "heading_text":
+            match = self._find_heading_by_text_enriched(doc, loc_value)
+            if match is None:
                 raise ValueError(
                     "No heading matching '%s' found" % loc_value)
-            return {"para_index": result["para_index"]}
+            result["para_index"] = match["para_index"]
+            result["confidence"] = match["confidence"]
+            if match.get("alternatives"):
+                result["alternatives"] = match["alternatives"]
 
-        raise ValueError("Unknown Writer locator type: '%s'" % loc_type)
+        else:
+            raise ValueError("Unknown Writer locator type: '%s'" % loc_type)
+
+        # Enrich with heading context and canonical locator
+        pi = result.get("para_index")
+        if pi is not None:
+            heading = self.find_heading_for_paragraph(doc, pi)
+            if heading:
+                result["heading"] = heading
+                bm = heading.get("bookmark")
+                if bm:
+                    result["canonical"] = "bookmark:%s" % bm
+        return result
 
     def _resolve_bookmark_locator(self, doc, bookmark_name):
         if not hasattr(doc, "getBookmarks"):
@@ -580,6 +692,15 @@ class TreeService:
 
     def _find_heading_by_text(self, doc, search_text):
         """Find heading by text (case-insensitive, fuzzy)."""
+        result = self._find_heading_by_text_enriched(doc, search_text)
+        return result
+
+    def _find_heading_by_text_enriched(self, doc, search_text):
+        """Find heading by text with confidence and ambiguity detection.
+
+        Returns dict with para_index, text, level, bookmark, confidence,
+        and alternatives (if ambiguous). Or None if not found.
+        """
         tree = self.build_heading_tree(doc)
         bookmark_map = self._bm_svc.get_mcp_bookmark_map(doc)
         headings = self._flatten_headings(tree)
@@ -588,23 +709,57 @@ class TreeService:
         if not search_lower:
             return None
 
+        def _enrich(h):
+            h["bookmark"] = bookmark_map.get(h["para_index"])
+            return h
+
         # Pass 1: exact match
-        for h in headings:
-            if h["text"].lower().strip() == search_lower:
-                h["bookmark"] = bookmark_map.get(h["para_index"])
-                return h
+        exact = [h for h in headings
+                 if h["text"].lower().strip() == search_lower]
+        if exact:
+            result = _enrich(exact[0])
+            result["confidence"] = "exact"
+            if len(exact) > 1:
+                result["confidence"] = "ambiguous"
+                result["alternatives"] = [
+                    {"text": h["text"], "para_index": h["para_index"],
+                     "level": h["level"],
+                     "bookmark": bookmark_map.get(h["para_index"])}
+                    for h in exact
+                ]
+            return result
 
         # Pass 2: prefix match
-        for h in headings:
-            if h["text"].lower().strip().startswith(search_lower):
-                h["bookmark"] = bookmark_map.get(h["para_index"])
-                return h
+        prefix = [h for h in headings
+                  if h["text"].lower().strip().startswith(search_lower)]
+        if prefix:
+            result = _enrich(prefix[0])
+            result["confidence"] = "prefix"
+            if len(prefix) > 1:
+                result["confidence"] = "ambiguous"
+                result["alternatives"] = [
+                    {"text": h["text"], "para_index": h["para_index"],
+                     "level": h["level"],
+                     "bookmark": bookmark_map.get(h["para_index"])}
+                    for h in prefix
+                ]
+            return result
 
         # Pass 3: substring match
-        for h in headings:
-            if search_lower in h["text"].lower():
-                h["bookmark"] = bookmark_map.get(h["para_index"])
-                return h
+        substr = [h for h in headings
+                  if search_lower in h["text"].lower()]
+        if substr:
+            result = _enrich(substr[0])
+            result["confidence"] = "substring"
+            if len(substr) > 1:
+                result["confidence"] = "ambiguous"
+                result["alternatives"] = [
+                    {"text": h["text"], "para_index": h["para_index"],
+                     "level": h["level"],
+                     "bookmark": bookmark_map.get(h["para_index"])}
+                    for h in substr
+                ]
+            return result
 
         return None
 

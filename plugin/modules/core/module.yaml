@@ -20,3 +20,21 @@ config:
         label: Warning
       - value: ERROR
         label: Error
+  force_track_changes:
+    type: boolean
+    default: true
+    widget: checkbox
+    label: Force track changes on MCP mutations
+    description: >
+      Automatically enable track changes (change recording) before any
+      mutation tool called via MCP. This ensures all AI edits are visible
+      and reversible.
+  follow_activity:
+    type: boolean
+    default: true
+    widget: checkbox
+    label: Follow MCP activity (scroll to mutations)
+    description: >
+      Automatically scroll the document view to the location of MCP
+      mutation operations (page granularity). This helps track what
+      the AI is modifying in real time.

@@ -125,6 +125,7 @@ def _build_page_map(doc):
         controller = doc.getCurrentController()
         vc = controller.getViewCursor()
         saved = doc.getText().createTextCursorByRange(vc.getStart())
+        saved_page = vc.getPage()
         doc.lockControllers()
         try:
             text = doc.getText()
@@ -139,8 +140,10 @@ def _build_page_map(doc):
                     pass
                 idx += 1
         finally:
-            vc.gotoRange(saved, False)
             doc.unlockControllers()
+        # Restore AFTER unlock so viewport actually scrolls back
+        vc.jumpToPage(saved_page)
+        vc.gotoRange(saved, False)
     except Exception:
         pass
 

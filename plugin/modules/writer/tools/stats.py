@@ -59,14 +59,8 @@ class GetDocumentStats(ToolBase):
         except Exception:
             heading_count = 0
 
-        # Page count (approximate via view cursor).
-        page_count = 0
-        try:
-            vc = doc.getCurrentController().getViewCursor()
-            vc.jumpToLastPage()
-            page_count = vc.getPage()
-        except Exception:
-            pass
+        # Page count (via document property or view cursor with save/restore).
+        page_count = doc_svc.get_page_count(doc)
 
         return {
             "status": "ok",

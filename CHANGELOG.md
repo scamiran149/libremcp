@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] — 2026-03-13
+
+### Added
+
+- **Follow activity** — `core.follow_activity` config option auto-scrolls the document view to the location of MCP mutation operations (page granularity). Subscribes to `tool:completed` events; only triggers for MCP-caller mutations with a `paragraph_index` in the result
+- **BM25 search ranking** — `search_fulltext` now scores results using BM25 relevance (IDF + term frequency normalization) with 2× heading boost, replacing the previous unranked set intersection
+- **Search heading context** — `search_in_document` enriches results with nearest heading bookmark via `writer_tree.enrich_search_results()`
+- **Panel "Show" button** — Actions panel now tracks `paragraph_index` per entry and shows a "Show" button to navigate to the paragraph of a completed action
+- **Tunnel status dialog** — redesigned with separate MCP and SSE endpoint URLs, per-field copy buttons, and provider name in menu text
+- **Options tab support** — modules with many settings can use tabs in their Options page; shared layout constants in `plugin/_layout.py`
+- **`tool:completed` event enrichment** — EventBus now passes `is_mutation` and `doc` to `tool:completed` subscribers
+
+### Changed
+
+- **Mutation detection** — extended `_READ_PREFIXES` with `resolve_`, `navigate_`, `goto_`, `scan_`, `check_`, `export_`, `print_`, `document_health` so these tools are no longer misclassified as mutations
+- **`get_page_count`** — now uses `model.getPropertyValue("PageCount")` (no cursor movement) instead of `jumpToLastPage()` with save/restore
+
+### Fixed
+
+- **Viewport stability on read operations** — all tools that resolve page numbers via the view cursor (`get_document_tree`, `get_document_stats`, `list_images`, `get_page_objects`, `search_fulltext` with pages, `resolve_locator page:`) now properly save/restore the viewport position using the pattern: save page + lock → work → unlock → `jumpToPage(saved_page)` + `gotoRange(saved)`
+- **`annotate_pages` nested locking** — refactored from per-node `get_page_for_paragraph` calls (each locking/unlocking) to a single lock cycle with cached `para_ranges`
+- **`list_images_writer` viewport jump** — wrapped image enumeration in a single lock cycle with save/restore after unlock
+- **`_build_page_map` (fulltext search)** — added cursor restore after unlock
+- **`get_page_objects` viewport jump** — added cursor save/restore around view cursor page resolution
+- **Options handler early logging** — ensures nelson logger has a handler when `options_handler.py` loads before `main.py`
+
 ## [0.3.3] — 2026-03-10
 
 ### Added

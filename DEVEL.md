@@ -205,14 +205,92 @@ If the requested backend is not installed, LO silently falls back to the default
 3. Settings panel — AI dropdowns render and respond to clicks
 4. Modal dialogs (Tools > Nelson MCP options) — layout is acceptable
 
+## Dev MCP servers (Linux)
+
+For visual debugging and automated testing, the project provides MCP servers that run LibreOffice in an isolated nested compositor. This allows taking screenshots, injecting keyboard/mouse input, and deploying the extension — all from Claude Code.
+
+### Prerequisites
+
+```bash
+# Fedora
+sudo dnf install weston cage grim xdotool scrot ImageMagick uv
+
+# Ubuntu/Debian
+sudo apt install weston cage grim xdotool scrot imagemagick
+pip install uv
+```
+
+Then install the Python dependencies:
+
+```bash
+cd dev/lo-dev-mcp
+uv venv && uv pip install -e ../compositor && uv pip install mcp pyyaml
+```
+
+### MCP entries in `.mcp.json`
+
+The project `.mcp.json` defines three MCP servers:
+
+| Server | Type | Purpose |
+|--------|------|---------|
+| `nelson` | HTTP `:8766` | Production Nelson extension (host LO) |
+| `nelson-dev` | HTTP `:8767` | Nelson extension inside the compositor LO |
+| `lo-dev` | stdio | Compositor automation (launch, screenshot, input, deploy) |
+
+`nelson` and `nelson-dev` are standard Nelson HTTP MCP endpoints — they expose the same document manipulation tools. The difference is which LO instance they connect to.
+
+`lo-dev` is the compositor control server. It manages the nested Wayland compositor and the isolated LO instance running inside it. The `nelson-dev` port (8767) must match the `nelson_port` in `dev/lo-dev-mcp/config.yaml` — `lo-dev` injects this port via `NELSON_SET_CONFIG` when launching the caged LO.
+
+### Compositor backends
+
+| Backend | Window | Resize | Screenshot | Best for |
+|---------|--------|--------|------------|----------|
+| **weston** (default) | Resizable, movable | Yes (restart) | `weston-screenshooter` | Daily dev |
+| **cage** | Kiosk, no decorations | No | `grim` | CI / headless |
+
+Configure in `dev/lo-dev-mcp/config.yaml`:
+
+```yaml
+compositor: weston       # or "cage"
+screen: "1280x800"
+weston_shell: kiosk      # "kiosk" or "desktop"
+weston_backend: x11      # x11 = resizable window on host
+app:
+  doc_type: writer
+  vcl_plugin: gtk3
+  profile_dir: /tmp/lo_dev_profile
+  nelson_port: 8767
+```
+
+### Autonomous dev with Claude Code
+
+The `lo-dev` MCP gives Claude Code full control over an isolated LibreOffice instance: launch, screenshot, mouse/keyboard input, deploy. This allows Claude to work autonomously — build, deploy, visually inspect, click through UI, fix issues — without manual intervention.
+
+**Setup:** after installing prerequisites, run `/mcp` in Claude Code to connect to `lo-dev`.
+
+**Workflow:**
+1. `lo-dev` > `launch` — starts a weston compositor window with LO inside
+2. `lo-dev` > `deploy` — builds Nelson `.oxt` and installs it into the caged LO
+3. `lo-dev` > `screenshot` — Claude sees the LO UI and can analyze it
+4. `lo-dev` > `click` / `key` / `type_text` — Claude interacts with LO (menus, dialogs, etc.)
+5. `nelson-dev` tools become available to test Nelson document manipulation on the caged instance
+6. `lo-dev` > `kill` — clean up when done
+
+Claude can iterate on code, redeploy, and visually verify the result in a loop — fully autonomous.
+
+See `dev/README.md` for the full tool list and `mcp-test.py` CLI usage.
+
 ## Logs and debugging
 
 | File | Content |
 |------|---------|
-| `~/nelson.log` | Plugin log (overwritten each LO session) |
+| `~/nelson.log` | Plugin log — native/production LO (overwritten each session) |
 | `~/soffice-debug.log` | LO internal errors |
+| `dev/lo-dev-mcp/log/nelson.log` | Plugin log — **dev compositor** LO instance |
 
 Symlinks exist in the project root for convenience (`./nelson.log`, `./soffice-debug.log`). Created by `scripts/check-setup.sh`.
+
+> **Dev vs native logs:** When using the `lo-dev` MCP compositor, Nelson logs go to `dev/lo-dev-mcp/log/nelson.log` (not `~/nelson.log`). The `lo-dev` > `tail_log` tool reads from this path.
 
 **Enable verbose logging** for a session (default is `WARN`):
 

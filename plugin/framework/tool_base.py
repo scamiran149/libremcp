@@ -9,7 +9,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
 
-_READ_PREFIXES = ("get_", "read_", "list_", "find_", "search_", "count_")
+_READ_PREFIXES = ("get_", "read_", "list_", "find_", "search_", "count_",
+                  "resolve_", "navigate_", "goto_", "scan_", "check_",
+                  "export_", "print_", "document_health")
 
 
 class ToolBase(ABC):

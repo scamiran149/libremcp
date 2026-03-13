@@ -21,11 +21,10 @@ import sys
 import threading
 
 # ── File logger (debug even when LO console is hidden) ──────────────────────
-# Set up on the 'nelson' logger (not root) so it works regardless of
-# root logger state configured by other extensions (e.g. mcp-libre).
-# Cannot import from plugin.framework here — sys.path isn't set up yet.
-
-_log_path = os.path.join(os.path.expanduser("~"), "nelson.log")
+# Inline setup (cannot import plugin.framework here — __init__.py has heavy deps).
+# Mirrors framework/logging.py setup_logging() — keep in sync.
+_log_path = os.environ.get("NELSON_LOG_PATH",
+                           os.path.join(os.path.expanduser("~"), "nelson.log"))
 _logger = logging.getLogger("nelson")
 _logger.handlers.clear()
 _logger.propagate = False

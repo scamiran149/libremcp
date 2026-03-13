@@ -18,7 +18,8 @@ import threading
 
 # ── Standard logging setup ─────────────────────────────────────────────
 
-LOG_PATH = os.path.join(os.path.expanduser("~"), "nelson.log")
+LOG_PATH = os.environ.get("NELSON_LOG_PATH",
+                          os.path.join(os.path.expanduser("~"), "nelson.log"))
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s — %(message)s"
 
 _setup_done = False

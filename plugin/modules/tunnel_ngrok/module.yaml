@@ -2,6 +2,7 @@ name: tunnel.ngrok
 title: Ngrok tunnel provider
 requires: [tunnel_manager]
 config_inline: true
+#config_disposition: tab
 
 config:
   authtoken:

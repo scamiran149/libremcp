@@ -58,7 +58,7 @@ try:
     from com.sun.star.ui import (
         XUIElementFactory, XUIElement, XToolPanel, XSidebarPanel)
     from com.sun.star.ui.UIElementType import TOOLPANEL
-    from com.sun.star.awt import XWindowListener, XItemListener
+    from com.sun.star.awt import XWindowListener, XItemListener, XActionListener
 
     # ── Shared panel wrapper ──────────────────────────────────────
 
@@ -132,6 +132,8 @@ try:
             add_control(self.ctx, self._root, "detail", "Edit",
                         {"ReadOnly": True, "MultiLine": True,
                          "VScroll": True})
+            add_control(self.ctx, self._root, "goto_btn", "Button",
+                        {"Label": "Show", "Enabled": False})
             add_control(self.ctx, self._root, "image", "ImageControl",
                         {"ScaleImage": True, "ScaleMode": 1})
             return self._root
@@ -148,14 +150,17 @@ try:
             label_ctrl = root.getControl("label")
             list_ctrl = root.getControl("list")
             detail_ctrl = root.getControl("detail")
+            goto_btn = root.getControl("goto_btn")
             image_ctrl = root.getControl("image")
 
             image_ctrl.setVisible(False)
+            goto_btn.setVisible(False)
 
             ctrls = {
                 "label": label_ctrl,
                 "list": list_ctrl,
                 "detail": detail_ctrl,
+                "goto_btn": goto_btn,
                 "image": image_ctrl,
             }
 
@@ -168,8 +173,8 @@ try:
                 def itemStateChanged(self, evt):
                     try:
                         sel = list_ctrl.getSelectedItemPos()
-                        self._pe._show_detail(sel, detail_ctrl, image_ctrl,
-                                              root)
+                        self._pe._show_detail(sel, detail_ctrl, goto_btn,
+                                              image_ctrl, root)
                     except Exception:
                         pass
 
@@ -177,6 +182,23 @@ try:
                     pass
 
             list_ctrl.addItemListener(_ListSelect(self))
+
+            # ── Go-to button handler ─────────────────────────────
+
+            class _GotoClick(unohelper.Base, XActionListener):
+                def __init__(self, panel_element):
+                    self._pe = panel_element
+
+                def actionPerformed(self, evt):
+                    try:
+                        self._pe._goto_paragraph()
+                    except Exception:
+                        log.exception("goto_paragraph failed")
+
+                def disposing(self, evt):
+                    pass
+
+            goto_btn.addActionListener(_GotoClick(self))
 
             # ── Resize handler ────────────────────────────────────
 
@@ -236,7 +258,8 @@ try:
                     line += " %s" % dur
                 list_ctrl.addItem(line, list_ctrl.getItemCount())
 
-        def _show_detail(self, index, detail_ctrl, image_ctrl, root):
+        def _show_detail(self, index, detail_ctrl, goto_btn, image_ctrl,
+                         root):
             """Show detail for the selected action entry."""
             if not self._action_log:
                 return
@@ -258,8 +281,15 @@ try:
                 lines.append("Error: %s" % entry.error)
             if entry.params_snippet:
                 lines.append("Params: %s" % entry.params_snippet)
+            if entry.paragraph_index is not None:
+                lines.append("Paragraph: %d" % entry.paragraph_index)
 
             detail_ctrl.getModel().Text = "\n".join(lines)
+
+            # Go-to button visibility
+            has_para = entry.paragraph_index is not None
+            goto_btn.setVisible(has_para)
+            goto_btn.getModel().Enabled = has_para
 
             # Image preview
             has_image = bool(entry.image_path
@@ -269,14 +299,74 @@ try:
                 image_ctrl.getModel().ImageURL = (
                     uno.systemPathToFileUrl(entry.image_path))
 
-            # Re-layout to account for image visibility change
+            # Re-layout to account for visibility changes
             ctrls = {
                 "label": root.getControl("label"),
                 "list": root.getControl("list"),
                 "detail": detail_ctrl,
+                "goto_btn": goto_btn,
                 "image": image_ctrl,
             }
             _layout_panel(root, ctrls)
+
+        def _goto_paragraph(self):
+            """Navigate the view cursor to the selected entry's paragraph.
+
+            Tries the nearest MCP bookmark first (resilient to edits),
+            falls back to paragraph index via ranges.
+            """
+            if not self._action_log:
+                return
+            entries = self._action_log.entries(limit=100)
+            if self._selected_index < 0 or self._selected_index >= len(entries):
+                return
+            entry = entries[self._selected_index]
+            pi = entry.paragraph_index
+            if pi is None:
+                return
+            try:
+                from plugin.main import get_services
+                services = get_services()
+                doc_svc = services.get("document")
+                if not doc_svc:
+                    return
+                doc = doc_svc.get_active_document()
+                if not doc or not hasattr(doc, "getText"):
+                    return
+                controller = doc.getCurrentController()
+                vc = controller.getViewCursor()
+
+                # Try nearest bookmark first
+                navigated = False
+                tree_svc = services.get("writer_tree")
+                if tree_svc:
+                    try:
+                        heading = tree_svc.find_heading_for_paragraph(
+                            doc, pi)
+                        if heading and heading.get("bookmark"):
+                            bm_name = heading["bookmark"]
+                            bookmarks = doc.getBookmarks()
+                            if bookmarks.hasByName(bm_name):
+                                bm = bookmarks.getByName(bm_name)
+                                anchor = bm.getAnchor()
+                                vc.gotoRange(anchor, False)
+                                # If bookmark is on a heading above,
+                                # move down to the actual paragraph
+                                offset = pi - heading["para_index"]
+                                for _ in range(offset):
+                                    vc.gotoNextParagraph(False)
+                                navigated = True
+                    except Exception:
+                        pass  # fall back to paragraph ranges
+
+                if not navigated:
+                    para_ranges = doc_svc.get_paragraph_ranges(doc)
+                    if pi < 0 or pi >= len(para_ranges):
+                        return
+                    para = para_ranges[pi]
+                    vc.gotoRange(para.getStart(), False)
+            except Exception:
+                log.exception("_goto_paragraph failed for index %d", pi)
 
     # ── Jobs panel ────────────────────────────────────────────────
 
@@ -538,6 +628,7 @@ try:
         - Label: fixed 16px
         - ListBox: ~50% of remaining (or more if image hidden)
         - Detail Edit: ~25-35% of remaining
+        - Goto button: fixed 24px (only when visible)
         - ImageControl: ~25% of remaining (hidden when no image)
         """
         r = win.getPosSize()
@@ -548,11 +639,16 @@ try:
         m = 6
         gap = 4
         label_h = 16
+        btn_h = 24
         cw = w - 2 * m
 
         image_ctrl = ctrls.get("image")
         image_visible = (image_ctrl and image_ctrl.isVisible()
                          if image_ctrl else False)
+
+        goto_btn = ctrls.get("goto_btn")
+        goto_visible = (goto_btn and goto_btn.isVisible()
+                        if goto_btn else False)
 
         y = m
         c = ctrls.get("label")
@@ -560,7 +656,14 @@ try:
             c.setPosSize(m, y, cw, label_h, 15)
         y += label_h + gap
 
-        remaining = h - y - m
+        # Reserve space for fixed-height elements
+        fixed_below = 0
+        if goto_visible:
+            fixed_below += btn_h + gap
+        if image_visible:
+            fixed_below += gap  # image gets remaining space
+
+        remaining = h - y - m - fixed_below
         if remaining < 60:
             remaining = 60
 
@@ -582,6 +685,10 @@ try:
         if c:
             c.setPosSize(m, y, cw, detail_h, 15)
         y += detail_h + gap
+
+        if goto_visible and goto_btn:
+            goto_btn.setPosSize(m, y, cw, btn_h, 15)
+            y += btn_h + gap
 
         if image_visible and image_ctrl:
             image_ctrl.setPosSize(m, y, cw, max(30, image_h), 15)

@@ -97,7 +97,9 @@ def _raw_tokens(text):
 
 class _DocIndex:
     __slots__ = ('terms', 'para_texts', 'para_count',
-                 'build_ms', 'language')
+                 'build_ms', 'language',
+                 'para_lengths', 'avg_para_length', 'para_term_freq',
+                 'heading_paras')
 
     def __init__(self):
         self.terms = {}        # stem -> set[int]
@@ -105,6 +107,33 @@ class _DocIndex:
         self.para_count = 0
         self.build_ms = 0.0
         self.language = "english"
+        # BM25 data
+        self.para_lengths = {}     # para_index -> token count
+        self.avg_para_length = 0.0
+        self.para_term_freq = {}   # (para_index, stem) -> count
+        self.heading_paras = set() # para indices that are headings
+
+    def bm25_score(self, para_index, query_stems, k1=1.2, b=0.75):
+        """Compute BM25 relevance score for a paragraph against query stems."""
+        import math
+        score = 0.0
+        dl = self.para_lengths.get(para_index, 0)
+        if dl == 0 or self.avg_para_length == 0:
+            return 0.0
+        for stem in query_stems:
+            df = len(self.terms.get(stem, ()))
+            if df == 0:
+                continue
+            tf = self.para_term_freq.get((para_index, stem), 0)
+            idf = math.log(
+                (self.para_count - df + 0.5) / (df + 0.5) + 1.0)
+            tf_norm = (tf * (k1 + 1.0)) / (
+                tf + k1 * (1.0 - b + b * dl / self.avg_para_length))
+            score += idf * tf_norm
+        # Boost headings
+        if para_index in self.heading_paras:
+            score *= 2.0
+        return score
 
     def query_and(self, stem_groups):
         if not stem_groups:
@@ -247,6 +276,7 @@ class IndexService:
         text_obj = doc.getText()
         enum = text_obj.createEnumeration()
         para_i = 0
+        total_tokens = 0
 
         while enum.hasMoreElements():
             el = enum.nextElement()
@@ -258,17 +288,32 @@ class IndexService:
                     stems = self._stem(stemmer, raw, stop_words)
                 else:
                     stems = [t for t in raw if t not in stop_words]
+                # BM25: store token count and term frequencies
+                idx.para_lengths[para_i] = len(stems)
+                total_tokens += len(stems)
+                freq = {}
                 for stem in stems:
+                    freq[stem] = freq.get(stem, 0) + 1
                     s = idx.terms.get(stem)
                     if s is None:
                         s = set()
                         idx.terms[stem] = s
                     s.add(para_i)
+                for stem, count in freq.items():
+                    idx.para_term_freq[(para_i, stem)] = count
+                # Detect headings
+                try:
+                    if el.getPropertyValue("OutlineLevel") > 0:
+                        idx.heading_paras.add(para_i)
+                except Exception:
+                    pass
             else:
                 idx.para_texts[para_i] = "[Table]"
             para_i += 1
 
         idx.para_count = para_i
+        idx.avg_para_length = (
+            total_tokens / para_i if para_i > 0 else 0.0)
         idx.build_ms = round((time.perf_counter() - t0) * 1000, 1)
         self._cache[key] = idx
         log.info("Index built [%s]: %d paras, %d stems, %.1fms",
@@ -389,12 +434,15 @@ class IndexService:
             hits = idx.query_not(hits, not_stems)
 
         total = len(hits)
-        selected = sorted(hits)[:max_results]
 
-        bookmark_map = self._bm_svc.get_mcp_bookmark_map(doc)
+        # Rank by BM25 score instead of position
+        unique_positive = list(set(all_positive))
+        scored = [(pi, idx.bm25_score(pi, unique_positive)) for pi in hits]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        selected = scored[:max_results]
 
         results = []
-        for para_i in selected:
+        for para_i, score in selected:
             ctx_lo = max(0, para_i - context_paragraphs)
             ctx_hi = min(idx.para_count, para_i + context_paragraphs + 1)
             context = [
@@ -408,15 +456,14 @@ class IndexService:
             entry = {
                 "paragraph_index": para_i,
                 "text": idx.para_texts.get(para_i, ""),
+                "score": round(score, 3),
                 "matched_stems": matched,
                 "context": context,
             }
-
-            nearest = self._bm_svc.find_nearest_heading_bookmark(
-                para_i, bookmark_map)
-            if nearest:
-                entry["nearest_heading"] = nearest
             results.append(entry)
+
+        # Enrich all results with heading context in one batch
+        self._tree_svc.enrich_search_results(doc, results)
 
         resp = {
             "query": query,

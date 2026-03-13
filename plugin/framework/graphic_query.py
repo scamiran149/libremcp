@@ -75,45 +75,70 @@ def list_images_writer(doc, doc_svc=None):
             pass
 
     images = []
-    for name in graphics.getElementNames():
-        try:
-            graphic = graphics.getByName(name)
-            size = graphic.getPropertyValue("Size")
-            entry = {
-                "name": name,
-                "width_mm": size.Width / 100.0,
-                "height_mm": size.Height / 100.0,
-                "width_100mm": size.Width,
-                "height_100mm": size.Height,
-            }
-            for prop in ("Title", "Description"):
-                try:
-                    entry[prop.lower()] = graphic.getPropertyValue(prop)
-                except Exception:
-                    entry[prop.lower()] = ""
 
-            # Paragraph index
-            if para_ranges and text_obj:
-                try:
-                    anchor = graphic.getAnchor()
-                    entry["paragraph_index"] = doc_svc.find_paragraph_for_range(
-                        anchor, para_ranges, text_obj
-                    )
-                except Exception:
-                    entry["paragraph_index"] = -1
+    # Save/restore view cursor for page number resolution
+    vc = None
+    saved = None
+    saved_page = None
+    try:
+        controller = doc.getCurrentController()
+        vc = controller.getViewCursor()
+        saved = doc.getText().createTextCursorByRange(vc.getStart())
+        saved_page = vc.getPage()
+        doc.lockControllers()
+    except Exception:
+        vc = None
 
-            # Page number
+    try:
+        for name in graphics.getElementNames():
             try:
-                anchor = graphic.getAnchor()
-                vc = doc.getCurrentController().getViewCursor()
-                vc.gotoRange(anchor.getStart(), False)
-                entry["page"] = vc.getPage()
+                graphic = graphics.getByName(name)
+                size = graphic.getPropertyValue("Size")
+                entry = {
+                    "name": name,
+                    "width_mm": size.Width / 100.0,
+                    "height_mm": size.Height / 100.0,
+                    "width_100mm": size.Width,
+                    "height_100mm": size.Height,
+                }
+                for prop in ("Title", "Description"):
+                    try:
+                        entry[prop.lower()] = graphic.getPropertyValue(prop)
+                    except Exception:
+                        entry[prop.lower()] = ""
+
+                # Paragraph index
+                if para_ranges and text_obj:
+                    try:
+                        anchor = graphic.getAnchor()
+                        entry["paragraph_index"] = doc_svc.find_paragraph_for_range(
+                            anchor, para_ranges, text_obj
+                        )
+                    except Exception:
+                        entry["paragraph_index"] = -1
+
+                # Page number (using locked view cursor)
+                if vc is not None:
+                    try:
+                        anchor = graphic.getAnchor()
+                        vc.gotoRange(anchor.getStart(), False)
+                        entry["page"] = vc.getPage()
+                    except Exception:
+                        pass
+
+                images.append(entry)
+            except Exception as e:
+                log.debug("list_images_writer: skip '%s': %s", name, e)
+    finally:
+        if vc is not None and saved is not None:
+            try:
+                doc.unlockControllers()
+                # Restore AFTER unlock so viewport actually scrolls back
+                vc.jumpToPage(saved_page)
+                vc.gotoRange(saved, False)
             except Exception:
                 pass
 
-            images.append(entry)
-        except Exception as e:
-            log.debug("list_images_writer: skip '%s': %s", name, e)
     return images
 
 

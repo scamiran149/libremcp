@@ -207,27 +207,30 @@ def generate_xcs_xcu(modules, output_dir):
 
 import xml.etree.ElementTree as ET
 
-# Layout constants for XDL pages (dialog units)
-_PAGE_WIDTH = 260
-_PAGE_HEIGHT = 260
-_SCROLLBAR_WIDTH = 12
+# Layout constants — single source of truth in plugin/_layout.py
+from plugin._layout import (
+    PAGE_WIDTH as _PAGE_WIDTH, PAGE_HEIGHT as _PAGE_HEIGHT,
+    SCROLLBAR_WIDTH as _SCROLLBAR_WIDTH, CONTENT_WIDTH as _CONTENT_WIDTH,
+)
 _MARGIN = 6
 _LABEL_WIDTH = 100
 _FIELD_X = 110
-_FIELD_WIDTH = 144
+_FIELD_WIDTH = _CONTENT_WIDTH - _FIELD_X - _MARGIN
 _ROW_HEIGHT = 14
 _ROW_GAP = 4
 _HELPER_HEIGHT = 10
 _HELPER_GAP = 1
 _BROWSE_BTN_WIDTH = 20
 _BROWSE_BTN_GAP = 2
+_TAB_SELECTOR_HEIGHT = 14
+_TAB_SELECTOR_GAP = 6
 
 # List-detail layout constants
 _LD_LIST_HEIGHT = 80
 _LD_INLINE_LIST_HEIGHT = 50
 _LD_BTN_WIDTH = 44
 _LD_BTN_GAP = 4
-_LD_LIST_WIDTH = _PAGE_WIDTH - _MARGIN * 2 - _LD_BTN_WIDTH - _LD_BTN_GAP
+_LD_LIST_WIDTH = _CONTENT_WIDTH - _MARGIN * 2 - _LD_BTN_WIDTH - _LD_BTN_GAP
 
 _DLG_NS = "http://openoffice.org/2000/dialog"
 _SCRIPT_NS = "http://openoffice.org/2000/script"
@@ -404,7 +407,7 @@ def _add_filefield(board, field_name, schema, y):
 def _helper_height(text, width=None):
     """Estimate helper height based on text length (multiline support)."""
     if width is None:
-        width = _PAGE_WIDTH - _MARGIN * 2
+        width = _CONTENT_WIDTH - _MARGIN * 2
     # ~4 chars per dialog unit is a reasonable estimate
     chars_per_line = max(width * 4 // 10, 40)
     lines = max(1, -(-len(text) // chars_per_line))  # ceil division
@@ -413,7 +416,7 @@ def _helper_height(text, width=None):
 
 def _add_helper(board, field_name, helper_text, y):
     """Add a small helper text below a field, spanning full page width."""
-    helper_width = _PAGE_WIDTH - _MARGIN * 2
+    helper_width = _CONTENT_WIDTH - _MARGIN * 2
     h = _helper_height(helper_text, helper_width)
     attrs = {
         _dlg("id"): "hlp_%s" % field_name,
@@ -456,7 +459,7 @@ def _add_title(board, title_id, text, y):
         _dlg("tab-index"): "0",
         _dlg("left"): str(_MARGIN),
         _dlg("top"): str(y),
-        _dlg("width"): str(_PAGE_WIDTH - _MARGIN * 2),
+        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
         _dlg("height"): "8",
         _dlg("value"): text,
         _dlg("style-id"): _STYLE_BOLD,
@@ -472,7 +475,7 @@ def _add_page_helper(board, helper_id, text, y):
         _dlg("tab-index"): "0",
         _dlg("left"): str(_MARGIN),
         _dlg("top"): str(y),
-        _dlg("width"): str(_PAGE_WIDTH - _MARGIN * 2),
+        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
         _dlg("height"): str(h),
         _dlg("value"): text,
         _dlg("multiline"): "true",
@@ -484,11 +487,12 @@ def _xdl_to_string(root):
     """Serialize XDL element tree to string with XML declaration and DOCTYPE."""
     ET.indent(root, space="  ")
     xml_body = ET.tostring(root, encoding="unicode")
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">\n'
-        + xml_body + "\n"
-    )
+    # Omit DOCTYPE when using elements not in the DTD (multipage, page)
+    has_multipage = "multipage" in xml_body
+    header = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    if not has_multipage:
+        header += '<!DOCTYPE dlg:window PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "dialog.dtd">\n'
+    return header + xml_body + "\n"
 
 
 _SEPARATOR_HEIGHT = 1
@@ -509,7 +513,7 @@ def _add_separator(board, sep_id, y, label=None):
             _dlg("tab-index"): "0",
             _dlg("left"): str(_MARGIN),
             _dlg("top"): str(y),
-            _dlg("width"): str(_PAGE_WIDTH - _MARGIN * 2),
+            _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
             _dlg("height"): str(h),
             _dlg("value"): label,
             _dlg("style-id"): _STYLE_SEMIBOLD,
@@ -521,7 +525,7 @@ def _add_separator(board, sep_id, y, label=None):
             _dlg("tab-index"): "0",
             _dlg("left"): str(_MARGIN),
             _dlg("top"): str(y),
-            _dlg("width"): str(_PAGE_WIDTH - _MARGIN * 2),
+            _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
             _dlg("height"): str(h),
         }
     ET.SubElement(board, _dlg("fixedline"), attrs)
@@ -536,7 +540,7 @@ def _add_inline_list_detail(board, field_name, schema, y):
         _dlg("tab-index"): "0",
         _dlg("left"): str(_MARGIN),
         _dlg("top"): str(y),
-        _dlg("width"): str(_PAGE_WIDTH - _MARGIN * 2),
+        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
         _dlg("height"): str(_ROW_HEIGHT),
         _dlg("value"): section_label,
     })
@@ -616,7 +620,8 @@ def generate_xdl(module_name, config_fields, title=None,
         page_helper: Optional helper text below the title.
         inline_children: Optional list of (child_manifest, child_config) tuples
             whose fields are appended after the parent's, each preceded by a
-            labeled separator.
+            labeled separator. Children with config_disposition: tab are
+            rendered as switchable tabs instead of stacked sections.
     """
     page_id = "Nelson_%s" % module_name.replace(".", "_")
 
@@ -700,46 +705,156 @@ def generate_xdl(module_name, config_fields, title=None,
         y = _emit_field(board, field_name, widget, schema, y)
 
     # ── Inline children sections ─────────────────────────────────────
+
     if inline_children:
+        # Split children into stacked (normal) and tabbed groups
+        stacked_children = []
+        tabbed_children = []
         for child_m, child_config in inline_children:
-            # Skip children with no visible config fields
             visible_fields = [
                 (fn, s) for fn, s in child_config.items()
                 if not s.get("internal") and s.get("widget", "text") != "list_detail"
             ]
             if not visible_fields:
                 continue
+            if child_m.get("config_disposition") == "tab":
+                tabbed_children.append((child_m, child_config))
+            else:
+                stacked_children.append((child_m, child_config))
 
+        # Stacked children: inline as labeled sections (default)
+        for child_m, child_config in stacked_children:
             child_name = child_m["name"]
             child_safe = child_name.replace(".", "_")
 
-            # Labeled separator (uses module title as label)
             sep_counter[0] += 1
             sep_label = child_m.get("title", _pretty_name(child_name))
             y = _add_separator(
                 board, "sep_%d" % sep_counter[0], y, label=sep_label)
 
-            # Optional helper below separator
             child_helper = child_m.get("helper")
             if child_helper:
                 y = _add_page_helper(
                     board, "phlp_%s" % child_safe, child_helper, y)
 
-            # Child config fields with prefixed IDs
             for field_name, schema in child_config.items():
                 if schema.get("internal"):
                     continue
                 widget = schema.get("widget", "text")
                 if widget == "list_detail":
-                    continue  # not supported inline-in-inline
-
+                    continue
                 prefixed = "%s__%s" % (child_safe, field_name)
                 y = _emit_field(board, prefixed, widget, schema, y)
 
-    # If content exceeds page height, store final y for runtime scrollbar
-    # and widen the window so the scrollbar sits outside the content area
+        # Tabbed children: listbox selector + flat controls with visibility
+        if tabbed_children:
+            # Separator before tab section
+            sep_counter[0] += 1
+            y = _add_separator(board, "sep_%d" % sep_counter[0], y)
+
+            # Tab selector: label + dropdown
+            ET.SubElement(board, _dlg("text"), {
+                _dlg("id"): "lbl___tab_selector__",
+                _dlg("left"): str(_MARGIN),
+                _dlg("top"): str(y + 2),
+                _dlg("width"): str(_LABEL_WIDTH),
+                _dlg("height"): str(_ROW_HEIGHT),
+                _dlg("value"): "Provider settings",
+            })
+            ET.SubElement(board, _dlg("menulist"), {
+                _dlg("id"): "__tab_selector__",
+                _dlg("tab-index"): "0",
+                _dlg("left"): str(_FIELD_X),
+                _dlg("top"): str(y),
+                _dlg("width"): str(_FIELD_WIDTH),
+                _dlg("height"): str(_ROW_HEIGHT),
+                _dlg("spin"): "true",
+                _dlg("dropdown"): "true",
+            })
+            y += 18  # selector + gap
+
+            # Compute content area start and tallest tab height
+            tab_start_y = y
+            tab_labels = []
+            tab_controls = {}  # tab_label -> [control_ids]
+
+            for ti, (child_m, child_config) in enumerate(tabbed_children):
+                child_name = child_m["name"]
+                child_safe = child_name.replace(".", "_")
+                tab_label = child_m.get("title", _pretty_name(child_name))
+                tab_labels.append(tab_label)
+                tab_ctrl_ids = []
+
+                cy = tab_start_y
+                child_helper = child_m.get("helper")
+                if child_helper:
+                    helper_id = "phlp_%s" % child_safe
+                    cy = _add_page_helper(
+                        board, helper_id, child_helper, cy)
+                    tab_ctrl_ids.append(helper_id)
+
+                for fn, schema in child_config.items():
+                    if schema.get("internal"):
+                        continue
+                    widget = schema.get("widget", "text")
+                    if widget == "list_detail":
+                        continue
+                    prefixed = "%s__%s" % (child_safe, fn)
+                    cy = _emit_field(board, prefixed, widget, schema, cy)
+                    # Collect all control IDs for this field
+                    tab_ctrl_ids.append(prefixed)
+                    tab_ctrl_ids.append("lbl_%s" % prefixed)
+                    if schema.get("helper"):
+                        tab_ctrl_ids.append("hlp_%s" % prefixed)
+
+                tab_controls[tab_label] = tab_ctrl_ids
+
+                # Hide controls for non-first tabs
+                if ti > 0:
+                    for ctrl_id in tab_ctrl_ids:
+                        # Set visible=false on the generated elements
+                        for elem in board:
+                            eid = elem.get(_dlg("id"))
+                            if eid == ctrl_id:
+                                elem.set(_dlg("visible"), "false")
+
+            # Use tallest tab's end Y
+            max_tab_h = 0
+            for child_m, child_config in tabbed_children:
+                ch = 0
+                if child_m.get("helper"):
+                    ch += 12
+                for fn, schema in child_config.items():
+                    if schema.get("internal"):
+                        continue
+                    widget = schema.get("widget", "text")
+                    if widget == "list_detail":
+                        continue
+                    ch += 14
+                    if schema.get("helper"):
+                        ch += 12
+                    ch += 4
+                max_tab_h = max(max_tab_h, ch)
+            y = tab_start_y + max_tab_h
+
+            # Hidden control with tab data for runtime handler
+            tab_data = json.dumps({"tabs": tab_labels, "controls": tab_controls})
+            ET.SubElement(board, _dlg("text"), {
+                _dlg("id"): "__tabs__",
+                _dlg("tab-index"): "0",
+                _dlg("left"): "0", _dlg("top"): "0",
+                _dlg("width"): "0", _dlg("height"): "0",
+                _dlg("value"): tab_data,
+            })
+
+    # If content exceeds page height, store final y for runtime scrollbar.
+    # This is a last-resort fallback — scroll in Options pages is a hack
+    # (repositioning controls, no mouse wheel, no native scroll).
+    # Prefer config_disposition: tab to split content into tabs.
     if y > _PAGE_HEIGHT:
-        window.set(_dlg("width"), str(_PAGE_WIDTH + _SCROLLBAR_WIDTH))
+        print("  WARNING: %s page overflows (%d > %d dialog units). "
+              "Consider using config_disposition: tab or splitting config."
+              % (module_name, y, _PAGE_HEIGHT))
         ET.SubElement(board, _dlg("text"), {
             _dlg("id"): "__content_height__",
             _dlg("tab-index"): "0",
@@ -802,7 +917,7 @@ def generate_list_detail_xdl(module_name, field_name, schema):
         _dlg("tab-index"): "0",
         _dlg("left"): str(_MARGIN),
         _dlg("top"): str(y),
-        _dlg("width"): str(_PAGE_WIDTH - _MARGIN * 2),
+        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
         _dlg("height"): str(_ROW_HEIGHT),
         _dlg("value"): section_label,
     })
@@ -863,9 +978,8 @@ def generate_list_detail_xdl(module_name, field_name, schema):
         y = _emit_field(board, ctrl_id, widget, item_schema, y)
 
     # If content exceeds page height, store final y for runtime scrollbar
-    # and widen the window so the scrollbar sits outside the content area
+    # (scrollbar space is always reserved in PAGE_WIDTH via CONTENT_WIDTH)
     if y > _PAGE_HEIGHT:
-        window.set(_dlg("width"), str(_PAGE_WIDTH + _SCROLLBAR_WIDTH))
         ET.SubElement(board, _dlg("text"), {
             _dlg("id"): "__content_height__",
             _dlg("tab-index"): "0",
@@ -1411,7 +1525,8 @@ def generate_options_dialog_xcu(modules):
         config = m.get("config", {})
 
         # Parent's own config (labeled "Tunnel" not "Main" since it's flat)
-        if config or name in inline_target_set:
+        # Skip if the parent itself is inlined elsewhere (e.g. writer -> doc)
+        if (config or name in inline_target_set) and name not in inline_set:
             safe = name.replace(".", "_")
             _add_leaf(lw_leaves, "Nelson_%s" % safe,
                       _pretty_name(name),

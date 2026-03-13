@@ -3,6 +3,16 @@
     "nelson": {
       "type": "http",
       "url": "http://localhost:8766/mcp"
+    },
+    "nelson-dev": {
+      "type": "http",
+      "url": "http://localhost:8767/mcp"
+    },
+    "lo-wbox": {
+      "type": "stdio",
+      "command": "wbox-mcp",
+      "args": ["serve"],
+      "cwd": "dev/lo-wbox"
     }
   }
 }

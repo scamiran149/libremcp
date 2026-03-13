@@ -47,6 +47,7 @@ ALWAYS_INCLUDE_PLUGIN = [
     "plugin/version.py",
     "plugin/prompt_function.py",
     "plugin/_manifest.py",
+    "plugin/_layout.py",
     "plugin/plugin.yaml",
     "plugin/framework/",
     "plugin/lib/",

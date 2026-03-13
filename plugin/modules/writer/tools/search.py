@@ -135,6 +135,11 @@ class SearchInDocument(ToolBase):
                             )
                         pos += step
 
+            # Enrich with heading context if tree service available
+            tree_svc = getattr(ctx.services, "writer_tree", None)
+            if tree_svc and matches:
+                tree_svc.enrich_search_results(doc, matches)
+
             return {
                 "status": "ok",
                 "matches": matches,

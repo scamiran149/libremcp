@@ -28,6 +28,7 @@ _parent = os.path.dirname(_plugin_dir)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
+import uno
 import unohelper
 from com.sun.star.awt import (
     XContainerWindowEventHandler, XActionListener, XItemListener,
@@ -36,6 +37,19 @@ from com.sun.star.lang import XServiceInfo
 
 log = logging.getLogger("nelson.options")
 
+# Ensure nelson logger has a handler (options_handler may load before main.py)
+_nelson_logger = logging.getLogger("nelson")
+if not _nelson_logger.handlers:
+    _nelson_logger.propagate = False
+    _lp = os.environ.get("NELSON_LOG_PATH",
+                         os.path.join(os.path.expanduser("~"), "nelson.log"))
+    _h = logging.FileHandler(_lp, mode="a", encoding="utf-8")
+    _h.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s — %(message)s"))
+    _nelson_logger.addHandler(_h)
+    _nelson_logger.setLevel(logging.DEBUG)
+
+log.info("options_handler.py module loaded")
 
 # ── List-detail state and UNO listeners ──────────────────────────────
 
@@ -263,9 +277,17 @@ class _BrowseListener(unohelper.Base, XActionListener):
 # ── Scroll listener ──────────────────────────────────────────────────
 
 
-_PAGE_WIDTH = 260
-_PAGE_HEIGHT = 260
-_SCROLLBAR_WIDTH = 12
+# Layout constants — single source of truth in plugin/_layout.py
+# Loaded via exec() because UNO's import system can't resolve plugin._layout
+_layout_ns = {}
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '_layout.py')) as _f:
+    exec(_f.read(), _layout_ns)
+_PAGE_WIDTH = _layout_ns['PAGE_WIDTH']
+_PAGE_HEIGHT = _layout_ns['PAGE_HEIGHT']
+_SCROLLBAR_WIDTH = _layout_ns['SCROLLBAR_WIDTH']
+_CONTENT_WIDTH = _layout_ns['CONTENT_WIDTH']
+_VISIBLE_HEIGHT = 185   # actual visible area in LO Options (official max)
+_OVERFLOW_TWEAK = 60    # extra DLU so last controls are fully visible when scrolled
 
 
 class _ScrollListener(unohelper.Base, XAdjustmentListener):
@@ -280,8 +302,68 @@ class _ScrollListener(unohelper.Base, XAdjustmentListener):
         for model, orig_y in self._positions:
             model.PositionY = orig_y - scroll_val
 
+    def reset(self):
+        """Restore all controls to their original Y positions."""
+        for model, orig_y in self._positions:
+            model.PositionY = orig_y
+
     def disposing(self, evt):
         pass
+
+
+# ── Tab listener ─────────────────────────────────────────────────────
+
+
+class _TabListener(unohelper.Base, XItemListener):
+    """Show/hide control groups when the tab selector changes."""
+
+    def __init__(self, tab_data, xWindow):
+        self._tab_data = tab_data  # {"tabs": [...], "controls": {...}}
+        self._xWindow = xWindow
+
+    def itemStateChanged(self, evt):
+        idx = evt.Selected
+        tabs = self._tab_data["tabs"]
+        if idx < 0 or idx >= len(tabs):
+            return
+        _apply_tab_visibility(self._xWindow, self._tab_data, idx)
+
+    def disposing(self, evt):
+        pass
+
+
+def _apply_tab_visibility(xWindow, tab_data, active_idx):
+    """Show controls for active tab, hide all others."""
+    tabs = tab_data["tabs"]
+    controls = tab_data["controls"]
+    active_tab = tabs[active_idx] if active_idx < len(tabs) else tabs[0]
+    active_ids = set(controls.get(active_tab, []))
+
+    # Collect all tab-managed IDs
+    all_tab_ids = set()
+    for ids in controls.values():
+        all_tab_ids.update(ids)
+
+    shown = 0
+    hidden = 0
+    missing = 0
+    for ctrl_id in all_tab_ids:
+        try:
+            ctrl = xWindow.getControl(ctrl_id)
+            if ctrl:
+                visible = ctrl_id in active_ids
+                ctrl.setVisible(visible)
+                if visible:
+                    shown += 1
+                else:
+                    hidden += 1
+            else:
+                missing += 1
+        except Exception:
+            missing += 1
+
+    log.debug("Tab visibility: active=%s shown=%d hidden=%d missing=%d",
+              active_tab, shown, hidden, missing)
 
 
 # ── Main handler ─────────────────────────────────────────────────────
@@ -297,11 +379,12 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         self.ctx = ctx
         self._cached_values = {}  # full_key -> value at init time
         self._ld_states = {}      # full_key -> _ListDetailState
+        self._scroll_listeners = {}  # id(xWindow) -> _ScrollListener
 
     # ── XContainerWindowEventHandler ─────────────────────────────────
 
     def callHandlerMethod(self, xWindow, eventObject, methodName):
-        log.debug("OptionsHandler: method=%s event=%s", methodName, eventObject)
+        log.info("OptionsHandler: method=%s event=%s", methodName, eventObject)
         if methodName != "external_event":
             return False
         try:
@@ -337,7 +420,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
     def _on_initialize(self, xWindow):
         """Load config values into the Options page controls."""
         module_name = self._detect_module(xWindow)
-        log.info("Options page initialize: module=%s", module_name)
+        # Reset scroll state to avoid polluting other pages
+        self._reset_scroll(xWindow)
         if not module_name:
             log.warning("Could not detect module from Options page")
             return
@@ -368,7 +452,29 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     xWindow, child_name, child_config, config_svc,
                     prefix=child_safe + "__")
 
+        self._setup_tabs(xWindow)
         self._setup_scroll(xWindow)
+
+    def _log_control_positions(self, xWindow, module_name, phase):
+        """Log position/size of the container and all controls for debugging."""
+        try:
+            pos = xWindow.getPosSize()
+            model = xWindow.getModel()
+            lines = ["[%s] module=%s win=(%d,%d,%dx%d) model=%dx%ddlu" % (
+                phase, module_name, pos.X, pos.Y, pos.Width, pos.Height,
+                getattr(model, 'Width', 0), getattr(model, 'Height', 0))]
+            for ctrl in xWindow.getControls():
+                m = ctrl.getModel()
+                name = getattr(m, "Name", "?")
+                if name.startswith("__") and name != "__scrollbar__":
+                    continue  # skip hidden metadata controls
+                cp = ctrl.getPosSize()  # pixel position
+                lines.append("  %s: dlu(%d,%d,%d,%d) px(%d,%d,%d,%d)" % (
+                    name, m.PositionX, m.PositionY, m.Width, m.Height,
+                    cp.X, cp.Y, cp.Width, cp.Height))
+            log.debug("Control positions:\n%s", "\n".join(lines))
+        except Exception:
+            log.debug("_log_control_positions failed", exc_info=True)
 
     def _load_module_fields(self, xWindow, module_name, mod_config,
                             config_svc, prefix=""):
@@ -519,8 +625,41 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         return changes
 
     def _on_back(self, xWindow):
-        """Reload values (revert unsaved changes)."""
-        self._on_initialize(xWindow)
+        """Revert unsaved changes — reset scroll and reload config values.
+
+        Unlike _on_initialize, does NOT re-setup scroll or tabs because the
+        page is being deactivated (Cancel or page switch).
+        """
+        self._reset_scroll(xWindow)
+
+        module_name = self._detect_module(xWindow)
+        if not module_name:
+            return
+
+        # Check if this is a list_detail page
+        ld_field = self._detect_list_detail(xWindow)
+        if ld_field:
+            self._ld_on_initialize(xWindow, module_name, ld_field)
+            return
+
+        manifest = self._get_manifest()
+        mod_config = self._get_module_config(manifest, module_name)
+        config_svc = self._get_config_service()
+
+        if mod_config:
+            self._load_module_fields(xWindow, module_name, mod_config,
+                                     config_svc, prefix="")
+
+        inline_names = self._detect_inline_modules(xWindow)
+        if inline_names:
+            for child_name in inline_names:
+                child_config = self._get_module_config(manifest, child_name)
+                if not child_config:
+                    continue
+                child_safe = child_name.replace(".", "_")
+                self._load_module_fields(
+                    xWindow, child_name, child_config, config_svc,
+                    prefix=child_safe + "__")
 
     # ── List-detail page handlers ────────────────────────────────────
 
@@ -826,6 +965,81 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
 
     # ── Scroll support ────────────────────────────────────────────────
 
+    def _reset_scroll(self, xWindow):
+        """Restore original positions of all controls (undo scroll offset).
+
+        Prefers the stored _ScrollListener which holds exact original positions.
+        Falls back to arithmetic (PositionY + ScrollValue) when no listener.
+        """
+        scroll_id = "__scrollbar__"
+        listener = self._scroll_listeners.pop(id(xWindow), None)
+        try:
+            dialog_model = xWindow.getModel()
+            has_sb = dialog_model.hasByName(scroll_id)
+
+            if listener is not None:
+                # Best path: restore exact original positions
+                listener.reset()
+                log.debug("_reset_scroll: restored via listener")
+            elif has_sb:
+                # Fallback: arithmetic reversal
+                sb_model = dialog_model.getByName(scroll_id)
+                scroll_val = getattr(sb_model, "ScrollValue", 0) or 0
+                if scroll_val:
+                    controls = xWindow.getControls()
+                    for ctrl in controls:
+                        m = ctrl.getModel()
+                        if getattr(m, "Name", "") == scroll_id:
+                            continue
+                        m.PositionY = m.PositionY + scroll_val
+                    log.debug("_reset_scroll: reversed offset %d (fallback)", scroll_val)
+
+            # Remove scrollbar control and model
+            if has_sb:
+                dialog_model.removeByName(scroll_id)
+        except Exception:
+            log.debug("_reset_scroll: cleanup error", exc_info=True)
+
+    def _setup_tabs(self, xWindow):
+        """Set up tab switching if __tabs__ hidden control exists."""
+        tab_data = self._detect_tabs(xWindow)
+        if not tab_data:
+            log.debug("_setup_tabs: no tab data found")
+            return
+
+        try:
+            tabs = tab_data.get("tabs", [])
+            if len(tabs) < 2:
+                log.debug("_setup_tabs: only %d tab(s), skipping", len(tabs))
+                return
+
+            selector = self._get_control(xWindow, "__tab_selector__")
+            if not selector:
+                log.warning("_setup_tabs: __tab_selector__ control not found")
+                return
+
+            model = selector.getModel()
+
+            # Set items on model (persists across page switches, unlike addItem)
+            model.StringItemList = tuple(tabs)
+
+            # Select first tab if nothing is selected
+            if selector.getSelectedItemPos() < 0:
+                selector.selectItemPos(0, True)
+
+            # Apply visibility for the current tab
+            idx = max(selector.getSelectedItemPos(), 0)
+            _apply_tab_visibility(xWindow, tab_data, idx)
+
+            # Attach listener only once (use Tag as flag)
+            if getattr(model, "Tag", "") != "tabs_init":
+                selector.addItemListener(_TabListener(tab_data, xWindow))
+                model.Tag = "tabs_init"
+
+            log.info("Tabs configured: %s (active=%d)", tabs, idx)
+        except Exception:
+            log.exception("_setup_tabs failed")
+
     def _setup_scroll(self, xWindow):
         """Add a scrollbar if the page content exceeds _PAGE_HEIGHT."""
         content_height = self._detect_content_height(xWindow)
@@ -837,7 +1051,6 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             if peer is None:
                 return
 
-            # Collect original positions for all controls
             scroll_id = "__scrollbar__"
             original_positions = []
             controls = xWindow.getControls()
@@ -848,34 +1061,38 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     continue
                 original_positions.append((model, model.PositionY))
 
-            # Create scrollbar model — placed at the right edge of
-            # the content area (PAGE_WIDTH), outside usable width
             dialog_model = xWindow.getModel()
             if dialog_model.hasByName(scroll_id):
                 dialog_model.removeByName(scroll_id)
 
+            # Create scrollbar with model positions (will be repositioned
+            # in pixels below to match actual container size)
             sb_model = dialog_model.createInstance(
                 "com.sun.star.awt.UnoControlScrollBarModel")
             sb_model.Name = scroll_id
             sb_model.Orientation = 1  # vertical
-            sb_model.PositionX = _PAGE_WIDTH
+
+            # Scrollbar sits at the right edge of the content area.
+            # Space is always reserved: controls use _CONTENT_WIDTH, scrollbar at _CONTENT_WIDTH.
+            sb_model.PositionX = _CONTENT_WIDTH
             sb_model.PositionY = 0
             sb_model.Width = _SCROLLBAR_WIDTH
             sb_model.Height = _PAGE_HEIGHT
             sb_model.ScrollValueMin = 0
-            sb_model.ScrollValueMax = content_height - _PAGE_HEIGHT
+            sb_model.ScrollValueMax = content_height - _VISIBLE_HEIGHT + _OVERFLOW_TWEAK
+            sb_model.VisibleSize = _VISIBLE_HEIGHT
             sb_model.LineIncrement = 10
-            sb_model.BlockIncrement = 50
+            sb_model.BlockIncrement = _VISIBLE_HEIGHT // 3
 
             dialog_model.insertByName(scroll_id, sb_model)
 
-            # Attach listener
             sb_ctrl = xWindow.getControl(scroll_id)
             if sb_ctrl:
-                sb_ctrl.addAdjustmentListener(
-                    _ScrollListener(original_positions))
+                listener = _ScrollListener(original_positions)
+                self._scroll_listeners[id(xWindow)] = listener
+                sb_ctrl.addAdjustmentListener(listener)
 
-            log.debug("Scrollbar added: content_height=%d page=%d",
+            log.debug("Scrollbar added: content=%d page=%d",
                       content_height, _PAGE_HEIGHT)
         except Exception:
             log.exception("_setup_scroll failed")
@@ -891,6 +1108,20 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     return int(raw)
         except Exception:
             pass
+        return None
+
+    def _detect_tabs(self, xWindow):
+        """Read the hidden __tabs__ control. Returns parsed dict or None."""
+        try:
+            ctrl = xWindow.getControl("__tabs__")
+            if ctrl:
+                model = ctrl.getModel()
+                raw = getattr(model, "Label", "") or getattr(model, "Text", "")
+                if raw:
+                    import json as _json
+                    return _json.loads(raw)
+        except Exception:
+            log.debug("_detect_tabs: no tab data")
         return None
 
     # ── Helpers ──────────────────────────────────────────────────────
@@ -948,11 +1179,41 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         return None
 
     def _get_control(self, xWindow, field_name):
-        """Get a control by field name, returning None if missing."""
+        """Get a control by field name, searching sub-containers (multipage)."""
         try:
-            return xWindow.getControl(field_name)
+            ctrl = xWindow.getControl(field_name)
+            if ctrl:
+                return ctrl
         except Exception:
-            return None
+            pass
+        # Search inside sub-containers (multipage pages)
+        try:
+            for ctrl in xWindow.getControls():
+                try:
+                    container = ctrl.queryInterface(
+                        uno.getTypeByName(
+                            "com.sun.star.awt.XControlContainer"))
+                    if container:
+                        found = container.getControl(field_name)
+                        if found:
+                            return found
+                        # Search one level deeper (page inside multipage)
+                        for sub in container.getControls():
+                            try:
+                                sub_c = sub.queryInterface(
+                                    uno.getTypeByName(
+                                        "com.sun.star.awt.XControlContainer"))
+                                if sub_c:
+                                    found = sub_c.getControl(field_name)
+                                    if found:
+                                        return found
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return None
 
     def _get_config_service(self):
         """Get the ConfigService from the framework."""

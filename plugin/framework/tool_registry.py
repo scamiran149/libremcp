@@ -165,13 +165,20 @@ class ToolRegistry:
         # Emit executing event
         bus = self._services.get("events")
         if bus:
-            bus.emit("tool:executing", name=tool_name, caller=ctx.caller)
+            bus.emit("tool:executing", name=tool_name, caller=ctx.caller,
+                     kwargs=kwargs)
 
         # Invalidate document cache on mutations (skipped in batch mode)
         if tool.detects_mutation() and not self.batch_mode:
             doc_svc = self._services.get("document")
             if doc_svc:
                 doc_svc.invalidate_cache(ctx.doc)
+
+        # Auto-enable track changes for MCP mutations
+        if (tool.detects_mutation() and ctx.caller == "mcp"
+                and ctx.doc is not None
+                and tool_name != "set_track_changes"):
+            self._ensure_track_changes(ctx.doc)
 
         try:
             result = tool.execute(ctx, **kwargs)
@@ -182,9 +189,27 @@ class ToolRegistry:
             return {"status": "error", "error": str(exc)}
 
         if bus:
-            bus.emit("tool:completed", name=tool_name, caller=ctx.caller)
+            bus.emit("tool:completed", name=tool_name, caller=ctx.caller,
+                     result=result, is_mutation=tool.detects_mutation(),
+                     doc=ctx.doc)
 
         return result
+
+    def _ensure_track_changes(self, doc):
+        """Enable RecordChanges if force_track_changes config is on."""
+        try:
+            cfg_svc = self._services.get("config")
+            if cfg_svc is None:
+                return
+            if not cfg_svc.proxy_for("core").get("force_track_changes"):
+                return
+            if not hasattr(doc, "getPropertyValue"):
+                return
+            if not doc.getPropertyValue("RecordChanges"):
+                doc.setPropertyValue("RecordChanges", True)
+                log.info("Track changes auto-enabled (force_track_changes)")
+        except Exception:
+            pass  # non-writer docs or missing property
 
     @property
     def tool_names(self):

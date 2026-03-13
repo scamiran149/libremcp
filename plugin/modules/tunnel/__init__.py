@@ -338,6 +338,12 @@ class TunnelModule(ModuleBase):
     def get_menu_text(self, action):
         if action == "toggle_tunnel":
             return "Stop Tunnel" if self._manager.is_running else "Start Tunnel"
+        if action == "tunnel_status":
+            cfg = self._services.config.proxy_for(self.name)
+            provider_name = cfg.get("provider")
+            if provider_name:
+                return "Tunnel Status (%s)" % provider_name.title()
+            return "Tunnel Status (none)"
         return None
 
     def get_menu_icon(self, action):
@@ -396,45 +402,105 @@ class TunnelModule(ModuleBase):
             return
 
         provider_name = provider.name if provider else "unknown"
-        msg = "Tunnel running via %s" % provider_name
+        base_url = url.rstrip("/") if url else ""
+        mcp_url = "%s/mcp" % base_url if base_url else ""
+        sse_url = "%s/sse" % base_url if base_url else ""
 
-        # Show dialog with copyable URL field
+        # Show dialog with endpoint URLs and copy buttons
         try:
             smgr = ctx.ServiceManager
 
             dlg_model = smgr.createInstanceWithContext(
                 "com.sun.star.awt.UnoControlDialogModel", ctx)
             dlg_model.Title = "Tunnel Status"
-            dlg_model.Width = 260
-            dlg_model.Height = 80
+            dlg_model.Width = 300
+            dlg_model.Height = 140
 
+            # Status label
             lbl = dlg_model.createInstance(
                 "com.sun.star.awt.UnoControlFixedTextModel")
             lbl.Name = "Msg"
             lbl.PositionX = 10
             lbl.PositionY = 6
-            lbl.Width = 240
-            lbl.Height = 20
-            lbl.MultiLine = True
-            lbl.Label = msg
+            lbl.Width = 280
+            lbl.Height = 10
+            lbl.Label = "Tunnel running via %s" % provider_name
             dlg_model.insertByName("Msg", lbl)
 
-            url_field = dlg_model.createInstance(
-                "com.sun.star.awt.UnoControlEditModel")
-            url_field.Name = "UrlField"
-            url_field.PositionX = 10
-            url_field.PositionY = 30
-            url_field.Width = 240
-            url_field.Height = 14
-            url_field.ReadOnly = True
-            url_field.Text = url if url else "(URL not yet available)"
-            dlg_model.insertByName("UrlField", url_field)
+            # MCP endpoint (Claude, Claude Code)
+            y = 22
+            lbl_mcp = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlFixedTextModel")
+            lbl_mcp.Name = "LblMcp"
+            lbl_mcp.PositionX = 10
+            lbl_mcp.PositionY = y
+            lbl_mcp.Width = 280
+            lbl_mcp.Height = 10
+            lbl_mcp.Label = "MCP endpoint (Claude, Claude Code):"
+            dlg_model.insertByName("LblMcp", lbl_mcp)
 
+            y += 12
+            fld_mcp = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlEditModel")
+            fld_mcp.Name = "FldMcp"
+            fld_mcp.PositionX = 10
+            fld_mcp.PositionY = y
+            fld_mcp.Width = 240
+            fld_mcp.Height = 14
+            fld_mcp.ReadOnly = True
+            fld_mcp.Text = mcp_url or "(not available)"
+            dlg_model.insertByName("FldMcp", fld_mcp)
+
+            btn_copy_mcp = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlButtonModel")
+            btn_copy_mcp.Name = "BtnCopyMcp"
+            btn_copy_mcp.PositionX = 254
+            btn_copy_mcp.PositionY = y
+            btn_copy_mcp.Width = 36
+            btn_copy_mcp.Height = 14
+            btn_copy_mcp.Label = "Copy"
+            dlg_model.insertByName("BtnCopyMcp", btn_copy_mcp)
+
+            # SSE endpoint (ChatGPT, other clients)
+            y += 22
+            lbl_sse = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlFixedTextModel")
+            lbl_sse.Name = "LblSse"
+            lbl_sse.PositionX = 10
+            lbl_sse.PositionY = y
+            lbl_sse.Width = 280
+            lbl_sse.Height = 10
+            lbl_sse.Label = "SSE endpoint (ChatGPT, other clients):"
+            dlg_model.insertByName("LblSse", lbl_sse)
+
+            y += 12
+            fld_sse = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlEditModel")
+            fld_sse.Name = "FldSse"
+            fld_sse.PositionX = 10
+            fld_sse.PositionY = y
+            fld_sse.Width = 240
+            fld_sse.Height = 14
+            fld_sse.ReadOnly = True
+            fld_sse.Text = sse_url or "(not available)"
+            dlg_model.insertByName("FldSse", fld_sse)
+
+            btn_copy_sse = dlg_model.createInstance(
+                "com.sun.star.awt.UnoControlButtonModel")
+            btn_copy_sse.Name = "BtnCopySse"
+            btn_copy_sse.PositionX = 254
+            btn_copy_sse.PositionY = y
+            btn_copy_sse.Width = 36
+            btn_copy_sse.Height = 14
+            btn_copy_sse.Label = "Copy"
+            dlg_model.insertByName("BtnCopySse", btn_copy_sse)
+
+            # OK button
             ok_btn = dlg_model.createInstance(
                 "com.sun.star.awt.UnoControlButtonModel")
             ok_btn.Name = "OKBtn"
-            ok_btn.PositionX = 200
-            ok_btn.PositionY = 58
+            ok_btn.PositionX = 240
+            ok_btn.PositionY = 118
             ok_btn.Width = 50
             ok_btn.Height = 14
             ok_btn.Label = "OK"
@@ -447,6 +513,28 @@ class TunnelModule(ModuleBase):
             toolkit = smgr.createInstanceWithContext(
                 "com.sun.star.awt.Toolkit", ctx)
             dlg.createPeer(toolkit, None)
+
+            # Wire copy button listeners
+            from plugin.framework.dialogs import copy_to_clipboard
+            import unohelper
+            from com.sun.star.awt import XActionListener
+
+            class CopyAction(unohelper.Base, XActionListener):
+                def __init__(self, text, lo_ctx):
+                    self._text = text
+                    self._ctx = lo_ctx
+                def actionPerformed(self, ev):
+                    copy_to_clipboard(self._ctx, self._text)
+                def disposing(self, ev):
+                    pass
+
+            if mcp_url:
+                dlg.getControl("BtnCopyMcp").addActionListener(
+                    CopyAction(mcp_url, ctx))
+            if sse_url:
+                dlg.getControl("BtnCopySse").addActionListener(
+                    CopyAction(sse_url, ctx))
+
             dlg.execute()
             dlg.dispose()
         except Exception:

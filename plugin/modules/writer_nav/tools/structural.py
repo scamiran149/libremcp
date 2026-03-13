@@ -4,7 +4,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 """Structural tools: list_sections, goto_page, get_page_objects, refresh_indexes,
-read_section, resolve_bookmark, update_fields."""
+read_section, resolve_bookmark, update_fields, resolve_locator."""
 
 from plugin.framework.tool_base import ToolBase
 
@@ -103,12 +103,15 @@ class GetPageObjects(ToolBase):
             controller = doc.getCurrentController()
             vc = controller.getViewCursor()
             saved = doc.getText().createTextCursorByRange(vc.getStart())
+            saved_page = vc.getPage()
             doc.lockControllers()
             try:
                 objects = self._scan_page(doc, vc, page)
             finally:
-                vc.gotoRange(saved, False)
                 doc.unlockControllers()
+            # Restore AFTER unlock so viewport actually scrolls back
+            vc.jumpToPage(saved_page)
+            vc.gotoRange(saved, False)
             return {"status": "ok", "page": page, **objects}
         except Exception as e:
             return {"status": "error", "error": str(e)}
@@ -336,6 +339,64 @@ class ResolveBookmark(ToolBase):
                         pass
 
             return result
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+
+class ResolveLocator(ToolBase):
+    """Resolve any locator to its canonical form with metadata."""
+
+    name = "resolve_locator"
+    intent = "navigate"
+    description = (
+        "Resolve any locator string to its current paragraph position "
+        "with confidence, canonical bookmark, heading context, and "
+        "alternatives (for ambiguous matches). Use this to anchor a "
+        "position before editing, or to validate a locator. "
+        "Supported locator types: paragraph:<N>, bookmark:<name>, "
+        "heading:<level.index>, heading_text:<text>, page:<N>, "
+        "section:<name>, regex:/<pattern>/, cursor:, first:, last:."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "locator": {
+                "type": "string",
+                "description": (
+                    "Locator string, e.g. 'heading_text:Introduction', "
+                    "'bookmark:_mcp_a1b2c3d4', 'paragraph:42'."
+                ),
+            },
+        },
+        "required": ["locator"],
+    }
+    doc_types = ["writer"]
+
+    def execute(self, ctx, **kwargs):
+        locator = kwargs.get("locator", "")
+        if not locator:
+            return {"status": "error", "message": "locator is required."}
+
+        doc = ctx.doc
+        doc_svc = ctx.services.document
+
+        try:
+            result = doc_svc.resolve_locator(doc, locator)
+            result["status"] = "ok"
+
+            # Add page number if we have a paragraph index
+            pi = result.get("para_index")
+            if pi is not None:
+                try:
+                    page = doc_svc.get_page_for_paragraph(doc, pi)
+                    if page:
+                        result["page"] = page
+                except Exception:
+                    pass
+
+            return result
+        except ValueError as e:
+            return {"status": "error", "message": str(e)}
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
