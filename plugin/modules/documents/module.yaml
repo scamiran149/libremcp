@@ -1,0 +1,13 @@
+name: documents
+title: Document gallery providers
+provides_services: [documents]
+requires: [config, events]
+
+config:
+  default_instance:
+    type: string
+    default: ""
+    widget: select
+    label: Default Document Gallery Provider
+    public: true
+    options_provider: "plugin.modules.documents.service:get_instance_options"

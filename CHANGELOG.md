@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.1] — 2026-03-14
+
+### Added
+
+- **Document gallery** — new `documents` and `documents.folder` modules, mirroring the image gallery architecture with provider registry, folder provider, and SQLite+FTS5 indexing
+- **Document gallery tools** — `docs_gallery_list`, `docs_gallery_get`, `docs_gallery_search`, `docs_gallery_providers`, `docs_gallery_update`, `docs_folder_rescan` (all `requires_doc=False`)
+- **Document metadata extraction** — reads title, description, subject, keywords, creator, page count, word count, character count, paragraph count, image count, table count from ODF (`meta.xml` + `document-statistic`) and OOXML (`docProps/core.xml` + `app.xml`) via pure stdlib `zipfile` — no LibreOffice needed
+- **Document metadata writing** — `docs_gallery_update` writes title, description, subject, keywords into ODF and OOXML files via zip rewriting (atomic temp-file swap); supports creating `docProps/core.xml` when absent
+- **Document type filter** — `docs_gallery_list` and `docs_gallery_search` accept `doc_type` filter (writer, calc, impress, draw, other)
+- **Document index** — SQLite+FTS5 database per folder (`~/.config/nelson/documents_<hash>.db`) with incremental mtime-based scanning, same pattern as image gallery
+
 ## [0.4.0] — 2026-03-13
 
 ### Added
