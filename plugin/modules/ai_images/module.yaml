@@ -2,16 +2,20 @@ name: ai_images
 title: AI image generation providers
 provides_services: [ai_images]
 requires: [config, events, images]
+menu_group: ai
 
 actions:
-  ai_index_toggle:
-    title: "Start AI Indexing"
+  ai_index_pass1:
+    title: "Pass 1 — Image AI (CLIP)"
+  ai_index_pass2:
+    title: "Pass 2 — Text AI (LLM)"
 
 menus:
   - title: "AI Gallery Indexer"
     context: [writer, calc, draw]
     submenu:
-      - action: ai_index_toggle
+      - action: ai_index_pass1
+      - action: ai_index_pass2
 
 config:
   default_instance:
@@ -36,6 +40,31 @@ config:
     label: Auto-save to Gallery
     public: true
     options_provider: "plugin.modules.ai_images.service:get_writable_gallery_options"
+  index_language:
+    type: string
+    default: ""
+    widget: combo_text
+    label: Indexation Language
+    helper: "Language for AI-generated tags. Leave empty to auto-detect from filenames."
+    options:
+      - value: ""
+        label: "(auto-detect)"
+      - value: "French"
+        label: "French"
+      - value: "English"
+        label: "English"
+      - value: "Spanish"
+        label: "Spanish"
+      - value: "German"
+        label: "German"
+      - value: "Portuguese"
+        label: "Portuguese"
+      - value: "Italian"
+        label: "Italian"
+      - value: "Chinese"
+        label: "Chinese"
+      - value: "Japanese"
+        label: "Japanese"
   gallery_filename:
     type: string
     default: "ai/{date}/{prompt}_{time}"

@@ -15,6 +15,9 @@ log = logging.getLogger("nelson.images.folder")
 
 _CONFIG_DIR = os.path.expanduser("~/.config/nelson")
 
+# Bump when columns change — DB auto-resets on mismatch.
+_SCHEMA_VERSION = 2
+
 _SCHEMA = """\
 CREATE TABLE IF NOT EXISTS images (
     rel_path    TEXT PRIMARY KEY,
@@ -29,9 +32,15 @@ CREATE TABLE IF NOT EXISTS images (
     file_size   INTEGER DEFAULT 0,
     file_mtime  REAL DEFAULT 0,
     xmp_mtime   REAL DEFAULT 0,
-    indexed_at  REAL DEFAULT 0
+    indexed_at  REAL DEFAULT 0,
+    index_stage INTEGER DEFAULT 0
 );
 """
+
+# Stage 0 = file scan only (no AI)
+# Stage 1 = CLIP caption done
+# Stage 2 = LLM folder universe done
+# Stage 3 = LLM per-image tags done
 
 _FTS_SCHEMA = """\
 CREATE VIRTUAL TABLE IF NOT EXISTS images_fts USING fts5(
@@ -79,10 +88,31 @@ class FolderIndex:
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
+            self._check_schema_version()
             self._conn.executescript(_SCHEMA)
             self._conn.executescript(_FTS_SCHEMA)
             self._conn.executescript(_FTS_TRIGGERS)
         return self._conn
+
+    def _check_schema_version(self):
+        """If schema version doesn't match, drop everything and start fresh."""
+        c = self._conn
+        c.execute("CREATE TABLE IF NOT EXISTS _meta "
+                  "(key TEXT PRIMARY KEY, value TEXT)")
+        row = c.execute(
+            "SELECT value FROM _meta WHERE key='schema_version'"
+        ).fetchone()
+        current = int(row[0]) if row else 0
+        if current == _SCHEMA_VERSION:
+            return
+        # Version mismatch — nuke all data tables, keep _meta
+        log.warning("Image index v%d → v%d — resetting: %s",
+                    current, _SCHEMA_VERSION, self._db_path)
+        for t in ("images_fts", "images"):
+            c.execute("DROP TABLE IF EXISTS %s" % t)
+        c.execute("INSERT OR REPLACE INTO _meta VALUES "
+                  "('schema_version', ?)", (str(_SCHEMA_VERSION),))
+        c.commit()
 
     def close(self):
         if self._conn:
@@ -272,6 +302,64 @@ class FolderIndex:
             (limit,),
         ).fetchall()
         return [_row_to_dict(row, self._root) for row in rows]
+
+    def list_at_stage(self, below_stage, limit=500):
+        """Return images whose index_stage is below *below_stage*."""
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT * FROM images WHERE index_stage < ? "
+            "ORDER BY rel_path LIMIT ?",
+            (below_stage, limit),
+        ).fetchall()
+        return [_row_to_dict(row, self._root) for row in rows]
+
+    def list_by_folder(self, folder_prefix, below_stage=None, limit=500):
+        """Return images in a folder prefix, optionally filtered by stage."""
+        conn = self._connect()
+        if below_stage is not None:
+            rows = conn.execute(
+                "SELECT * FROM images "
+                "WHERE rel_path LIKE ? AND index_stage < ? "
+                "ORDER BY rel_path LIMIT ?",
+                (folder_prefix + "%", below_stage, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM images WHERE rel_path LIKE ? "
+                "ORDER BY rel_path LIMIT ?",
+                (folder_prefix + "%", limit),
+            ).fetchall()
+        return [_row_to_dict(row, self._root) for row in rows]
+
+    def update_stage(self, rel_path, stage):
+        """Set the index_stage for an image."""
+        conn = self._connect()
+        conn.execute(
+            "UPDATE images SET index_stage=? WHERE rel_path=?",
+            (stage, rel_path))
+        conn.commit()
+
+    def update_stage_bulk(self, rel_paths, stage):
+        """Set the index_stage for multiple images at once."""
+        conn = self._connect()
+        conn.executemany(
+            "UPDATE images SET index_stage=? WHERE rel_path=?",
+            [(stage, rp) for rp in rel_paths])
+        conn.commit()
+
+    def get_folders(self):
+        """Return distinct folder prefixes from indexed images."""
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT DISTINCT CASE "
+            "  WHEN INSTR(rel_path, '\\') > 0 "
+            "    THEN SUBSTR(rel_path, 1, INSTR(rel_path, '\\')) "
+            "  WHEN INSTR(rel_path, '/') > 0 "
+            "    THEN SUBSTR(rel_path, 1, INSTR(rel_path, '/')) "
+            "  ELSE '' END AS folder "
+            "FROM images ORDER BY folder"
+        ).fetchall()
+        return [r[0] for r in rows]
 
     def count(self):
         """Total indexed images."""

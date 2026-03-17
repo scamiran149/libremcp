@@ -208,3 +208,11 @@ class _LazyProvider:
 
     def list_untagged(self, limit=50):
         return self._ensure().list_untagged(limit=limit)
+
+    @property
+    def _index(self):
+        return self._ensure()._index
+
+    @property
+    def _root(self):
+        return self._ensure()._root

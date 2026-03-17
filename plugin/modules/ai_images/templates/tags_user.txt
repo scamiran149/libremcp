@@ -1,0 +1,12 @@
+Filename: "{filename}"
+CLIP description: "{description}"
+Existing tags: {existing_tags}
+{context_section}
+
+Produce a JSON object:
+- "tags": 5-10 specific tags for THIS image (not generic folder tags)
+- "remove": existing tags that are wrong (art movements, artist names, stock photo labels)
+
+Respond in {lang}. Focus on: subject, action, location, object, emotion, season.
+Do NOT repeat existing tags.
+ONLY output JSON.
