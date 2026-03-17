@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] — 2026-03-17
+
+### Added
+
+- **AI text module** — `plugin/modules/ai` with `AiService` registry, `LlmProvider` ABC, instance-based provider management
+- **Ollama provider** — `plugin/modules/ai_ollama` with list_detail instances, start/stop menu, detect/install scripts (ps1/sh), create preset button, combo_text model selector
+- **Multi-pass AI indexation** — 3-pass pipeline: CLIP caption (pass 1), folder universe via LLM (pass 2), per-image contextual tags via LLM (pass 3)
+- **Hierarchical folder universe** — pass 2 processes top-down (root first), parent universe propagated as context to child folders
+- **Categorized themes** — pass 2 produces structured tags (context/activities/places/people) instead of flat generic lists, avoiding vague tags like "outdoor", "people", "scenic"
+- **Template manager** — `plugin/framework/template_manager.py` with `{placeholder}` substitution, per-module `templates/` directory, language variant support
+- **Indexation language config** — `ai_images.index_language` option to force tag language (French, English, etc.) with auto-detect fallback
+- **Folder context files** — pass 2 reads all `.txt`/`.md` files in a folder as context, with LLM summary if content exceeds 2000 chars
+- **Per-image context** — `<image>.txt` sidecar files injected into pass 3 prompt
+- **CLIP noise removal** — pass 3 asks LLM to identify and remove CLIP hallucinations (art movements, artist names) via `"remove"` field
+- **`combo_text` widget** — split combo for Options: select dropdown + editable text field, with listener sync. Works in list_detail item fields
+- **`menu_group`** — modules declare their menu group; menus sorted by group with separators between groups (ai, network, tools)
+- **`index_stage` column** — tracks which passes have been completed per image, with schema version check and auto-reset on mismatch
+
+### Changed
+
+- **Indexer menu** — two toggle entries "Pass 1 — Image AI (CLIP)" and "Pass 2 — Text AI (LLM)" with per-pass stop label
+- **Non-blocking launch** — indexation starts directly in background job, no more HTTP check freezing the LO main thread
+- **Status bar progress** — real partial fill (X/Y per image), not flash-to-100%
+- **ImageMagick subprocess** — `CREATE_NO_WINDOW` on Windows (no flashing terminal)
+- **DB reset** — soft reset via `DELETE FROM` instead of `os.remove` (fixes Windows file lock)
+- **HTTP Server menu** — actions wrapped in submenu
+- **Debug menu removed** — actions available via `/api/debug` endpoint only
+
 ## [0.5.1] — 2026-03-17
 
 ### Added
