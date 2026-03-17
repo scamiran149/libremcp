@@ -148,22 +148,41 @@ class ToolRegistry:
         if tool is None:
             raise KeyError(f"Unknown tool: {tool_name}")
 
+        bus = self._services.get("events")
+
         # Check doc_type compatibility
         if tool.doc_types and ctx.doc_type and ctx.doc_type not in tool.doc_types:
-            raise ValueError(
-                f"Tool {tool_name} does not support doc_type={ctx.doc_type}"
-            )
+            err_msg = (
+                "Tool '%s' requires %s but active document is %s."
+                % (tool_name, "/".join(tool.doc_types), ctx.doc_type))
+            if bus:
+                bus.emit("tool:failed", name=tool_name, error=err_msg,
+                         caller=ctx.caller)
+            return {
+                "status": "error",
+                "code": "incompatible_doc_type",
+                "message": err_msg,
+                "hint": "Open a %s document first." % "/".join(tool.doc_types),
+                "retryable": False,
+            }
 
         # Validate parameters (before flattening — schema has nested doc-type objects)
         ok, err = tool.validate(**kwargs)
         if not ok:
-            return {"status": "error", "error": err}
+            if bus:
+                bus.emit("tool:failed", name=tool_name, error=err,
+                         caller=ctx.caller)
+            return {
+                "status": "error",
+                "code": "invalid_params",
+                "message": err,
+                "retryable": False,
+            }
 
         # Flatten doc-type-specific nested params
         kwargs = _flatten_doc_type_params(kwargs, ctx.doc_type)
 
         # Emit executing event
-        bus = self._services.get("events")
         if bus:
             bus.emit("tool:executing", name=tool_name, caller=ctx.caller,
                      kwargs=kwargs)
@@ -186,7 +205,12 @@ class ToolRegistry:
             log.exception("Tool execution failed: %s", tool_name)
             if bus:
                 bus.emit("tool:failed", name=tool_name, error=str(exc), caller=ctx.caller)
-            return {"status": "error", "error": str(exc)}
+            return {
+                "status": "error",
+                "code": "execution_error",
+                "message": str(exc),
+                "retryable": True,
+            }
 
         if bus:
             bus.emit("tool:completed", name=tool_name, caller=ctx.caller,

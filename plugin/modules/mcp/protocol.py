@@ -57,6 +57,19 @@ _EXECUTION_TIMEOUT = -32001
 _mcp_session_id = str(uuid.uuid4())
 
 
+def _tool_error(code, message, hint=None, retryable=False):
+    """Build a structured tool error response."""
+    err = {
+        "status": "error",
+        "code": code,
+        "message": message,
+        "retryable": retryable,
+    }
+    if hint:
+        err["hint"] = hint
+    return err
+
+
 class MCPProtocolHandler:
     """MCP JSON-RPC protocol — route handlers for the HTTP server."""
 
@@ -337,15 +350,21 @@ class MCPProtocolHandler:
             log.warning("MCP %s: busy (%s)", method, e)
             return (429, _jsonrpc_error(
                 req_id, _SERVER_BUSY, str(e),
-                {"retryable": True}))
+                {"code": "server_busy", "retryable": True,
+                 "hint": "LibreOffice main thread is processing another "
+                         "request. Retry after a short delay."}))
         except TimeoutError as e:
             log.error("MCP %s: timeout (%s)", method, e)
             return (504, _jsonrpc_error(
-                req_id, _EXECUTION_TIMEOUT, str(e)))
+                req_id, _EXECUTION_TIMEOUT, str(e),
+                {"code": "execution_timeout", "retryable": True,
+                 "hint": "The tool took too long. LibreOffice may be "
+                         "blocked by a dialog or heavy operation."}))
         except Exception as e:
             log.error("MCP %s error: %s", method, e, exc_info=True)
             return (500, _jsonrpc_error(
-                req_id, _INTERNAL_ERROR, str(e)))
+                req_id, _INTERNAL_ERROR, str(e),
+                {"code": "internal_error", "retryable": False}))
 
     # ── Backpressure execution ───────────────────────────────────────
 
@@ -381,8 +400,12 @@ class MCPProtocolHandler:
             if doc_uri:
                 doc = self._resolve_document_uri(doc_svc, doc_uri)
                 if doc is None:
-                    return {"status": "error",
-                            "message": "Document not found: %s" % doc_uri}
+                    return _tool_error(
+                        "document_not_found",
+                        "Document not found: %s" % doc_uri,
+                        hint="Use list_open_documents to see available docs.",
+                        retryable=False,
+                    )
             else:
                 doc = doc_svc.get_active_document()
             if doc:
@@ -393,8 +416,12 @@ class MCPProtocolHandler:
         # Check if tool requires an open document
         tool = registry._tools.get(tool_name)
         if doc is None and (tool is None or tool.requires_doc):
-            return {"status": "error",
-                    "message": "No document open in LibreOffice."}
+            return _tool_error(
+                "no_document",
+                "No document open in LibreOffice.",
+                hint="Use create_document or open_document first.",
+                retryable=False,
+            )
 
         # Get UNO context
         ctx = None
@@ -420,6 +447,25 @@ class MCPProtocolHandler:
             result["_elapsed_ms"] = round(elapsed * 1000, 1)
             if doc_uri:
                 result["_document"] = doc_uri
+            # Always include resolved document context
+            result["_session"] = _mcp_session_id
+            if doc is not None:
+                try:
+                    doc_id = doc_svc.get_doc_id(doc)
+                    title = ""
+                    try:
+                        title = (doc.getDocumentProperties().Title
+                                 or doc.getCurrentController().getFrame()
+                                 .getTitle())
+                    except Exception:
+                        pass
+                    result["_resolved"] = {
+                        "doc_id": doc_id,
+                        "doc_type": doc_type,
+                        "title": title or None,
+                    }
+                except Exception:
+                    pass
 
         return result
 
@@ -484,6 +530,41 @@ class MCPProtocolHandler:
                 continue
 
         return None
+
+    # ── Health endpoint ────────────────────────────────────────────────
+
+    def handle_health(self, handler):
+        """GET /health — readiness probe."""
+        doc_svc = self.services.document
+        doc = None
+        doc_type = None
+        try:
+            doc = doc_svc.get_active_document()
+            if doc:
+                doc_type = doc_svc.detect_doc_type(doc)
+        except Exception:
+            pass
+
+        save_dir = None
+        try:
+            save_dir = doc_svc.get_default_save_dir().replace("\\", "/")
+        except Exception:
+            pass
+
+        tool_count = len(self.tool_registry)
+        data = {
+            "status": "ok",
+            "version": self.version,
+            "session_id": _mcp_session_id,
+            "tools": tool_count,
+            "document": {
+                "available": doc is not None,
+                "doc_type": doc_type,
+                "doc_id": doc_svc.get_doc_id(doc) if doc else None,
+            },
+            "default_save_dir": save_dir,
+        }
+        self._send_json(handler, 200, data)
 
     # ── Helpers ───────────────────────────────────────────────────────
 

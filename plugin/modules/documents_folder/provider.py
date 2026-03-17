@@ -36,6 +36,7 @@ class FolderDocumentProvider(DocumentGalleryProvider):
             e.strip().lower() for e in ext_str.split(",") if e.strip()
         }
         self.name = config_dict.get("name", "folder")
+        self.root_path = self._root  # exposed for default_save_dir
         self._index = DocumentIndex(self._root)
 
     def list_items(self, path="", offset=0, limit=50, doc_type=None):

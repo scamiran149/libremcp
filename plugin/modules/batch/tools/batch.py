@@ -208,13 +208,16 @@ class ExecuteBatch(ToolBase):
                     args = resolve_batch_vars(args, batch_vars)
 
                 # Execute the tool via registry
+                t0 = time.perf_counter()
                 result = tool_reg.execute(tool_name, ctx, **args)
+                step_ms = round((time.perf_counter() - t0) * 1000, 1)
                 step_ok = (isinstance(result, dict)
                            and result.get("status") != "error")
                 results.append({
                     "step": i + 1,
                     "tool": tool_name,
                     "success": step_ok,
+                    "elapsed_ms": step_ms,
                     "result": result,
                 })
                 last_result = result

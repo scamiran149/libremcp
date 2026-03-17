@@ -14,6 +14,41 @@ _READ_PREFIXES = ("get_", "read_", "list_", "find_", "search_", "count_",
                   "export_", "print_", "document_health")
 
 
+def _suggest_enum(value: str, allowed: list) -> Optional[str]:
+    """Return the closest enum value if edit distance <= 3, else None."""
+    if not allowed or not isinstance(value, str):
+        return None
+    value_lower = value.lower().rstrip("s")  # "lines" → "line"
+    for a in allowed:
+        if a.lower() == value_lower:
+            return a
+    # Simple Levenshtein
+    best, best_dist = None, 4
+    for a in allowed:
+        d = _levenshtein(value_lower, a.lower())
+        if d < best_dist:
+            best, best_dist = a, d
+    return best
+
+
+def _levenshtein(s: str, t: str) -> int:
+    if len(s) < len(t):
+        return _levenshtein(t, s)
+    if not t:
+        return len(s)
+    prev = list(range(len(t) + 1))
+    for i, sc in enumerate(s):
+        curr = [i + 1]
+        for j, tc in enumerate(t):
+            curr.append(min(
+                prev[j + 1] + 1,
+                curr[j] + 1,
+                prev[j] + (0 if sc == tc else 1),
+            ))
+        prev = curr
+    return prev[-1]
+
+
 class ToolBase(ABC):
     """Abstract base for every tool exposed to LLM agents and MCP clients.
 
@@ -71,6 +106,21 @@ class ToolBase(ABC):
         for key in kwargs:
             if props and key not in props:
                 return False, f"Unknown parameter: {key}"
+
+        # Validate enum values with suggestions
+        for key, value in kwargs.items():
+            if key not in props:
+                continue
+            prop_schema = props[key]
+            allowed = prop_schema.get("enum")
+            if allowed and value not in allowed:
+                hint = _suggest_enum(value, allowed)
+                msg = "Invalid value '%s' for '%s'. Allowed: %s" % (
+                    value, key, ", ".join(str(a) for a in allowed))
+                if hint:
+                    msg += ". Did you mean '%s'?" % hint
+                return False, msg
+
         return True, None
 
     @abstractmethod

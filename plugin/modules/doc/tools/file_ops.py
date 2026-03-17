@@ -33,6 +33,97 @@ _EXT_FILTERS = {
 }
 
 
+def _save_to_path(doc, path):
+    """Save a document to a filesystem path.
+
+    Handles path normalization, directory creation, filter detection,
+    and Overwrite flag.  Returns (file_url, error_dict_or_None).
+    """
+    # Normalize path: resolve ~, make absolute, fix separators
+    path = os.path.expanduser(path)
+    path = os.path.abspath(path)
+
+    # Ensure parent directory exists
+    parent = os.path.dirname(path)
+    if not os.path.isdir(parent):
+        try:
+            os.makedirs(parent, exist_ok=True)
+        except OSError as exc:
+            return None, {
+                "status": "error",
+                "code": "invalid_path",
+                "message": "Cannot create directory: %s (%s)" % (parent, exc),
+                "retryable": False,
+            }
+
+    # Detect filter from extension
+    _, ext = os.path.splitext(path)
+    ext = ext.lower()
+    filter_name = _EXT_FILTERS.get(ext)
+    if not filter_name:
+        return None, {
+            "status": "error",
+            "code": "unsupported_extension",
+            "message": "Unsupported extension: %s. Supported: %s"
+                       % (ext, ", ".join(sorted(_EXT_FILTERS))),
+            "retryable": False,
+        }
+
+    # Convert to file:// URL
+    file_url = uno.systemPathToFileUrl(path)
+
+    # Build store properties
+    pv_filter = PropertyValue()
+    pv_filter.Name = "FilterName"
+    pv_filter.Value = filter_name
+
+    pv_overwrite = PropertyValue()
+    pv_overwrite.Name = "Overwrite"
+    pv_overwrite.Value = True
+
+    try:
+        doc.storeToURL(file_url, (pv_filter, pv_overwrite))
+    except Exception as exc:
+        log.exception("storeToURL failed for %s: %s", file_url, exc)
+        return None, {
+            "status": "error",
+            "code": "store_failed",
+            "message": "Save failed: %s" % exc,
+            "hint": "Check that the path is valid and writable: %s" % path,
+            "retryable": False,
+        }
+
+    # storeToURL should act as "Save As" and update the doc URL.
+    # If it didn't (known LO quirk on some platforms), fall back to
+    # dispatch .uno:SaveAs which is the real "File > Save As".
+    try:
+        if not doc.getURL() and os.path.isfile(path):
+            log.info("storeToURL did not update URL; trying .uno:SaveAs")
+            frame = doc.getCurrentController().getFrame()
+            from plugin.framework.uno_context import get_ctx
+            ctx = get_ctx()
+            dispatcher = ctx.ServiceManager.createInstanceWithContext(
+                "com.sun.star.frame.DispatchHelper", ctx)
+            dispatcher.executeDispatch(
+                frame, ".uno:SaveAs", "", 0,
+                (pv_filter, pv_overwrite,
+                 PropertyValue("URL", 0, file_url, 0)),
+            )
+    except Exception:
+        log.debug("SaveAs dispatch fallback failed", exc_info=True)
+
+    # Final verification
+    try:
+        saved_url = doc.getURL()
+        if not saved_url and os.path.isfile(path):
+            log.warning("Document saved to disk but URL not updated: %s",
+                        path)
+    except Exception:
+        pass
+
+    return file_url, None
+
+
 class SaveDocument(ToolBase):
     """Save the current document to its existing location."""
 
@@ -73,37 +164,32 @@ class SaveDocument(ToolBase):
         # Unsaved document — need a path
         path = kwargs.get("path")
         if not path:
+            save_dir = "~/Documents"
+            try:
+                save_dir = ctx.services.document.get_default_save_dir()
+            except Exception:
+                pass
             return {
                 "status": "error",
-                "error": (
+                "code": "unsaved_document",
+                "message": (
                     "Document has never been saved. Provide a 'path' "
-                    "parameter (e.g. path='C:/Users/me/report.odt') or "
-                    "use save_document_as. Supported extensions: "
-                    + ", ".join(sorted(_EXT_FILTERS)) + "."
+                    "parameter to save it."
                 ),
+                "hint": (
+                    "Example: path='%s/report.odt'. "
+                    "Supported extensions: %s."
+                    % (save_dir.replace("\\", "/"),
+                       ", ".join(sorted(_EXT_FILTERS)))
+                ),
+                "default_save_dir": save_dir.replace("\\", "/"),
+                "retryable": False,
             }
 
-        # Save to the given path (same logic as SaveDocumentAs)
-        file_url = uno.systemPathToFileUrl(path)
-        _, ext = os.path.splitext(path)
-        ext = ext.lower()
-        filter_name = _EXT_FILTERS.get(ext)
-        if not filter_name:
-            return {
-                "status": "error",
-                "error": "Unsupported extension: %s. Supported: %s"
-                         % (ext, ", ".join(sorted(_EXT_FILTERS))),
-            }
-
-        pv = PropertyValue()
-        pv.Name = "FilterName"
-        pv.Value = filter_name
-
-        try:
-            doc.storeToURL(file_url, (pv,))
-        except Exception as exc:
-            log.exception("SaveDocument (first save) failed: %s", exc)
-            return {"status": "error", "error": str(exc)}
+        # Save to the given path
+        file_url, err = _save_to_path(doc, path)
+        if err:
+            return err
 
         return {"status": "ok", "file_url": file_url, "first_save": True}
 
@@ -161,17 +247,21 @@ class ExportPdf(ToolBase):
 
 
 class SaveDocumentAs(ToolBase):
-    """Save a copy of the document to a new path."""
+    """Save the current document to a new path (File > Save As)."""
 
     name = "save_document_as"
     intent = "media"
-    description = "Save a copy of the document to a new path."
+    description = (
+        "Save the current document to a new path. "
+        "The document adopts the new file as its location "
+        "(like File > Save As, not an export)."
+    )
     parameters = {
         "type": "object",
         "properties": {
             "target_path": {
                 "type": "string",
-                "description": "Absolute file path to save the copy to.",
+                "description": "Absolute file path to save to.",
             },
         },
         "required": ["target_path"],
@@ -181,32 +271,10 @@ class SaveDocumentAs(ToolBase):
 
     def execute(self, ctx, **kwargs):
         target_path = kwargs["target_path"]
-
-        # Convert to file:// URL.
-        url = uno.systemPathToFileUrl(target_path)
-
-        # Determine filter from extension.
-        _, ext = os.path.splitext(target_path)
-        ext = ext.lower()
-        filter_name = _EXT_FILTERS.get(ext)
-        if not filter_name:
-            return {
-                "status": "error",
-                "error": "Unsupported file extension: %s. Supported: %s"
-                         % (ext, ", ".join(sorted(_EXT_FILTERS))),
-            }
-
-        pv = PropertyValue()
-        pv.Name = "FilterName"
-        pv.Value = filter_name
-
-        try:
-            ctx.doc.storeToURL(url, (pv,))
-        except Exception as exc:
-            log.exception("SaveAs failed: %s", exc)
-            return {"status": "error", "error": str(exc)}
-
-        return {"status": "ok", "file_url": url}
+        file_url, err = _save_to_path(ctx.doc, target_path)
+        if err:
+            return err
+        return {"status": "ok", "file_url": file_url}
 
 
 # ── Factory URLs for new documents ───────────────────────────────────
@@ -254,8 +322,11 @@ class CreateDocument(ToolBase):
                 "type": "string",
                 "description": (
                     "Optional file path to save the document immediately "
-                    "(e.g. C:/Users/me/report.odt). Supported extensions: "
-                    + ", ".join(sorted(_EXT_FILTERS)) + "."
+                    "(e.g. C:/Users/me/report.odt). "
+                    "Supported extensions: "
+                    + ", ".join(sorted(_EXT_FILTERS)) + ". "
+                    "Tip: use get_recent_documents to discover valid "
+                    "directory paths on this machine."
                 ),
             },
         },
@@ -307,25 +378,11 @@ class CreateDocument(ToolBase):
 
         # Optionally save immediately
         if path:
-            file_url = uno.systemPathToFileUrl(path)
-            _, ext = os.path.splitext(path)
-            ext = ext.lower()
-            filter_name = _EXT_FILTERS.get(ext)
-            if not filter_name:
-                result["save_error"] = (
-                    "Unsupported extension: %s. Supported: %s"
-                    % (ext, ", ".join(sorted(_EXT_FILTERS)))
-                )
+            file_url, save_err = _save_to_path(new_doc, path)
+            if save_err:
+                result["save_error"] = save_err.get("message", str(save_err))
             else:
-                pv = PropertyValue()
-                pv.Name = "FilterName"
-                pv.Value = filter_name
-                try:
-                    new_doc.storeToURL(file_url, (pv,))
-                    result["file_url"] = file_url
-                except Exception as exc:
-                    log.warning("CreateDocument save failed: %s", exc)
-                    result["save_error"] = str(exc)
+                result["file_url"] = file_url
 
         return result
 

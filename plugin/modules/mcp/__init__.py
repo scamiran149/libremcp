@@ -58,6 +58,9 @@ class MCPModule(ModuleBase):
         routes.add("POST", "/messages", p.handle_sse_post, raw=True)
         routes.add("GET", "/sse", p.handle_sse_stream, raw=True)
 
+        # Health / readiness probe (raw — custom JSON response)
+        routes.add("GET", "/health", p.handle_health, raw=True)
+
         self._routes_registered = True
         log.info("MCP routes registered")
 
@@ -66,6 +69,7 @@ class MCPModule(ModuleBase):
         for method, path in [
             ("POST", "/mcp"), ("GET", "/mcp"), ("DELETE", "/mcp"),
             ("POST", "/sse"), ("POST", "/messages"), ("GET", "/sse"),
+            ("GET", "/health"),
         ]:
             routes.remove(method, path)
         self._routes_registered = False

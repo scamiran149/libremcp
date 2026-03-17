@@ -476,6 +476,52 @@ class DocumentService(ServiceBase):
         except Exception:
             log.debug("goto_paragraph(%d) failed", para_index, exc_info=True)
 
+    # ── Default save directory ────────────────────────────────────
+
+    def get_default_save_dir(self):
+        """Return the best default directory for saving new documents.
+
+        Resolution order:
+        1. First writable document gallery folder (if documents service exists)
+        2. LibreOffice's configured "My Documents" path ($(work))
+        3. ~/Documents or ~ as last fallback
+        """
+        import os
+
+        # 1. Try document gallery
+        try:
+            from plugin.modules.documents.service import DocumentGalleryService
+            doc_gallery = self._services.get("documents")
+            if doc_gallery and doc_gallery._instances:
+                for inst in doc_gallery._instances.values():
+                    provider = inst.provider
+                    if hasattr(provider, "root_path"):
+                        p = provider.root_path
+                        if p and os.path.isdir(p):
+                            return p
+        except Exception:
+            pass
+
+        # 2. LibreOffice PathSubstitution: $(work)
+        try:
+            import uno
+            ctx = get_ctx()
+            smgr = ctx.ServiceManager
+            ps = smgr.createInstanceWithContext(
+                "com.sun.star.util.PathSubstitution", ctx)
+            work_url = ps.substituteVariables("$(work)", True)
+            work_path = uno.fileUrlToSystemPath(work_url)
+            if os.path.isdir(work_path):
+                return work_path
+        except Exception:
+            pass
+
+        # 3. Fallback
+        docs = os.path.expanduser("~/Documents")
+        if os.path.isdir(docs):
+            return docs
+        return os.path.expanduser("~")
+
     def doc_key(self, model):
         """Stable key for a document (URL or id)."""
         try:

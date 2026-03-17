@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.1] — 2026-03-17
+
+### Added
+
+- **`GET /health` endpoint** — readiness probe returning version, session ID, tool count, active document, and `default_save_dir` for agent bootstrapping
+- **`_resolved` context in all tool responses** — every response includes `_resolved` (doc_id, doc_type, title) and `_session` so agents always know which document was targeted
+- **Structured error codes** — all errors now include `code`, `message`, `hint`, `retryable` fields (e.g. `document_not_found`, `unsaved_document`, `incompatible_doc_type`, `invalid_params`, `server_busy`, `execution_timeout`)
+- **Enum suggestions on validation** — invalid enum values trigger "Did you mean 'X'?" hints using Levenshtein distance (e.g. `chart_type: "lines"` → `Did you mean 'line'?`)
+- **`default_save_dir` resolution** — `DocumentService.get_default_save_dir()` resolves the best save directory: document gallery folder → LibreOffice `$(work)` path → `~/Documents`
+- **Batch step timings** — `execute_batch` results include per-step `elapsed_ms`
+
+### Fixed
+
+- **Save path bug** — `_save_to_path` now normalizes paths (`expanduser`, `abspath`), creates parent directories, and adds the `Overwrite` property
+- **"Save As" semantics** — `storeToURL` + `.uno:SaveAs` dispatch fallback ensures the document adopts its new file path (URL, title, modified state all updated). Previously `storeToURL` alone would export a copy without updating the document's internal URL
+- **`save_document_as` description** — corrected from "save a copy" to "save as" (document adopts the new path)
+- **Validation errors in Actions panel** — `tool:failed` events now emitted for parameter validation and doc_type incompatibility errors, so they appear in the sidebar panel
+- **Session validation** — stale `Mcp-Session-Id` now returns `409 Conflict` with structured error instead of being silently accepted
+
+### Changed
+
+- **`save_document` error on unsaved docs** — now returns `default_save_dir` and example path in the hint instead of a generic "use File > Save As" message
+- **`create_document` path tip** — description suggests using `get_recent_documents` to discover valid directories on the target machine
+
 ## [0.5.0] — 2026-03-17
 
 ### Added
