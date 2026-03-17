@@ -2,6 +2,7 @@ name: http
 title: Built-in HTTP server
 requires: [config, events]
 provides_services: [http_routes]
+menu_group: network
 
 actions:
   toggle_server:
@@ -12,8 +13,11 @@ actions:
     icon: stopped
 
 menus:
-  - action: toggle_server
-  - action: server_status
+  - title: "HTTP Server"
+    context: [writer, calc, draw]
+    submenu:
+      - action: toggle_server
+      - action: server_status
 
 config:
   enabled:

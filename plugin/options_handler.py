@@ -75,6 +75,28 @@ class _ListDetailState:
         self._item_options = {}  # fname -> resolved options list
 
 
+class _ComboTextListener(unohelper.Base, XItemListener):
+    """Select → text field sync for combo_text widget."""
+
+    def __init__(self, sel_ctrl, txt_ctrl, values):
+        self._sel = sel_ctrl
+        self._txt = txt_ctrl
+        self._values = values
+
+    def itemStateChanged(self, event):
+        try:
+            idx = self._sel.getSelectedItemPos()
+            if 0 <= idx < len(self._values):
+                val = self._values[idx]
+                if val is not None:  # not "(custom)"
+                    self._txt.getModel().Text = val
+        except Exception:
+            pass
+
+    def disposing(self, event):
+        pass
+
+
 class _LDItemListener(unohelper.Base, XItemListener):
     """Listbox item selection listener for list_detail."""
 
@@ -540,6 +562,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 elif widget == "combo":
                     resolved = self._resolve_options(schema)
                     self._populate_combo(ctrl, resolved, val)
+                elif widget == "combo_text":
+                    resolved = self._resolve_options(schema)
+                    self._setup_combo_text(xWindow, ctrl_id, resolved, val)
             except Exception:
                 log.exception("Error loading %s", full_key)
 
@@ -874,10 +899,19 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     opts = state._item_options.get(fname)
                     combo_schema = dict(fschema, options=opts) if opts else fschema
                     self._populate_combo(ctrl, combo_schema, val)
+                elif widget == "combo_text":
+                    self._setup_combo_text(
+                        state.xWindow, ctrl_id, fschema, val)
                 else:
                     ctrl.getModel().Text = str(val) if val else ""
 
                 ctrl.getModel().Enabled = has_item
+                # Also enable/disable the select part of combo_text
+                if widget == "combo_text":
+                    sel = self._get_control(
+                        state.xWindow, "sel_%s" % ctrl_id)
+                    if sel:
+                        sel.getModel().Enabled = has_item
             except Exception:
                 log.exception("Error showing detail field %s", ctrl_id)
 
@@ -1130,7 +1164,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         """Read the current value from a control."""
         if widget == "checkbox":
             return ctrl.getModel().State == 1
-        elif widget in ("text", "password", "textarea", "file", "folder", "combo"):
+        elif widget in ("text", "password", "textarea", "file", "folder",
+                         "combo", "combo_text"):
             return ctrl.getModel().Text or ""
         elif widget in ("number", "slider"):
             raw = ctrl.getModel().Value
@@ -1320,6 +1355,42 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             labels = tuple(o.get("label", o.get("value", "")) for o in options)
             ctrl.getModel().StringItemList = labels
         ctrl.setText(str(current_value) if current_value else "")
+
+    def _setup_combo_text(self, xWindow, field_name, schema, current_value):
+        """Wire a combo_text widget: select (sel_<field>) + text (<field>).
+
+        Selecting in the dropdown fills the text field with the value.
+        The text field holds the real config value.
+        """
+        sel_ctrl = self._get_control(xWindow, "sel_%s" % field_name)
+        txt_ctrl = self._get_control(xWindow, field_name)
+        if not sel_ctrl or not txt_ctrl:
+            return
+
+        options = list(schema.get("options", []))
+        values = [o.get("value", "") for o in options]
+        labels = [o.get("label", o.get("value", "")) for o in options]
+
+        # Add "(custom)" entry at the end
+        labels.append("(custom)")
+        values.append(None)
+
+        model = sel_ctrl.getModel()
+        model.StringItemList = tuple(labels)
+
+        # Set text field
+        val = str(current_value) if current_value else ""
+        txt_ctrl.getModel().Text = val
+
+        # Select matching entry or "(custom)"
+        if val in values:
+            model.SelectedItems = (values.index(val),)
+        else:
+            model.SelectedItems = (len(labels) - 1,)  # (custom)
+
+        # Listener: select → update text
+        sel_ctrl.addItemListener(
+            _ComboTextListener(sel_ctrl, txt_ctrl, values))
 
     def _populate_select(self, ctrl, schema, current_value):
         """Populate a menulist/listbox with options and select current value.

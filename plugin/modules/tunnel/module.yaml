@@ -2,6 +2,7 @@ name: tunnel
 title: Tunnel providers for external MCP access
 requires: [config, events, http_routes]
 provides_services: [tunnel_manager]
+menu_group: network
 
 actions:
   toggle_tunnel:

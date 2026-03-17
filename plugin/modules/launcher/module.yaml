@@ -2,6 +2,7 @@ name: launcher
 title: AI CLI Launcher
 requires: [config, events]
 provides_services: [launcher_manager]
+menu_group: tools
 
 config:
   provider:

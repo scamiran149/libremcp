@@ -24,10 +24,4 @@ actions:
   debug_info:
     title: "System Info"
 
-menus:
-  # Menu is always visible; on_action() checks debug.enabled at runtime
-  # and shows an "enable in Options" message if disabled.
-  - title: "Debug"
-    context: [writer, calc, draw]
-    submenu:
-      - action: debug_info
+# Menu removed — debug actions available via /api/debug endpoint

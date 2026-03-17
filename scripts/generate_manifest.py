@@ -312,6 +312,30 @@ def _add_combobox(board, field_name, schema, y):
     ET.SubElement(combo_el, _dlg("menupopup"))
 
 
+def _add_combo_text(board, field_name, schema, y):
+    """Add a select dropdown + a text field below it (split combo).
+
+    The select populates the text field. The text field is the real value.
+    The select ID is ``sel_<field_name>``, the text field is ``<field_name>``.
+    """
+    # Select (dropdown) — top row
+    sel_attrs = {
+        _dlg("id"): "sel_%s" % field_name,
+        _dlg("tab-index"): "0",
+        _dlg("left"): str(_FIELD_X),
+        _dlg("top"): str(y),
+        _dlg("width"): str(_FIELD_WIDTH),
+        _dlg("height"): str(_ROW_HEIGHT),
+        _dlg("spin"): "true",
+        _dlg("dropdown"): "true",
+    }
+    ET.SubElement(board, _dlg("menulist"), sel_attrs)
+    # Text field — row below
+    txt_y = y + _ROW_HEIGHT + _ROW_GAP
+    txt_attrs = _common_attrs(field_name, txt_y)
+    ET.SubElement(board, _dlg("textfield"), txt_attrs)
+
+
 def _add_label(board, field_name, label_text, y):
     attrs = {
         _dlg("id"): "lbl_%s" % field_name,
@@ -358,6 +382,9 @@ def _add_widget(board, ctrl_id, widget, schema, y):
         _add_menulist(board, ctrl_id, schema, y)
     elif widget == "combo":
         _add_combobox(board, ctrl_id, schema, y)
+    elif widget == "combo_text":
+        _add_combo_text(board, ctrl_id, schema, y)
+        return _ROW_HEIGHT + _ROW_GAP
     elif widget in ("file", "folder"):
         _add_filefield(board, ctrl_id, schema, y)
     else:
@@ -1264,26 +1291,28 @@ def generate_addons_xcu(modules, framework_manifest, output_path):
     submenu = ET.SubElement(top_menu, "node", {_oor("name"): "Submenu"})
 
     counter = [0]
-    prev_module = False
+    prev_group = None
     icon_entries = []  # (command_url, module_name, icon_prefix)
-    # Module entries (in topo-sort order)
-    for m in modules:
-        menus = m.get("menus")
-        if not menus:
-            continue
+    # Module entries — grouped by menu_group, separator between groups.
+    # Within each group, topo-sort order is preserved.
+    menu_modules = [m for m in modules
+                    if m.get("menus") and m["name"] != "main"]
+    # Stable sort by group name (preserves topo-sort within groups)
+    menu_modules.sort(key=lambda m: m.get("menu_group", "zzz_default"))
+    for m in menu_modules:
+        group = m.get("menu_group", "zzz_default")
         mod_name = m["name"]
-        if mod_name == "main":
-            continue  # framework handled separately below
+        menus = m["menus"]
         actions = m.get("actions", {})
 
-        # Auto-separator between module groups
-        if prev_module:
+        # Separator between groups (not before the first)
+        if prev_group is not None and group != prev_group:
             counter[0] += 1
             _menu_node(submenu, "M%d" % counter[0], url="private:separator")
 
         _build_menu_entries(submenu, menus, actions, mod_name, counter,
                             icon_entries=icon_entries)
-        prev_module = True
+        prev_group = group
 
     # Framework entries (appended last)
     if framework_manifest:

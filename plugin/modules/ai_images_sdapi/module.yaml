@@ -1,6 +1,7 @@
 name: ai_images.sdapi
 title: Stable Diffusion WebUI Forge image generation
 requires: [ai_images]
+menu_group: ai
 
 actions:
   sdapi_launch:
