@@ -188,8 +188,9 @@ class Module(ModuleBase):
                         page = vc.getPage()
                         cache = DocumentCache.get(doc)
                         cache.current_page = page
-                        # Reset idle rebuild timer
-                        module._reset_idle_timer()
+                        # Only reset idle timer if cache needs rebuild
+                        if cache.dirty:
+                            module._reset_idle_timer()
                     except Exception:
                         pass
 
