@@ -705,7 +705,13 @@ class InsertImage(ToolBase):
             paragraph_index = resolved.get("para_index")
 
         if paragraph_index is not None:
-            target, _ = doc_svc.find_paragraph_element(doc, paragraph_index)
+            # Use cached para_ranges if available, else enumerate inline
+            # (idxV2: find_paragraph_element triggers full scan if cache empty)
+            para_ranges = doc_svc.get_paragraph_ranges(doc)
+            if para_ranges and paragraph_index < len(para_ranges):
+                target = para_ranges[paragraph_index]
+            else:
+                target = None
             if target is None:
                 return {
                     "status": "error",

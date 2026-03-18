@@ -322,12 +322,24 @@ class DocumentService(ServiceBase):
         if cache.para_ranges is not None:
             return cache.para_ranges
         try:
-            text = model.getText()
-            enum = text.createEnumeration()
-            ranges = []
-            while enum.hasMoreElements():
-                ranges.append(enum.nextElement())
-            cache.para_ranges = ranges
+            # Lock controllers during enumeration to prevent
+            # viewport repositioning (LO may scroll on enumerate)
+            locked = False
+            try:
+                model.lockControllers()
+                locked = True
+            except Exception:
+                pass
+            try:
+                text = model.getText()
+                enum = text.createEnumeration()
+                ranges = []
+                while enum.hasMoreElements():
+                    ranges.append(enum.nextElement())
+                cache.para_ranges = ranges
+            finally:
+                if locked:
+                    model.unlockControllers()
             return ranges
         except Exception:
             return []
