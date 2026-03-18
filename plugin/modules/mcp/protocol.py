@@ -447,27 +447,141 @@ class MCPProtocolHandler:
             result["_elapsed_ms"] = round(elapsed * 1000, 1)
             if doc_uri:
                 result["_document"] = doc_uri
-            # Always include resolved document context
             result["_session"] = _mcp_session_id
-            if doc is not None:
-                try:
-                    doc_id = doc_svc.get_doc_id(doc)
-                    title = ""
-                    try:
-                        title = (doc.getDocumentProperties().Title
-                                 or doc.getCurrentController().getFrame()
-                                 .getTitle())
-                    except Exception:
-                        pass
-                    result["_resolved"] = {
-                        "doc_id": doc_id,
-                        "doc_type": doc_type,
-                        "title": title or None,
-                    }
-                except Exception:
-                    pass
+            self._enrich_result(result, doc, doc_svc, doc_type,
+                                arguments)
 
         return result
+
+    def _enrich_result(self, result, doc, doc_svc, doc_type,
+                       arguments=None):
+        """Add systematic meta to every tool result.
+
+        Writer: _page, paragraph_index
+        Calc: _sheet
+        Draw/Impress: _page_index
+
+        Resolves paragraph_index from: result > arguments > locator.
+        """
+        if doc is None:
+            return
+
+        # Document identity
+        try:
+            doc_id = doc_svc.get_doc_id(doc)
+            title = ""
+            try:
+                title = (doc.getDocumentProperties().Title
+                         or doc.getCurrentController().getFrame()
+                         .getTitle())
+            except Exception:
+                pass
+            result["_resolved"] = {
+                "doc_id": doc_id,
+                "doc_type": doc_type,
+                "title": title or None,
+            }
+        except Exception:
+            pass
+
+        try:
+            controller = doc.getCurrentController()
+        except Exception:
+            return
+
+        # --- Writer meta ---
+        if doc_type == "writer":
+            try:
+                vc = controller.getViewCursor()
+                args = arguments or {}
+
+                # Resolve paragraph_index: result > args > locator
+                pi = result.get("paragraph_index")
+                if pi is None:
+                    pi = result.get("para_index")
+                if pi is None and isinstance(args.get("paragraph_index"), int):
+                    pi = args["paragraph_index"]
+                if pi is None and args.get("locator"):
+                    try:
+                        resolved = doc_svc.resolve_locator(
+                            doc, args["locator"])
+                        pi = resolved.get("para_index")
+                    except Exception:
+                        pass
+                # Also check nested writer args
+                if pi is None:
+                    w = args.get("writer", {})
+                    if isinstance(w, dict):
+                        if isinstance(w.get("paragraph_index"), int):
+                            pi = w["paragraph_index"]
+                        elif w.get("locator"):
+                            try:
+                                resolved = doc_svc.resolve_locator(
+                                    doc, w["locator"])
+                                pi = resolved.get("para_index")
+                            except Exception:
+                                pass
+
+                if pi is not None and isinstance(pi, int):
+                    result.setdefault("paragraph_index", pi)
+                    # Set _page only if known with certainty (in PageMap)
+                    try:
+                        from plugin.modules.core.services.document import \
+                            DocumentCache
+                        pmap = DocumentCache.get(doc).page_map
+                        known = pmap._samples.get(pi)
+                        if known:
+                            result["_page"] = known
+                        # else: don't set _page — let follow_activity
+                        # use paragraph_index with goto_paragraph
+                    except Exception:
+                        pass
+
+                    # Nearest bookmark (cached, no rebuild)
+                    try:
+                        bm_svc = self.services.get("writer_bookmarks")
+                        if bm_svc:
+                            bm_map = bm_svc.get_mcp_bookmark_map(doc)
+                            nearest = bm_svc.find_nearest_heading_bookmark(
+                                pi, bm_map)
+                            if nearest:
+                                result.setdefault(
+                                    "_bookmark", nearest["bookmark"])
+                    except Exception:
+                        pass
+                else:
+                    # Use tracked current_page if available
+                    try:
+                        from plugin.modules.core.services.document import \
+                            DocumentCache
+                        result["_page"] = getattr(
+                            DocumentCache.get(doc), "current_page",
+                            vc.getPage())
+                    except Exception:
+                        result["_page"] = vc.getPage()
+            except Exception:
+                pass
+
+        # --- Calc meta ---
+        elif doc_type == "calc":
+            try:
+                sheet = controller.getActiveSheet()
+                result["_sheet"] = sheet.getName()
+            except Exception:
+                pass
+
+        # --- Draw/Impress meta ---
+        elif doc_type in ("draw", "impress"):
+            try:
+                page = controller.getCurrentPage()
+                # Find page index
+                pages = doc.getDrawPages()
+                for i in range(pages.getCount()):
+                    if pages.getByIndex(i) == page:
+                        result["_page_index"] = i
+                        break
+            except Exception:
+                pass
 
     def _resolve_document_uri(self, doc_svc, uri):
         """Resolve a document URI to a UNO model.

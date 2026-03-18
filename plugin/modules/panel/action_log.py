@@ -54,8 +54,12 @@ class ActionLog:
                     s = s[:37] + "..."
                 parts.append(s)
             entry.params_snippet = ", ".join(parts)[:120]
-            # Extract paragraph_index from input args
+            # Extract paragraph_index from input args (top-level or nested)
             pi = kwargs.get("paragraph_index")
+            if pi is None:
+                w = kwargs.get("writer")
+                if isinstance(w, dict):
+                    pi = w.get("paragraph_index")
             if pi is None:
                 pi = kwargs.get("locator")  # store locator for later
             if isinstance(pi, int):

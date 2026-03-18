@@ -22,6 +22,110 @@ log = logging.getLogger("nelson.images")
 # Persistent cache directory for downloaded images.
 _IMAGE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "nelson_images")
 
+# Default image width when none specified (mm)
+_DEFAULT_WIDTH_MM = 120
+# Default max height to avoid portrait photos eating a full page (mm)
+_DEFAULT_MAX_HEIGHT_MM = 160
+
+
+def _read_image_dimensions(path):
+    """Read pixel dimensions from image header. Returns (w, h) or (0, 0)."""
+    import struct
+    try:
+        with open(path, "rb") as f:
+            header = f.read(32)
+        if header[:8] == b"\x89PNG\r\n\x1a\n":
+            return struct.unpack(">II", header[16:24])
+        if header[:6] in (b"GIF87a", b"GIF89a"):
+            return struct.unpack("<HH", header[6:10])
+        if header[:2] == b"\xff\xd8":
+            return _read_jpeg_dims(path)
+    except Exception:
+        pass
+    return (0, 0)
+
+
+def _read_jpeg_dims(path):
+    """Read JPEG dimensions from SOF marker."""
+    import struct
+    try:
+        with open(path, "rb") as f:
+            f.read(2)
+            while True:
+                marker = f.read(2)
+                if len(marker) < 2 or marker[0] != 0xFF:
+                    break
+                mtype = marker[1]
+                if mtype in (0xC0, 0xC1, 0xC2):
+                    f.read(2)
+                    data = f.read(5)
+                    if len(data) >= 5:
+                        h, w = struct.unpack(">HH", data[1:5])
+                        return (w, h)
+                    break
+                elif mtype in (0xD9, 0xDA):
+                    break
+                else:
+                    seg_len = struct.unpack(">H", f.read(2))[0]
+                    f.seek(seg_len - 2, 1)
+    except Exception:
+        pass
+    return (0, 0)
+
+
+def _basename_from_url(file_url):
+    """Extract filename without extension from a file:// URL."""
+    try:
+        name = file_url.rsplit("/", 1)[-1]
+        name = name.rsplit(".", 1)[0] if "." in name else name
+        # URL-decode
+        import urllib.parse
+        return urllib.parse.unquote(name)
+    except Exception:
+        return ""
+
+
+def _fit_dimensions(image_path, width_mm, height_mm, max_height_mm=None):
+    """Compute final dimensions preserving aspect ratio.
+
+    Rules:
+    - If both given: fit within the box, preserving ratio.
+    - If only width: compute height from ratio.
+    - If only height: compute width from ratio.
+    - If neither: use _DEFAULT_WIDTH_MM and compute height.
+    - If image dimensions unreadable: fallback to given or defaults.
+    """
+    ext = image_path.rsplit(".", 1)[-1].lower() if "." in image_path else ""
+    px_w, px_h = _read_image_dimensions(image_path)
+
+    if px_w <= 0 or px_h <= 0:
+        # Can't read dimensions — use given or defaults
+        return (width_mm or _DEFAULT_WIDTH_MM, height_mm or _DEFAULT_WIDTH_MM)
+
+    ratio = px_w / px_h
+
+    if width_mm and height_mm:
+        # Fit within box, preserve ratio
+        box_ratio = width_mm / height_mm
+        if ratio > box_ratio:
+            return (width_mm, round(width_mm / ratio))
+        else:
+            return (round(height_mm * ratio), height_mm)
+    elif width_mm:
+        h = round(width_mm / ratio)
+        max_h = max_height_mm or _DEFAULT_MAX_HEIGHT_MM
+        if h > max_h:
+            return (round(max_h * ratio), max_h)
+        return (width_mm, h)
+    elif height_mm:
+        return (round(height_mm * ratio), height_mm)
+    else:
+        h = round(_DEFAULT_WIDTH_MM / ratio)
+        max_h = max_height_mm or _DEFAULT_MAX_HEIGHT_MM
+        if h > max_h:
+            return (round(max_h * ratio), max_h)
+        return (_DEFAULT_WIDTH_MM, h)
+
 
 # ------------------------------------------------------------------
 # ListImages — all doc types
@@ -455,11 +559,25 @@ class InsertImage(ToolBase):
             },
             "width_mm": {
                 "type": "integer",
-                "description": "Width in millimetres (default: 80).",
+                "description": "Width in millimetres (default: 120). Aspect ratio is always preserved.",
             },
             "height_mm": {
                 "type": "integer",
-                "description": "Height in millimetres (default: 80).",
+                "description": "Height in millimetres. Aspect ratio is always preserved.",
+            },
+            "max_height_mm": {
+                "type": "integer",
+                "description": (
+                    "Maximum height in mm for portrait images (default: 160). "
+                    "Prevents tall images from filling an entire page."
+                ),
+            },
+            "caption": {
+                "type": "boolean",
+                "description": (
+                    "Add a caption below the image (default: true in Writer). "
+                    "Caption text = description > title > filename."
+                ),
             },
             "title": {
                 "type": "string",
@@ -527,8 +645,8 @@ class InsertImage(ToolBase):
         if not image_path:
             return {"status": "error", "message": "image_path is required."}
 
-        width_mm = kwargs.get("width_mm", 80)
-        height_mm = kwargs.get("height_mm", 80)
+        width_mm = kwargs.get("width_mm")
+        height_mm = kwargs.get("height_mm")
         title = kwargs.get("title", "")
         description = kwargs.get("description", "")
 
@@ -541,6 +659,11 @@ class InsertImage(ToolBase):
 
         if not os.path.isfile(image_path):
             return {"status": "error", "message": "File not found: %s" % image_path}
+
+        # Preserve aspect ratio
+        max_height_mm = kwargs.get("max_height_mm")
+        width_mm, height_mm = _fit_dimensions(
+            image_path, width_mm, height_mm, max_height_mm)
 
         file_url = uno.systemPathToFileUrl(os.path.abspath(image_path))
         width_units = int(width_mm) * 100
@@ -563,26 +686,20 @@ class InsertImage(ToolBase):
             return {"status": "error", "message": str(e)}
 
     def _insert_writer(self, ctx, file_url, width, height, title, desc, **kwargs):
-        """Insert image in Writer document."""
+        """Insert image in Writer inside a TextFrame with caption.
+
+        The TextFrame wraps the image + an optional caption line below.
+        This matches Writer's native "Insert > Caption" behaviour.
+        Pass caption=False for a standalone image without frame.
+        """
         from com.sun.star.awt import Size
         doc = ctx.doc
-
-        graphic = doc.createInstance("com.sun.star.text.TextGraphicObject")
-        graphic.setPropertyValue("GraphicURL", file_url)
-        size = Size()
-        size.Width = width
-        size.Height = height
-        graphic.setPropertyValue("Size", size)
-        if title:
-            graphic.setPropertyValue("Title", title)
-        if desc:
-            graphic.setPropertyValue("Description", desc)
-
         doc_text = doc.getText()
         doc_svc = ctx.services.document
+
+        # Resolve insertion point
         locator = kwargs.get("locator")
         paragraph_index = kwargs.get("paragraph_index")
-
         if locator is not None and paragraph_index is None:
             resolved = doc_svc.resolve_locator(doc, locator)
             paragraph_index = resolved.get("para_index")
@@ -598,6 +715,106 @@ class InsertImage(ToolBase):
         else:
             cursor = doc_text.createTextCursor()
             cursor.gotoEnd(False)
+
+        add_caption = kwargs.get("caption", True)
+        caption_text = desc or title or _basename_from_url(file_url)
+
+        if add_caption and caption_text:
+            return self._insert_with_frame(
+                doc, doc_text, cursor, file_url, width, height,
+                title, desc, caption_text)
+        else:
+            return self._insert_standalone(
+                doc, doc_text, cursor, file_url, width, height,
+                title, desc)
+
+    def _insert_with_frame(self, doc, doc_text, cursor,
+                           file_url, width, height,
+                           title, desc, caption_text):
+        """Insert image inside a TextFrame with caption below.
+
+        Follows the same pattern as mcp-libre: frame size = image size,
+        frame auto-grows to fit caption text.
+        """
+        from com.sun.star.awt import Size
+
+        frame = doc.createInstance("com.sun.star.text.TextFrame")
+        frame.setPropertyValue("Size", Size(width, height))
+        frame.setPropertyValue("AnchorType", 4)   # AT_CHARACTER
+        frame.setPropertyValue("HoriOrient", 0)    # NONE
+        frame.setPropertyValue("VertOrient", 0)    # NONE
+        frame.setPropertyValue("SizeType", 2)      # FIX
+        frame.setPropertyValue("WidthType", 1)     # FIX
+
+        # Margins matching reference (top=0, left=0, right/bottom ~5mm)
+        frame.setPropertyValue("TopMargin", 0)
+        frame.setPropertyValue("BottomMargin", 499)
+        frame.setPropertyValue("LeftMargin", 0)
+        frame.setPropertyValue("RightMargin", 499)
+
+        # Zero borders and padding
+        from com.sun.star.table import BorderLine2
+        empty_border = BorderLine2()
+        for side in ("TopBorder", "BottomBorder", "LeftBorder", "RightBorder"):
+            try:
+                frame.setPropertyValue(side, empty_border)
+            except Exception:
+                pass
+        for dist in ("TopBorderDistance", "BottomBorderDistance",
+                     "LeftBorderDistance", "RightBorderDistance",
+                     "BorderDistance"):
+            try:
+                frame.setPropertyValue(dist, 0)
+            except Exception:
+                pass
+
+        doc_text.insertTextContent(cursor, frame, False)
+
+        # Insert image inside the frame
+        graphic = doc.createInstance("com.sun.star.text.TextGraphicObject")
+        graphic.setPropertyValue("GraphicURL", file_url)
+        graphic.setPropertyValue("Size", Size(width, height))
+        graphic.setPropertyValue("AnchorType", 0)  # AT_PARAGRAPH
+        graphic.setPropertyValue("HoriOrient", 2)   # CENTER
+        graphic.setPropertyValue("VertOrient", 1)    # TOP
+        if title:
+            graphic.setPropertyValue("Title", title)
+        if desc:
+            graphic.setPropertyValue("Description", desc)
+
+        frame_text = frame.getText()
+        frame_cursor = frame_text.createTextCursor()
+        # Replace the initial empty paragraph with the image
+        frame_text.insertTextContent(frame_cursor, graphic, True)
+
+        # Add caption text after the image
+        cap_cursor = frame_text.createTextCursorByRange(frame_text.getEnd())
+        frame_text.insertControlCharacter(cap_cursor, 0, False)
+        cap_cursor = frame_text.createTextCursorByRange(frame_text.getEnd())
+        frame_text.insertString(cap_cursor, caption_text, False)
+
+        return {
+            "status": "ok",
+            "frame_name": frame.getName(),
+            "image_name": graphic.getName(),
+            "width_mm": width // 100,
+            "height_mm": height // 100,
+            "caption": caption_text,
+        }
+
+    def _insert_standalone(self, doc, doc_text, cursor,
+                           file_url, width, height, title, desc):
+        """Insert a standalone image without frame."""
+        from com.sun.star.awt import Size
+
+        graphic = doc.createInstance("com.sun.star.text.TextGraphicObject")
+        graphic.setPropertyValue("GraphicURL", file_url)
+        graphic.setPropertyValue("Size", Size(width, height))
+        graphic.setPropertyValue("AnchorType", 4)  # AT_CHARACTER
+        if title:
+            graphic.setPropertyValue("Title", title)
+        if desc:
+            graphic.setPropertyValue("Description", desc)
 
         doc_text.insertTextContent(cursor, graphic, False)
 

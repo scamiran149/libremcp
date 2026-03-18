@@ -19,6 +19,83 @@ log = logging.getLogger("nelson.document")
 _yield_counter = 0
 
 
+class PageMap:
+    """Sparse mapping between paragraph indices and page numbers.
+
+    Builds incrementally from observed (para_index, page) pairs.
+    Uses linear interpolation to estimate unknown positions, then
+    corrects via jumpToPage + re-interpolation.
+    """
+
+    # Threshold below which we scan sequentially instead of jumping
+    SEQ_THRESHOLD = 10
+
+    def __init__(self):
+        self._samples = {}  # {para_index: page_number}
+        self._total_paras = 0
+
+    def observe(self, para_index, page):
+        """Record an observed (paragraph, page) pair."""
+        if para_index is not None and page is not None and page > 0:
+            self._samples[para_index] = page
+
+    def set_total(self, total):
+        self._total_paras = total
+
+    def estimate_page(self, target_para):
+        """Estimate which page a paragraph is on via interpolation."""
+        if not self._samples:
+            return 1
+        # Find nearest samples below and above
+        below = [(pi, pg) for pi, pg in self._samples.items()
+                 if pi <= target_para]
+        above = [(pi, pg) for pi, pg in self._samples.items()
+                 if pi > target_para]
+
+        if below and above:
+            pi_lo, pg_lo = max(below, key=lambda x: x[0])
+            pi_hi, pg_hi = min(above, key=lambda x: x[0])
+            if pi_hi == pi_lo:
+                return pg_lo
+            ratio = (target_para - pi_lo) / (pi_hi - pi_lo)
+            return max(1, round(pg_lo + ratio * (pg_hi - pg_lo)))
+        elif below:
+            pi_lo, pg_lo = max(below, key=lambda x: x[0])
+            if pi_lo == 0 and self._total_paras > 0:
+                # Extrapolate from origin
+                paras_per_page = max(1, pi_lo / max(1, pg_lo))
+                return max(1, round(pg_lo + (target_para - pi_lo)
+                                    / max(1, paras_per_page)))
+            return pg_lo
+        elif above:
+            pi_hi, pg_hi = min(above, key=lambda x: x[0])
+            return max(1, pg_hi)
+        return 1
+
+    def estimate_para(self, target_page):
+        """Estimate which paragraph starts a page via interpolation."""
+        if not self._samples:
+            return 0
+        below = [(pi, pg) for pi, pg in self._samples.items()
+                 if pg <= target_page]
+        above = [(pi, pg) for pi, pg in self._samples.items()
+                 if pg > target_page]
+
+        if below and above:
+            pi_lo, pg_lo = max(below, key=lambda x: x[1])
+            pi_hi, pg_hi = min(above, key=lambda x: x[1])
+            if pg_hi == pg_lo:
+                return pi_lo
+            ratio = (target_page - pg_lo) / (pg_hi - pg_lo)
+            return max(0, round(pi_lo + ratio * (pi_hi - pi_lo)))
+        elif below:
+            return max(below, key=lambda x: x[1])[0]
+        return 0
+
+    def clear(self):
+        self._samples.clear()
+
+
 class DocumentCache:
     """Cache for expensive UNO calls, tied to a document model."""
 
@@ -28,6 +105,7 @@ class DocumentCache:
         self.length = None
         self.para_ranges = None
         self.page_cache = {}
+        self.page_map = PageMap()
         self.last_invalidated = time.time()
 
     @classmethod
@@ -463,18 +541,90 @@ class DocumentService(ServiceBase):
     def goto_paragraph(self, model, para_index):
         """Move the view cursor to a paragraph, scrolling the viewport.
 
-        This is the intentional "follow activity" navigation — it DOES
-        move the viewport (unlike get_page_for_paragraph which preserves it).
+        Uses iterative page jumps via PageMap for O(1)-ish navigation
+        instead of scanning all paragraphs from the start.
         """
         try:
+            controller = model.getCurrentController()
+            vc = controller.getViewCursor()
+            cache = DocumentCache.get(model)
+            pmap = cache.page_map
+
+            # Ensure we have paragraph ranges
             para_ranges = self.get_paragraph_ranges(model)
             if para_index >= len(para_ranges):
                 return
-            controller = model.getCurrentController()
-            vc = controller.getViewCursor()
-            vc.gotoRange(para_ranges[para_index].getStart(), False)
+            pmap.set_total(len(para_ranges))
+
+            # Seed PageMap with current position
+            cur_page = vc.getPage()
+            if not pmap._samples:
+                pmap.observe(0, 1)
+
+            # Check if we already know the exact page for this paragraph
+            known_page = pmap._samples.get(para_index)
+
+            if known_page is None:
+                # Iterative jump: estimate page, jump, check, re-estimate
+                est_page = pmap.estimate_page(para_index)
+
+                # Don't jump if already on the estimated page
+                if est_page != cur_page:
+                    vc.jumpToPage(est_page)
+
+                max_iterations = 4
+                for _ in range(max_iterations):
+                    landed_para = self._find_para_at_cursor(
+                        vc, para_ranges, model.getText())
+                    landed_page = vc.getPage()
+                    pmap.observe(landed_para, landed_page)
+
+                    diff = para_index - landed_para
+                    if abs(diff) < PageMap.SEQ_THRESHOLD:
+                        break
+
+                    # Re-estimate and jump
+                    est_page = pmap.estimate_page(para_index)
+                    if est_page != landed_page:
+                        vc.jumpToPage(est_page)
+                    else:
+                        break  # Can't get closer by jumping
+            else:
+                # Known exact page — jump only if not already there
+                if known_page != cur_page:
+                    vc.jumpToPage(known_page)
+
+            # Final move to exact paragraph — skip if already there
+            current_para = self._find_para_at_cursor(
+                vc, para_ranges, model.getText())
+            if current_para != para_index:
+                vc.gotoRange(para_ranges[para_index].getStart(), False)
+            final_page = vc.getPage()
+            pmap.observe(para_index, final_page)
+
         except Exception:
             log.debug("goto_paragraph(%d) failed", para_index, exc_info=True)
+
+    def _find_para_at_cursor(self, vc, para_ranges, text_obj):
+        """Find the paragraph index at the current view cursor position.
+
+        Uses compareRegionStarts for a binary search.
+        Falls back to 0 on error.
+        """
+        try:
+            cursor_range = vc.getStart()
+            lo, hi = 0, len(para_ranges) - 1
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                cmp = text_obj.compareRegionStarts(
+                    para_ranges[mid].getStart(), cursor_range)
+                if cmp <= 0:
+                    lo = mid
+                else:
+                    hi = mid - 1
+            return lo
+        except Exception:
+            return 0
 
     # ── Default save directory ────────────────────────────────────
 

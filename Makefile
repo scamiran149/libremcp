@@ -309,9 +309,18 @@ deploy:
 	@rm -f $(HOME_DIR)/nelson.log
 	@sleep 1
 	$(MAKE) lo-start
-	@echo "Waiting for LO to load..."
-	@sleep 12
-	@$(MAKE) log
+	@echo "Waiting for LibreOffice..."
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
+		if grep -q "main.py loaded" $(HOME_DIR)/nelson.log 2>/dev/null; then \
+			echo "Nelson loaded."; \
+			if curl -sf http://localhost:8766/health >/dev/null 2>&1; then \
+				echo "MCP ready."; \
+				curl -sf http://localhost:8766/health 2>/dev/null | head -1; \
+			fi; \
+			break; \
+		fi; \
+		sleep 2; \
+	done
 
 log:
 	@cat $(HOME_DIR)/nelson.log 2>/dev/null || echo "No nelson.log found"

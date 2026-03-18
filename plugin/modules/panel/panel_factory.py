@@ -312,8 +312,7 @@ try:
         def _goto_paragraph(self):
             """Navigate the view cursor to the selected entry's paragraph.
 
-            Tries the nearest MCP bookmark first (resilient to edits),
-            falls back to paragraph index via ranges.
+            Uses PageMap-based goto_paragraph for fast navigation.
             """
             if not self._action_log:
                 return
@@ -333,38 +332,7 @@ try:
                 doc = doc_svc.get_active_document()
                 if not doc or not hasattr(doc, "getText"):
                     return
-                controller = doc.getCurrentController()
-                vc = controller.getViewCursor()
-
-                # Try nearest bookmark first
-                navigated = False
-                tree_svc = services.get("writer_tree")
-                if tree_svc:
-                    try:
-                        heading = tree_svc.find_heading_for_paragraph(
-                            doc, pi)
-                        if heading and heading.get("bookmark"):
-                            bm_name = heading["bookmark"]
-                            bookmarks = doc.getBookmarks()
-                            if bookmarks.hasByName(bm_name):
-                                bm = bookmarks.getByName(bm_name)
-                                anchor = bm.getAnchor()
-                                vc.gotoRange(anchor, False)
-                                # If bookmark is on a heading above,
-                                # move down to the actual paragraph
-                                offset = pi - heading["para_index"]
-                                for _ in range(offset):
-                                    vc.gotoNextParagraph(False)
-                                navigated = True
-                    except Exception:
-                        pass  # fall back to paragraph ranges
-
-                if not navigated:
-                    para_ranges = doc_svc.get_paragraph_ranges(doc)
-                    if pi < 0 or pi >= len(para_ranges):
-                        return
-                    para = para_ranges[pi]
-                    vc.gotoRange(para.getStart(), False)
+                doc_svc.goto_paragraph(doc, pi)
             except Exception:
                 log.exception("_goto_paragraph failed for index %d", pi)
 
