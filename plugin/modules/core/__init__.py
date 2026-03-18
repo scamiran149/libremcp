@@ -38,21 +38,68 @@ class Module(ModuleBase):
         # self._rebuilding = False
 
     def start_background(self, services):
-        # Pre-build paragraph cache so first tool call doesn't scan
-        try:
-            from plugin.framework.main_thread import post_to_main_thread
-            doc_svc = self._doc_svc
-
-            def _prebuild():
-                doc = doc_svc.get_active_document()
-                if doc and hasattr(doc, "getText"):
-                    doc_svc.get_paragraph_ranges(doc)
-
-            post_to_main_thread(_prebuild)
-        except Exception:
-            pass
-        # Attach page change logger (debug only)
         self._attach_page_logger()
+        # Pre-build paragraph cache in background after doc is loaded
+        import threading
+        threading.Thread(
+            target=self._prebuild_cache,
+            daemon=True, name="nelson-prebuild").start()
+
+    def _prebuild_cache(self):
+        """Wait for a document to load, then build para_ranges cache.
+
+        Skips if the cache was already built by a tool call.
+        """
+        import time
+        from plugin.framework.main_thread import post_to_main_thread
+        from plugin.modules.core.services.document import DocumentCache
+
+        # Wait for a document to be available (max 30s)
+        doc = None
+        for _ in range(15):
+            time.sleep(2)
+            try:
+                doc = self._doc_svc.get_active_document()
+                if doc and hasattr(doc, "getText"):
+                    break
+                doc = None
+            except Exception:
+                pass
+        if doc is None:
+            return
+
+        # Skip if already built (a tool call may have triggered it)
+        cache = DocumentCache.get(doc)
+        if cache.para_ranges is not None:
+            return
+
+        def _build():
+            # Re-check inside main thread (may have been built meanwhile)
+            if cache.para_ranges is not None:
+                return
+            try:
+                sb = None
+                try:
+                    frame = doc.getCurrentController().getFrame()
+                    sb = frame.createStatusIndicator()
+                    sb.start("Nelson: indexing document...", 0)
+                except Exception:
+                    pass
+
+                self._doc_svc.get_paragraph_ranges(doc)
+
+                n = len(cache.para_ranges) if cache.para_ranges else 0
+                if sb:
+                    sb.setText("Nelson: %d paragraphs ready" % n)
+                    sb.setValue(100)
+                    import threading
+                    threading.Timer(
+                        3.0, lambda: post_to_main_thread(sb.end)
+                    ).start()
+            except Exception:
+                log.debug("prebuild cache failed", exc_info=True)
+
+        post_to_main_thread(_build)
 
     def _on_tool_completed(self, name=None, caller=None, result=None,
                            is_mutation=False, doc=None, **_kw):
