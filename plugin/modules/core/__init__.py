@@ -31,6 +31,7 @@ class Module(ModuleBase):
         self._services = services
         self._idle_timer = None
         self._idle_delay = 3.0  # seconds of idle before cache rebuild
+        self._rebuilding = False  # suppress events during rebuild
         bus = services.events
         bus.subscribe("tool:completed", self._on_tool_completed)
 
@@ -68,6 +69,7 @@ class Module(ModuleBase):
 
             def _rebuild():
                 try:
+                    self._rebuilding = True
                     # Status bar feedback
                     sb = self._statusbar_start(doc, "Nelson: indexing paragraphs...")
                     text = doc.getText()
@@ -98,6 +100,8 @@ class Module(ModuleBase):
                               len(fresh))
                 except Exception:
                     log.debug("idle: rebuild failed", exc_info=True)
+                finally:
+                    self._rebuilding = False
 
             post_to_main_thread(_rebuild)
         except Exception:
@@ -189,7 +193,8 @@ class Module(ModuleBase):
                         cache = DocumentCache.get(doc)
                         cache.current_page = page
                         # Only reset idle timer if cache needs rebuild
-                        if cache.dirty:
+                        # and we're not currently rebuilding
+                        if cache.dirty and not module._rebuilding:
                             module._reset_idle_timer()
                     except Exception:
                         pass
