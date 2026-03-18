@@ -117,8 +117,26 @@ class DocumentCache:
 
     @classmethod
     def invalidate(cls, model):
+        """Invalidate mutable caches but preserve PageMap.
+
+        Para_ranges must be rebuilt (paragraph indices shifted),
+        but PageMap stays as a good approximation (pages shift by ±1).
+        """
         mid = id(model)
-        cls._instances.pop(mid, None)
+        cache = cls._instances.get(mid)
+        if cache is None:
+            return
+        # Save PageMap — it's still a useful approximation
+        saved_page_map = cache.page_map
+        saved_current_page = getattr(cache, "current_page", None)
+        # Reset everything else
+        cache.length = None
+        cache.para_ranges = None
+        cache.page_cache = {}
+        cache.last_invalidated = time.time()
+        # Restore PageMap
+        cache.page_map = saved_page_map
+        cache.current_page = saved_current_page
 
     @classmethod
     def remove(cls, model):
