@@ -480,16 +480,19 @@ class MCPProtocolHandler:
         except Exception:
             return
 
-        # --- Writer meta (lightweight — no scanning) ---
-        if doc_type == "writer":
-            try:
-                vc = controller.getViewCursor()
-                result["_page"] = vc.getPage()
-            except Exception:
-                pass
+        # --- Writer meta ---
+        # idxV2: _page disabled — vc.getPage() may trigger layout recalc
+        # which repositions the viewport. Will be re-enabled with proper
+        # cursor tracking.
+        # if doc_type == "writer":
+        #     try:
+        #         vc = controller.getViewCursor()
+        #         result["_page"] = vc.getPage()
+        #     except Exception:
+        #         pass
 
         # --- Calc meta ---
-        elif doc_type == "calc":
+        if doc_type == "calc":
             try:
                 sheet = controller.getActiveSheet()
                 result["_sheet"] = sheet.getName()

@@ -705,9 +705,8 @@ class InsertImage(ToolBase):
             paragraph_index = resolved.get("para_index")
 
         if paragraph_index is not None:
-            # Use cached para_ranges if available, else enumerate inline
-            # (idxV2: find_paragraph_element triggers full scan if cache empty)
             para_ranges = doc_svc.get_paragraph_ranges(doc)
+            log.debug("INSERT_IMAGE: para_ranges len=%d", len(para_ranges) if para_ranges else 0)
             if para_ranges and paragraph_index < len(para_ranges):
                 target = para_ranges[paragraph_index]
             else:
@@ -725,11 +724,6 @@ class InsertImage(ToolBase):
         add_caption = kwargs.get("caption", True)
         caption_text = desc or title or _basename_from_url(file_url)
 
-        # Save viewport position before insertion
-        controller = doc.getCurrentController()
-        vc = controller.getViewCursor()
-        saved_page = vc.getPage()
-
         if add_caption and caption_text:
             result = self._insert_with_frame(
                 doc, doc_text, cursor, file_url, width, height,
@@ -738,13 +732,6 @@ class InsertImage(ToolBase):
             result = self._insert_standalone(
                 doc, doc_text, cursor, file_url, width, height,
                 title, desc)
-
-        # Restore viewport position
-        try:
-            if vc.getPage() != saved_page:
-                vc.jumpToPage(saved_page)
-        except Exception:
-            pass
 
         if paragraph_index is not None:
             result["paragraph_index"] = paragraph_index
@@ -790,7 +777,9 @@ class InsertImage(ToolBase):
             except Exception:
                 pass
 
+        log.debug("INSERT_IMAGE: inserting frame")
         doc_text.insertTextContent(cursor, frame, False)
+        log.debug("INSERT_IMAGE: frame inserted")
 
         # Insert image inside the frame (AS_CHARACTER avoids empty line)
         graphic = doc.createInstance("com.sun.star.text.TextGraphicObject")
@@ -804,10 +793,10 @@ class InsertImage(ToolBase):
 
         frame_text = frame.getText()
         frame_cursor = frame_text.createTextCursor()
-        # Minimize the initial empty paragraph (CharHeight 1)
-        # so it doesn't create visible space above the image
         frame_cursor.setPropertyValue("CharHeight", 1)
+        log.debug("INSERT_IMAGE: inserting graphic")
         frame_text.insertTextContent(frame_cursor, graphic, False)
+        log.debug("INSERT_IMAGE: graphic inserted")
 
         # Add caption after the image
         cap_cursor = frame_text.createTextCursorByRange(frame_text.getEnd())
@@ -815,6 +804,7 @@ class InsertImage(ToolBase):
         cap_cursor = frame_text.createTextCursorByRange(frame_text.getEnd())
         cap_cursor.setPropertyValue("CharHeight", 10)
         frame_text.insertString(cap_cursor, caption_text, False)
+        log.debug("INSERT_IMAGE: caption inserted, done")
 
         return {
             "status": "ok",

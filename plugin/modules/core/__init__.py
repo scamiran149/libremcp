@@ -51,17 +51,72 @@ class Module(ModuleBase):
             post_to_main_thread(_prebuild)
         except Exception:
             pass
-        # --- idxV2: disabled for now ---
-        # self._attach_cursor_tracker()
-        # self._reset_idle_timer()
+        # Attach page change logger (debug only)
+        self._attach_page_logger()
 
     def _on_tool_completed(self, name=None, caller=None, result=None,
                            is_mutation=False, doc=None, **_kw):
-        """Handle tool completion events."""
-        # --- idxV2: follow_activity disabled ---
-        # Auto-scroll caused freezes and wrong page jumps.
-        # User uses panel "Show" button for navigation instead.
-        pass
+        """Auto-scroll to mutation location when follow_activity is on.
+
+        Uses the same goto_paragraph as the panel Show button.
+        """
+        if not is_mutation or caller != "mcp" or doc is None:
+            return
+        if not self._cfg.get("follow_activity", True):
+            return
+        if result is None or result.get("status") == "error":
+            return
+        pi = result.get("paragraph_index")
+        if pi is None:
+            pi = result.get("para_index")
+        if pi is None or not isinstance(pi, int):
+            return
+        try:
+            self._doc_svc.goto_paragraph(doc, pi)
+        except Exception:
+            pass
+
+    def _attach_page_logger(self):
+        """Debug: log every page change via XSelectionChangeListener."""
+        try:
+            import unohelper
+            from com.sun.star.view import XSelectionChangeListener
+            from plugin.framework.main_thread import post_to_main_thread
+
+            doc_svc = self._doc_svc
+            last_page = [0]
+
+            class _PageLogger(unohelper.Base, XSelectionChangeListener):
+                def selectionChanged(self, event):
+                    try:
+                        doc = doc_svc.get_active_document()
+                        if doc is None:
+                            return
+                        vc = doc.getCurrentController().getViewCursor()
+                        page = vc.getPage()
+                        if page != last_page[0]:
+                            log.debug("PAGE_CHANGE: %d -> %d",
+                                        last_page[0], page)
+                            last_page[0] = page
+                    except Exception:
+                        pass
+
+                def disposing(self, event):
+                    pass
+
+            def _attach():
+                doc = doc_svc.get_active_document()
+                if doc is None:
+                    return
+                try:
+                    controller = doc.getCurrentController()
+                    controller.addSelectionChangeListener(_PageLogger())
+                except Exception:
+                    pass
+
+            post_to_main_thread(_attach)
+        except Exception:
+            pass
 
     # ==================================================================
     # idxV2: all below is disabled pending unified index redesign.
