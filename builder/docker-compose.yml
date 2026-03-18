@@ -5,3 +5,9 @@ services:
     volumes:
       - ..:/src:ro
       - ../build:/output
+      - pip-cache:/tmp/pip-cache
+    environment:
+      - PIP_CACHE_DIR=/tmp/pip-cache
+
+volumes:
+  pip-cache:
