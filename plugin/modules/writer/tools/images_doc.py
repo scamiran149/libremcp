@@ -771,6 +771,9 @@ class InsertImage(ToolBase):
             except Exception:
                 pass
 
+        # Lock controllers to prevent viewport jump during insertion
+        doc.lockControllers()
+
         doc_text.insertTextContent(cursor, frame, False)
 
         # Insert image inside the frame (AS_CHARACTER avoids empty line)
@@ -796,6 +799,8 @@ class InsertImage(ToolBase):
         cap_cursor = frame_text.createTextCursorByRange(frame_text.getEnd())
         cap_cursor.setPropertyValue("CharHeight", 10)
         frame_text.insertString(cap_cursor, caption_text, False)
+
+        doc.unlockControllers()
 
         return {
             "status": "ok",
