@@ -119,19 +119,19 @@ class DocumentCache:
 
     @classmethod
     def invalidate(cls, model):
-        """Mark caches as dirty but keep them usable (stale but functional).
-
-        Para_ranges is kept as-is (stale) — the idle rebuilder will
-        reconstruct a fresh copy and swap it in when ready.
-        PageMap is never invalidated (self-correcting).
-        """
+        """Clear mutable caches. PageMap is kept (idxV2: self-correcting)."""
         mid = id(model)
         cache = cls._instances.get(mid)
         if cache is None:
             return
-        cache.dirty = True
+        # --- idxV2: keep PageMap for future use ---
+        saved_page_map = cache.page_map
+        cache.length = None
+        cache.para_ranges = None
         cache.page_cache = {}
+        cache.dirty = True
         cache.last_invalidated = time.time()
+        cache.page_map = saved_page_map
 
     @classmethod
     def remove(cls, model):
@@ -552,44 +552,18 @@ class DocumentService(ServiceBase):
             return 0
 
     def goto_paragraph(self, model, para_index):
-        """Scroll the viewport to the page containing a paragraph.
+        """Move the view cursor to a paragraph, scrolling the viewport.
 
-        Uses PageMap interpolation + jumpToPage. No paragraph scanning.
-        Seeds the PageMap from document properties if empty.
+        Uses cached para_ranges + gotoRange. Simple and correct.
         """
+        # --- idxV2: was PageMap-based, reverted to simple gotoRange ---
         try:
+            para_ranges = self.get_paragraph_ranges(model)
+            if para_index >= len(para_ranges):
+                return
             controller = model.getCurrentController()
             vc = controller.getViewCursor()
-            cache = DocumentCache.get(model)
-            pmap = cache.page_map
-
-            # Seed PageMap if empty — quick: just origin + last page
-            if not pmap._samples:
-                pmap.observe(0, 1)
-                try:
-                    saved = vc.getPage()
-                    vc.jumpToLastPage()
-                    last_page = vc.getPage()
-                    # Rough total from cache or estimate
-                    total = cache.length or 500
-                    pmap.observe(total, last_page)
-                    pmap.set_total(total)
-                    vc.jumpToPage(saved)
-                except Exception:
-                    pass
-
-            # Estimate page and jump if needed
-            known_page = pmap._samples.get(para_index)
-            est_page = known_page or pmap.estimate_page(para_index)
-            cur_page = getattr(cache, "current_page", None) or vc.getPage()
-
-            if est_page != cur_page:
-                vc.jumpToPage(est_page)
-                # Record observation for self-correction
-                landed_page = vc.getPage()
-                if landed_page != est_page:
-                    pmap.observe(para_index, landed_page)
-
+            vc.gotoRange(para_ranges[para_index].getStart(), False)
         except Exception:
             log.debug("goto_paragraph(%d) failed", para_index, exc_info=True)
 

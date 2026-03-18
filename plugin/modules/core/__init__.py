@@ -29,117 +29,23 @@ class Module(ModuleBase):
         self._doc_svc = services.document
         self._cfg = services.config.proxy_for("core")
         self._services = services
-        self._idle_timer = None
-        self._idle_delay = 3.0  # seconds of idle before cache rebuild
-        self._rebuilding = False  # suppress events during rebuild
         bus = services.events
         bus.subscribe("tool:completed", self._on_tool_completed)
 
+        # --- idxV2: disabled for now ---
+        # self._idle_timer = None
+        # self._idle_delay = 3.0
+        # self._rebuilding = False
+
     def start_background(self, services):
-        self._attach_cursor_tracker()
-        # Trigger initial cache build after idle
-        self._reset_idle_timer()
-
-    def _reset_idle_timer(self):
-        """Reset the idle timer. When it expires, rebuild caches."""
-        import threading
-        if self._idle_timer is not None:
-            self._idle_timer.cancel()
-        self._idle_timer = threading.Timer(
-            self._idle_delay, self._on_idle)
-        self._idle_timer.daemon = True
-        self._idle_timer.start()
-
-    def _on_idle(self):
-        """Called when no activity for _idle_delay seconds.
-
-        If the cache is dirty, rebuilds paragraph ranges on the
-        main thread and swaps it in atomically.
-        """
-        try:
-            from plugin.framework.main_thread import post_to_main_thread
-            from plugin.modules.core.services.document import DocumentCache
-
-            doc = self._doc_svc.get_active_document()
-            if doc is None:
-                return
-            cache = DocumentCache.get(doc)
-            if not cache.dirty:
-                return
-
-            def _rebuild():
-                try:
-                    self._rebuilding = True
-                    # Status bar feedback
-                    sb = self._statusbar_start(doc, "Nelson: indexing paragraphs...")
-                    text = doc.getText()
-                    enum = text.createEnumeration()
-                    fresh = []
-                    while enum.hasMoreElements():
-                        fresh.append(enum.nextElement())
-                    # Atomic swap
-                    cache.para_ranges = fresh
-                    cache.length = len(fresh)
-                    cache.dirty = False
-                    # Seed PageMap with doc dimensions
-                    pmap = cache.page_map
-                    pmap.set_total(len(fresh))
-                    pmap.observe(0, 1)
-                    try:
-                        controller = doc.getCurrentController()
-                        vc = controller.getViewCursor()
-                        saved = vc.getPage()
-                        vc.jumpToLastPage()
-                        pmap.observe(len(fresh) - 1, vc.getPage())
-                        vc.jumpToPage(saved)
-                    except Exception:
-                        pass
-                    self._statusbar_end(sb,
-                        "Nelson: %d paragraphs indexed" % len(fresh))
-                    log.debug("idle: rebuilt para cache (%d paras)",
-                              len(fresh))
-                except Exception:
-                    log.debug("idle: rebuild failed", exc_info=True)
-                finally:
-                    self._rebuilding = False
-
-            post_to_main_thread(_rebuild)
-        except Exception:
-            log.debug("idle: cache rebuild failed", exc_info=True)
-
-    @staticmethod
-    def _statusbar_start(doc, text):
-        """Show a brief message in the LO status bar."""
-        try:
-            frame = doc.getCurrentController().getFrame()
-            sb = frame.createStatusIndicator()
-            sb.start(text, 0)
-            return sb
-        except Exception:
-            return None
-
-    @staticmethod
-    def _statusbar_end(sb, text=None):
-        """Update and close status bar indicator."""
-        if sb is None:
-            return
-        try:
-            import threading
-            from plugin.framework.main_thread import post_to_main_thread
-            if text:
-                sb.setText(text)
-                sb.setValue(100)
-            threading.Timer(
-                2.0, lambda: post_to_main_thread(sb.end)).start()
-        except Exception:
-            pass
+        pass
+        # --- idxV2: disabled for now ---
+        # self._attach_cursor_tracker()
+        # self._reset_idle_timer()
 
     def _on_tool_completed(self, name=None, caller=None, result=None,
                            is_mutation=False, doc=None, **_kw):
         """Auto-scroll to mutation location when follow_activity is on."""
-        # Schedule idle rebuild after any MCP mutation
-        if is_mutation and caller == "mcp":
-            self._reset_idle_timer()
         if not is_mutation or caller != "mcp" or doc is None:
             return
         if not self._cfg.get("follow_activity", True):
@@ -147,67 +53,70 @@ class Module(ModuleBase):
         if result is None or result.get("status") == "error":
             return
 
-        # Jump to the page of the mutation (no paragraph scan)
-        from plugin.modules.core.services.document import DocumentCache
+        # Simple: if result has a known page, jump there
         page = result.get("_page") or result.get("page")
         if page and isinstance(page, int):
             try:
                 controller = doc.getCurrentController()
                 vc = controller.getViewCursor()
-                cur_page = getattr(
-                    DocumentCache.get(doc), "current_page", None
-                ) or vc.getPage()
-                if page != cur_page:
+                if page != vc.getPage():
                     vc.jumpToPage(page)
             except Exception:
-                log.debug("follow_activity: jump failed", exc_info=True)
+                pass
 
-    def _attach_cursor_tracker(self):
-        """Attach a lightweight listener to track the current page."""
-        try:
-            import unohelper
-            from com.sun.star.view import XSelectionChangeListener
-            from plugin.modules.core.services.document import DocumentCache
-            from plugin.framework.main_thread import post_to_main_thread
+    # ==================================================================
+    # idxV2: all below is disabled pending unified index redesign.
+    # The goal is a single index that maps paragraphs, pages, images,
+    # objects etc. without the current PageMap/idle rebuild complexity.
+    # ==================================================================
 
-            doc_svc = self._doc_svc
-            module = self
+    # def _reset_idle_timer(self):
+    #     """Reset the idle timer. When it expires, rebuild caches."""
+    #     import threading
+    #     if self._idle_timer is not None:
+    #         self._idle_timer.cancel()
+    #     self._idle_timer = threading.Timer(
+    #         self._idle_delay, self._on_idle)
+    #     self._idle_timer.daemon = True
+    #     self._idle_timer.start()
 
-            class _CursorTracker(unohelper.Base, XSelectionChangeListener):
-                """Ultra-light: reads vc.getPage() + resets idle timer."""
+    # def _on_idle(self):
+    #     """idxV2: idle cache rebuilder — disabled.
+    #     Rebuilt para_ranges on main thread and swapped atomically.
+    #     Problem: jumpToLastPage triggered cursor events → infinite loop.
+    #     """
+    #     pass
 
-                def selectionChanged(self, event):
-                    try:
-                        doc = doc_svc.get_active_document()
-                        if doc is None:
-                            return
-                        controller = doc.getCurrentController()
-                        vc = controller.getViewCursor()
-                        page = vc.getPage()
-                        cache = DocumentCache.get(doc)
-                        cache.current_page = page
-                        # Only reset idle timer if cache needs rebuild
-                        # and we're not currently rebuilding
-                        if cache.dirty and not module._rebuilding:
-                            module._reset_idle_timer()
-                    except Exception:
-                        pass
+    # @staticmethod
+    # def _statusbar_start(doc, text):
+    #     """Show a brief message in the LO status bar."""
+    #     try:
+    #         frame = doc.getCurrentController().getFrame()
+    #         sb = frame.createStatusIndicator()
+    #         sb.start(text, 0)
+    #         return sb
+    #     except Exception:
+    #         return None
 
-                def disposing(self, event):
-                    pass
+    # @staticmethod
+    # def _statusbar_end(sb, text=None):
+    #     """Update and close status bar indicator."""
+    #     if sb is None:
+    #         return
+    #     try:
+    #         import threading
+    #         from plugin.framework.main_thread import post_to_main_thread
+    #         if text:
+    #             sb.setText(text)
+    #             sb.setValue(100)
+    #         threading.Timer(
+    #             2.0, lambda: post_to_main_thread(sb.end)).start()
+    #     except Exception:
+    #         pass
 
-            def _attach():
-                doc = doc_svc.get_active_document()
-                if doc is None:
-                    return
-                try:
-                    controller = doc.getCurrentController()
-                    controller.addSelectionChangeListener(_CursorTracker())
-                    log.debug("Cursor tracker attached")
-                except Exception:
-                    log.debug("Could not attach cursor tracker", exc_info=True)
-
-            post_to_main_thread(_attach)
-
-        except Exception:
-            log.debug("_attach_cursor_tracker failed", exc_info=True)
+    # def _attach_cursor_tracker(self):
+    #     """idxV2: cursor tracker — disabled.
+    #     Attached XSelectionChangeListener to track current_page.
+    #     Problem: events during rebuild caused infinite loop.
+    #     """
+    #     pass

@@ -524,16 +524,6 @@ class MCPProtocolHandler:
 
                 if pi is not None and isinstance(pi, int):
                     result.setdefault("paragraph_index", pi)
-                    # Set _page only from known observations (not estimates)
-                    try:
-                        from plugin.modules.core.services.document import \
-                            DocumentCache
-                        pmap = DocumentCache.get(doc).page_map
-                        known = pmap._samples.get(pi)
-                        if known:
-                            result["_page"] = known
-                    except Exception:
-                        pass
 
                     # Nearest bookmark (cached, no rebuild)
                     try:
@@ -547,16 +537,9 @@ class MCPProtocolHandler:
                                     "_bookmark", nearest["bookmark"])
                     except Exception:
                         pass
-                else:
-                    # Use tracked current_page if available
-                    try:
-                        from plugin.modules.core.services.document import \
-                            DocumentCache
-                        result["_page"] = getattr(
-                            DocumentCache.get(doc), "current_page",
-                            vc.getPage())
-                    except Exception:
-                        result["_page"] = vc.getPage()
+
+                # Current page from ViewCursor (where the user is)
+                result["_page"] = vc.getPage()
             except Exception:
                 pass
 
