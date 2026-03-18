@@ -557,10 +557,10 @@ class DocumentService(ServiceBase):
             return 0
 
     def goto_paragraph(self, model, para_index):
-        """Move the view cursor to a paragraph, scrolling the viewport.
+        """Scroll the viewport to the page containing a paragraph.
 
-        Uses iterative page jumps via PageMap for O(1)-ish navigation
-        instead of scanning all paragraphs from the start.
+        Uses PageMap interpolation + jumpToPage. No paragraph scanning.
+        Seeds the PageMap from document properties if empty.
         """
         try:
             controller = model.getCurrentController()
@@ -568,81 +568,32 @@ class DocumentService(ServiceBase):
             cache = DocumentCache.get(model)
             pmap = cache.page_map
 
-            # Ensure we have paragraph ranges
-            para_ranges = self.get_paragraph_ranges(model)
-            if para_index >= len(para_ranges):
-                return
-            pmap.set_total(len(para_ranges))
-
-            # Seed PageMap with current position
-            cur_page = vc.getPage()
+            # Seed PageMap from doc properties if empty (no scan)
             if not pmap._samples:
-                pmap.observe(0, 1)
+                try:
+                    pc = model.getPropertyValue("PageCount")
+                    wc = model.getPropertyValue("ParagraphCount")
+                    pmap.observe(0, 1)
+                    if wc > 0 and pc > 0:
+                        pmap.observe(wc, pc)
+                        pmap.set_total(wc)
+                except Exception:
+                    pmap.observe(0, 1)
 
-            # Check if we already know the exact page for this paragraph
+            # Estimate page and jump if needed
             known_page = pmap._samples.get(para_index)
+            est_page = known_page or pmap.estimate_page(para_index)
+            cur_page = getattr(cache, "current_page", None) or vc.getPage()
 
-            if known_page is None:
-                # Iterative jump: estimate page, jump, check, re-estimate
-                est_page = pmap.estimate_page(para_index)
-
-                # Don't jump if already on the estimated page
-                if est_page != cur_page:
-                    vc.jumpToPage(est_page)
-
-                max_iterations = 4
-                for _ in range(max_iterations):
-                    landed_para = self._find_para_at_cursor(
-                        vc, para_ranges, model.getText())
-                    landed_page = vc.getPage()
-                    pmap.observe(landed_para, landed_page)
-
-                    diff = para_index - landed_para
-                    if abs(diff) < PageMap.SEQ_THRESHOLD:
-                        break
-
-                    # Re-estimate and jump
-                    est_page = pmap.estimate_page(para_index)
-                    if est_page != landed_page:
-                        vc.jumpToPage(est_page)
-                    else:
-                        break  # Can't get closer by jumping
-            else:
-                # Known exact page — jump only if not already there
-                if known_page != cur_page:
-                    vc.jumpToPage(known_page)
-
-            # Final move to exact paragraph — skip if already there
-            current_para = self._find_para_at_cursor(
-                vc, para_ranges, model.getText())
-            if current_para != para_index:
-                vc.gotoRange(para_ranges[para_index].getStart(), False)
-            final_page = vc.getPage()
-            pmap.observe(para_index, final_page)
+            if est_page != cur_page:
+                vc.jumpToPage(est_page)
+                # Record observation for self-correction
+                landed_page = vc.getPage()
+                if landed_page != est_page:
+                    pmap.observe(para_index, landed_page)
 
         except Exception:
             log.debug("goto_paragraph(%d) failed", para_index, exc_info=True)
-
-    def _find_para_at_cursor(self, vc, para_ranges, text_obj):
-        """Find the paragraph index at the current view cursor position.
-
-        Uses compareRegionStarts for a binary search.
-        Falls back to 0 on error.
-        """
-        try:
-            cursor_range = vc.getStart()
-            lo, hi = 0, len(para_ranges) - 1
-            while lo < hi:
-                mid = (lo + hi + 1) // 2
-                cmp = text_obj.compareRegionStarts(
-                    para_ranges[mid].getStart(), cursor_range)
-                if cmp <= 0:
-                    lo = mid
-                else:
-                    hi = mid - 1
-            return lo
-        except Exception:
-            return 0
 
     # ── Default save directory ────────────────────────────────────
 

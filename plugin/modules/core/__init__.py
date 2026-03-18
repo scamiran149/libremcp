@@ -57,17 +57,38 @@ class Module(ModuleBase):
             except Exception:
                 pass
 
-        # Fallback to paragraph-based navigation
+        # Fallback: estimate page from PageMap and jump (no scan)
         pi = result.get("paragraph_index")
         if pi is None:
             pi = result.get("para_index")
         if pi is None:
             return
         try:
-            self._doc_svc.goto_paragraph(doc, pi)
-            log.debug("follow_activity: scrolled to paragraph %d", pi)
+            from plugin.modules.core.services.document import DocumentCache
+            cache = DocumentCache.get(doc)
+            pmap = cache.page_map
+            # Seed with doc stats if empty
+            if not pmap._samples:
+                try:
+                    pc = doc.getPropertyValue("PageCount")
+                    # Rough para count from doc stats (no scan)
+                    wc = doc.getPropertyValue("ParagraphCount")
+                    pmap.observe(0, 1)
+                    if wc > 0 and pc > 0:
+                        pmap.observe(wc, pc)
+                        pmap.set_total(wc)
+                except Exception:
+                    pass
+            est_page = pmap.estimate_page(pi)
+            controller = doc.getCurrentController()
+            vc = controller.getViewCursor()
+            cur_page = vc.getPage()
+            if est_page != cur_page:
+                vc.jumpToPage(est_page)
+            log.debug("follow_activity: jumped to page %d for para %d",
+                      est_page, pi)
         except Exception:
-            log.debug("follow_activity: scroll failed", exc_info=True)
+            log.debug("follow_activity: jump failed", exc_info=True)
 
     def _attach_cursor_tracker(self):
         """Attach a lightweight listener to track the current page."""
