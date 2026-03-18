@@ -29,15 +29,69 @@ class Module(ModuleBase):
         self._doc_svc = services.document
         self._cfg = services.config.proxy_for("core")
         self._services = services
+        self._idle_timer = None
+        self._idle_delay = 3.0  # seconds of idle before cache rebuild
         bus = services.events
         bus.subscribe("tool:completed", self._on_tool_completed)
 
     def start_background(self, services):
         self._attach_cursor_tracker()
 
+    def _reset_idle_timer(self):
+        """Reset the idle timer. When it expires, rebuild caches."""
+        import threading
+        if self._idle_timer is not None:
+            self._idle_timer.cancel()
+        self._idle_timer = threading.Timer(
+            self._idle_delay, self._on_idle)
+        self._idle_timer.daemon = True
+        self._idle_timer.start()
+
+    def _on_idle(self):
+        """Called when no activity for _idle_delay seconds.
+
+        If the cache is dirty, rebuilds paragraph ranges on the
+        main thread and swaps it in atomically.
+        """
+        try:
+            from plugin.framework.main_thread import post_to_main_thread
+            from plugin.modules.core.services.document import DocumentCache
+
+            doc = self._doc_svc.get_active_document()
+            if doc is None:
+                return
+            cache = DocumentCache.get(doc)
+            if not cache.dirty:
+                return
+
+            def _rebuild():
+                try:
+                    text = doc.getText()
+                    enum = text.createEnumeration()
+                    fresh = []
+                    while enum.hasMoreElements():
+                        fresh.append(enum.nextElement())
+                    # Atomic swap
+                    cache.para_ranges = fresh
+                    cache.length = len(fresh)
+                    cache.dirty = False
+                    # Update PageMap total
+                    cache.page_map.set_total(len(fresh))
+                    log.debug("idle: rebuilt para cache (%d paras)",
+                              len(fresh))
+                except Exception:
+                    log.debug("idle: rebuild failed", exc_info=True)
+
+            post_to_main_thread(_rebuild)
+        except Exception:
+            log.debug("idle: cache rebuild failed", exc_info=True)
+
     def _on_tool_completed(self, name=None, caller=None, result=None,
                            is_mutation=False, doc=None, **_kw):
         """Auto-scroll to mutation location when follow_activity is on."""
+        # Schedule idle rebuild after any MCP mutation
+        if is_mutation and caller == "mcp":
+            self._reset_idle_timer()
         if not is_mutation or caller != "mcp" or doc is None:
             return
         if not self._cfg.get("follow_activity", True):
@@ -99,9 +153,10 @@ class Module(ModuleBase):
             from plugin.framework.main_thread import post_to_main_thread
 
             doc_svc = self._doc_svc
+            module = self
 
             class _CursorTracker(unohelper.Base, XSelectionChangeListener):
-                """Ultra-light: just reads vc.getPage() on selection change."""
+                """Ultra-light: reads vc.getPage() + resets idle timer."""
 
                 def selectionChanged(self, event):
                     try:
@@ -112,9 +167,9 @@ class Module(ModuleBase):
                         vc = controller.getViewCursor()
                         page = vc.getPage()
                         cache = DocumentCache.get(doc)
-                        cache.page_map.observe(None, None)  # no-op
-                        # Store current page for quick access
                         cache.current_page = page
+                        # Reset idle rebuild timer
+                        module._reset_idle_timer()
                     except Exception:
                         pass
 
