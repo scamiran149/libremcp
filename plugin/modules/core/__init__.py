@@ -38,7 +38,19 @@ class Module(ModuleBase):
         # self._rebuilding = False
 
     def start_background(self, services):
-        pass
+        # Pre-build paragraph cache so first tool call doesn't scan
+        try:
+            from plugin.framework.main_thread import post_to_main_thread
+            doc_svc = self._doc_svc
+
+            def _prebuild():
+                doc = doc_svc.get_active_document()
+                if doc and hasattr(doc, "getText"):
+                    doc_svc.get_paragraph_ranges(doc)
+
+            post_to_main_thread(_prebuild)
+        except Exception:
+            pass
         # --- idxV2: disabled for now ---
         # self._attach_cursor_tracker()
         # self._reset_idle_timer()
