@@ -725,6 +725,11 @@ class InsertImage(ToolBase):
         add_caption = kwargs.get("caption", True)
         caption_text = desc or title or _basename_from_url(file_url)
 
+        # Save viewport position before insertion
+        controller = doc.getCurrentController()
+        vc = controller.getViewCursor()
+        saved_page = vc.getPage()
+
         if add_caption and caption_text:
             result = self._insert_with_frame(
                 doc, doc_text, cursor, file_url, width, height,
@@ -733,6 +738,14 @@ class InsertImage(ToolBase):
             result = self._insert_standalone(
                 doc, doc_text, cursor, file_url, width, height,
                 title, desc)
+
+        # Restore viewport position
+        try:
+            if vc.getPage() != saved_page:
+                vc.jumpToPage(saved_page)
+        except Exception:
+            pass
+
         if paragraph_index is not None:
             result["paragraph_index"] = paragraph_index
         return result
