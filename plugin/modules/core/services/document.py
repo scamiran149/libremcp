@@ -355,16 +355,20 @@ class DocumentService(ServiceBase):
         return -1
 
     def find_paragraph_element(self, model, para_index):
-        """Find a paragraph element by index. Returns (element, max_index)."""
-        doc_text = model.getText()
-        enum = doc_text.createEnumeration()
-        idx = 0
-        while enum.hasMoreElements():
-            element = enum.nextElement()
-            if idx == para_index:
-                return element, idx
-            idx += 1
-        return None, idx
+        """Find a paragraph element by index. Returns (element, max_index).
+
+        Uses cached para_ranges when available to avoid O(n) scan.
+        """
+        cache = DocumentCache.get(model)
+        if cache.para_ranges is not None:
+            if para_index < len(cache.para_ranges):
+                return cache.para_ranges[para_index], len(cache.para_ranges)
+            return None, len(cache.para_ranges)
+        # Fallback: enumerate (first call only, builds cache)
+        para_ranges = self.get_paragraph_ranges(model)
+        if para_index < len(para_ranges):
+            return para_ranges[para_index], len(para_ranges)
+        return None, len(para_ranges)
 
     def annotate_pages(self, nodes, model):
         """Recursively add 'page' field to heading tree nodes.
