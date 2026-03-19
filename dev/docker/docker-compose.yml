@@ -1,20 +1,19 @@
-# Dev build container — persistent work volume for incremental builds.
+# Dev build container — mounts project, runs make.
 #
-# Usage from project root:
-#   make docker-dev          (build, incremental)
-#   make docker-dev-rebuild  (clean + build)
+# Usage:
+#   make docker-dev              → make build (incremental)
+#   make docker-dev-rebuild      → make rebuild (force)
 
 services:
   dev-build:
     build: .
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
-      - ../../:/src:ro
-      - ../../build:/output
-      - work:/work
+      - ../../:/src
+    working_dir: /src
     environment:
       - HOME=/tmp
-    entrypoint: ["/bin/bash", "/src/dev/docker/build-dev.sh"]
+    entrypoint: ["make"]
+    command: ["USE_DOCKER=", "build"]
 
-volumes:
-  work:
+volumes: {}

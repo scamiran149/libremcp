@@ -155,11 +155,11 @@ docker-build:
 	@echo "Done: build/nelson.oxt"
 
 docker-dev:
-	docker compose -f dev/docker/docker-compose.yml run --rm dev-build
+	docker compose -f dev/docker/docker-compose.yml run --rm dev-build build USE_DOCKER=
 	@echo "Done: build/nelson.oxt"
 
 docker-dev-rebuild:
-	docker compose -f dev/docker/docker-compose.yml run --rm dev-build rebuild
+	docker compose -f dev/docker/docker-compose.yml run --rm dev-build rebuild USE_DOCKER=
 	@echo "Done: build/nelson.oxt (rebuilt)"
 
 # ── RDB (UNO type library) ────────────────────────────────────────────────
