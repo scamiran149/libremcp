@@ -9,8 +9,8 @@ services:
     container_name: nelson-dev
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
-      - ../../:/src
-    working_dir: /src
+      - ../../:/nelson-mcp
+    working_dir: /nelson-mcp
     environment:
       - HOME=/tmp
     command: ["sleep", "infinity"]

@@ -222,6 +222,24 @@ def zip_bundle(base_dir, output):
     return 0
 
 
+def _is_up_to_date(project_root, output_path):
+    """Check if output is newer than all source files."""
+    oxt_mtime = os.path.getmtime(output_path)
+    source_dirs = ["plugin", "extension", "build/generated", "vendor"]
+    for d in source_dirs:
+        full = os.path.join(project_root, d)
+        if not os.path.isdir(full):
+            continue
+        for dirpath, _, filenames in os.walk(full):
+            for fn in filenames:
+                if fn.endswith((".pyc", ".oxt")) or "__pycache__" in dirpath:
+                    continue
+                fp = os.path.join(dirpath, fn)
+                if os.path.getmtime(fp) > oxt_mtime:
+                    return False
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build Nelson MCP .oxt extension")
     parser.add_argument(
@@ -233,7 +251,15 @@ def main():
     parser.add_argument(
         "--repack", action="store_true",
         help="Only re-zip build/bundle/ (skip assembly)")
+    parser.add_argument(
+        "--check", action="store_true",
+        help="Skip build if .oxt is newer than all sources")
     args = parser.parse_args()
+
+    if args.check and os.path.isfile(args.output):
+        if _is_up_to_date(PROJECT_ROOT, args.output):
+            print("%s is up to date." % args.output)
+            return 0
 
     if not args.repack:
         modules = args.modules or _discover_modules(PROJECT_ROOT)

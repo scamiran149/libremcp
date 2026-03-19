@@ -137,7 +137,7 @@ help:
 vendor: vendor/.installed
 vendor/.installed: requirements-vendor.txt
 	$(DOCKER_EXEC) pip install --target vendor -r requirements-vendor.txt
-	@touch vendor/.installed
+	$(DOCKER_EXEC) touch vendor/.installed
 
 ifeq ($(OS),Windows_NT)
 DOCKER_UID ?= 1000
@@ -148,16 +148,19 @@ DOCKER_GID ?= $(shell id -g)
 endif
 export DOCKER_UID DOCKER_GID
 
-DOCKER_EXEC = docker exec nelson-dev
-DOCKER_UP   = docker compose -f dev/docker/docker-compose.yml up -d --build
+DOCKER_EXEC  = docker exec nelson-dev
+DOCKER_COMPOSE = docker compose -f dev/docker/docker-compose.yml
 DOCKER_CI   = docker compose -f builder/docker-compose.yml up --build
 
 # Start dev container if not running
 dev-up:
-	@docker inspect nelson-dev >/dev/null 2>&1 || $(DOCKER_UP)
+	@docker start nelson-dev 2>NUL || $(DOCKER_COMPOSE) up -d
+
+dev-build-image:
+	$(DOCKER_COMPOSE) build
 
 dev-down:
-	docker compose -f dev/docker/docker-compose.yml down
+	$(DOCKER_COMPOSE) down
 
 # Legacy Docker build (CI/release — ephemeral container)
 docker-build:
@@ -196,7 +199,7 @@ $(ICON_DIR)/logo.png: $(ICON_SVG) | $(ICON_DIR)
 	$(DOCKER_EXEC) magick -background none -density 256 $< -resize 42x42 $@
 
 $(ICON_DIR):
-	$(MKDIR) $(ICON_DIR)
+	$(DOCKER_EXEC) mkdir -p $(ICON_DIR)
 
 sqlite3:
 ifeq ($(OS),Windows_NT)
@@ -209,9 +212,7 @@ endif
 # The container runs `make _build` which uses local targets with deps.
 # Use `make _build` directly if running inside the container or locally.
 build: dev-up vendor manifest rdb icons sqlite3
-	@echo "Building $(EXTENSION_NAME).oxt..."
-	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt
-	@echo "Done: build/$(EXTENSION_NAME).oxt"
+	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt --check
 
 rebuild: clean build
 
@@ -254,9 +255,9 @@ build/generated/Addons.xcu: $(MANIFEST_SOURCES) $(SCRIPTS)/generate_manifest.py
 xcu: manifest
 
 clean:
-	$(RM_RF) build
-	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-	find . -name "*.pyc" -delete 2>/dev/null || true
+	$(DOCKER_EXEC) rm -rf build vendor/.installed
+	-$(DOCKER_EXEC) find . -name "__pycache__" -type d -exec rm -rf {} +
+	-$(DOCKER_EXEC) find . -name "*.pyc" -delete
 
 # ── Install ──────────────────────────────────────────────────────────────────
 
