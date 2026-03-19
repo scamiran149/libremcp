@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Nelson MCP — Tool Reference</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2em; max-width: 900px; color: #333; }
+  h1 { color: #222; }
+  .stats { color: #666; margin-bottom: 1.5em; }
+  #search {
+    width: 100%; padding: 10px; font-size: 1em;
+    margin: 1em 0; border: 1px solid #ccc; border-radius: 6px;
+    box-sizing: border-box;
+  }
+  .tool {
+    margin: 1em 0; padding: 1em;
+    background: #f8f8f8; border-radius: 8px;
+    border-left: 3px solid #4a9eff;
+  }
+  .tool h3 { margin: 0 0 .3em; font-size: 1.1em; }
+  .tool h3 code { background: #e8f0fe; padding: 2px 6px; border-radius: 4px; }
+  .desc { color: #555; margin: .3em 0; }
+  .params { margin: .5em 0 0; font-size: .9em; }
+  .param { margin: .3em 0 .3em 1em; }
+  .pname { font-weight: bold; }
+  .ptype { color: #888; font-size: .85em; }
+  .required { color: #c44; font-weight: bold; }
+  .enum code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: .85em; }
+  .presets { margin: 2em 0; padding: 1em; background: #fffbe6; border-radius: 8px; }
+  .presets h2 { margin-top: 0; }
+  .preset-list { columns: 2; }
+  .preset-list li { margin: .3em 0; }
+</style>
+</head>
+<body>
+<h1>Nelson MCP — Tool Reference</h1>
+<div class="stats">{tool_count} tools available. Version {version}.</div>
+
+<div class="presets">
+  <h2>Presets</h2>
+  <p>Use these in Options &gt; MCP &gt; Custom Endpoints to create filtered endpoints for smaller LLMs.</p>
+  {presets_html}
+</div>
+
+<h2>All Tools</h2>
+<input id="search" type="text" placeholder="Filter tools...">
+
+{tools_html}
+
+<script>
+document.getElementById('search').addEventListener('input', function() {
+  var q = this.value.toLowerCase();
+  document.querySelectorAll('.tool').forEach(function(t) {
+    t.style.display = t.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>

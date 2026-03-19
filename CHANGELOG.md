@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] — 2026-03-19
+
+### Added
+
+- **Custom MCP endpoints** — configurable filtered endpoints in Options > MCP. Each endpoint exposes a subset of tools (one per line in textarea). Presets available: minimal (8), writer-edit (25), writer-read (15), calc (20), gallery (10). Useful for smaller LLMs (fixes #2)
+- **Tool reference page** — `/api/tools` HTML endpoint with searchable tool documentation, auto-generated from schemas. "Tool Reference" button in Options opens it
+- **Undo support** — all MCP mutations wrapped in `UndoContext`, Ctrl+Z reverts entire tool operation. Each action has a unique `_action_id` visible in undo history and MCP results
+- **MCP bridge** — `dev/mcp-bridge/server.py` stdio-to-HTTP proxy with auto re-initialize on 409, `-Xutf8` for Windows UTF-8
+- **Dev Docker build** — persistent `nelson-dev` container with `docker exec`, Make targets with file dependencies (skip vendor/manifest/icons if unchanged). `make build` from PowerShell works
+- **md2xhp converter** — `tools/md2xhp/md2xhp.py` converts Markdown subset to LibreOffice XHP help format (headings, lists, code, notes, inline formatting)
+- **PageMap** (idxV2, disabled) — sparse paragraph↔page cache with interpolation, kept as commented code for future unified index
+
+### Changed
+
+- **Insert image with frame + caption** — TextFrame wraps image + caption (AS_CHARACTER + CharHeight 1 pattern). Aspect ratio always preserved, `max_height_mm` default 160
+- **follow_activity** — uses `goto_paragraph` (same as panel Show), disabled complex PageMap estimation
+- **Cache invalidation** — moved AFTER tool execution (tool uses valid cache). Prebuild at boot with retry + status bar
+- **`_enrich_result` simplified** — no scanning, no PageMap estimation, no `vc.getPage()` in hot paths
+- **Makefile** — Docker dev container (`make dev-up`), PowerShell compatible (`make deploy` works from PS), `make rebuild` forces clean build, `build_oxt.py --check` skips if up to date
+- **Menu groups** — `menu_group` field on modules, sorted with separators (ai, network, tools). Debug menu removed
+- **Deploy** — polls log + health instead of `sleep 12`, pip-cache Docker volume
+
+### Fixed
+
+- **Viewport jump on insert** — `lockControllers` during `get_paragraph_ranges` enumeration, cache invalidation after (not before) tool execution
+- **Panel Show freeze** — uses cached `find_paragraph_element` instead of full enumeration
+- **Idle rebuild loop** — disabled (idxV2), was causing infinite cursor events
+
 ## [0.6.1] — 2026-03-18
 
 ### Added

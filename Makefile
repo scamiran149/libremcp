@@ -300,7 +300,7 @@ endif
 # ── LibreOffice ──────────────────────────────────────────────────────────────
 
 lo-start:
-	NELSON_SET_CONFIG="$(NELSON_SET_CONFIG)" $(RUN_SH) $(SCRIPTS)/launch-lo-debug$(EXT)
+	$(RUN_SH) $(SCRIPTS)/launch-lo-debug$(EXT)
 
 lo-start-full:
 ifeq ($(OS),Windows_NT)

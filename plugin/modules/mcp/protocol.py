@@ -73,9 +73,10 @@ def _tool_error(code, message, hint=None, retryable=False):
 class MCPProtocolHandler:
     """MCP JSON-RPC protocol — route handlers for the HTTP server."""
 
-    def __init__(self, services):
+    def __init__(self, services, tool_filter=None):
         self.services = services
         self.tool_registry = services.tools
+        self.tool_filter = tool_filter  # set of tool names, or None for all
         self.event_bus = getattr(services, "events", None)
         self.version = "unknown"
         try:
@@ -274,6 +275,8 @@ class MCPProtocolHandler:
     def _mcp_tools_list(self, params):
         doc_type = self._detect_active_doc_type()
         schemas = self.tool_registry.get_mcp_schemas(doc_type)
+        if self.tool_filter:
+            schemas = [s for s in schemas if s["name"] in self.tool_filter]
         return {"tools": schemas}
 
     def _mcp_resources_list(self, params):
@@ -287,6 +290,9 @@ class MCPProtocolHandler:
         arguments = params.get("arguments", {})
         if not tool_name:
             raise ValueError("Missing 'name' in tools/call params")
+        if self.tool_filter and tool_name not in self.tool_filter:
+            raise ValueError(
+                "Tool '%s' not available on this endpoint" % tool_name)
 
         if self.event_bus:
             self.event_bus.emit("mcp:request", tool=tool_name, args=arguments)
@@ -608,6 +614,76 @@ class MCPProtocolHandler:
             "default_save_dir": save_dir,
         }
         self._send_json(handler, 200, data)
+
+    def handle_tool_reference(self, handler):
+        """GET /api/tools — HTML tool reference page."""
+        from plugin.framework.http_server import send_cors_headers
+        schemas = self.tool_registry.get_mcp_schemas()
+
+        html = ['<!DOCTYPE html><html><head>',
+                '<meta charset="utf-8">',
+                '<title>Nelson MCP — Tool Reference</title>',
+                '<style>',
+                'body{font-family:system-ui;margin:2em;max-width:900px}',
+                'h1{color:#333}h2{color:#555;border-bottom:1px solid #ddd;padding-bottom:4px}',
+                '.tool{margin:1em 0;padding:1em;background:#f8f8f8;border-radius:6px}',
+                '.tool h3{margin:0 0 .3em;font-size:1.1em}',
+                '.desc{color:#666;margin:.3em 0}',
+                '.params{margin:.5em 0 0;font-size:.9em}',
+                '.param{margin:.2em 0 .2em 1em}',
+                '.pname{font-weight:bold;color:#333}',
+                '.ptype{color:#888;font-size:.85em}',
+                '.required{color:#c44}',
+                'code{background:#eee;padding:1px 4px;border-radius:3px;font-size:.9em}',
+                '#search{width:100%;padding:8px;font-size:1em;margin:1em 0;border:1px solid #ccc;border-radius:4px}',
+                '</style></head><body>',
+                '<h1>Nelson MCP — Tool Reference</h1>',
+                '<p>%d tools available. Version %s.</p>' % (
+                    len(schemas), self.version),
+                '<input id="search" type="text" placeholder="Filter tools..." oninput="filter()">']
+
+        for s in sorted(schemas, key=lambda x: x["name"]):
+            name = s["name"]
+            desc = s.get("description", "")
+            props = s.get("inputSchema", {}).get("properties", {})
+            required = set(s.get("inputSchema", {}).get("required", []))
+
+            html.append('<div class="tool" data-name="%s">' % name)
+            html.append('<h3><code>%s</code></h3>' % name)
+            if desc:
+                html.append('<div class="desc">%s</div>' % desc)
+            if props:
+                html.append('<div class="params">')
+                for pname, pschema in props.items():
+                    if pname == "_document":
+                        continue
+                    ptype = pschema.get("type", "")
+                    pdesc = pschema.get("description", "")
+                    req = ' <span class="required">*</span>' if pname in required else ""
+                    enum = pschema.get("enum")
+                    enum_str = ""
+                    if enum:
+                        enum_str = " (%s)" % ", ".join(
+                            '<code>%s</code>' % e for e in enum)
+                    html.append(
+                        '<div class="param">'
+                        '<span class="pname">%s</span>%s '
+                        '<span class="ptype">%s</span>%s'
+                        '%s</div>' % (
+                            pname, req, ptype, enum_str,
+                            " — %s" % pdesc if pdesc else ""))
+                html.append('</div>')
+            html.append('</div>')
+
+        html.append('<script>function filter(){var q=document.getElementById("search").value.toLowerCase();document.querySelectorAll(".tool").forEach(function(t){t.style.display=t.textContent.toLowerCase().includes(q)?"":"none"})}</script>')
+        html.append('</body></html>')
+
+        body = "\n".join(html).encode("utf-8")
+        handler.send_response(200)
+        send_cors_headers(handler)
+        handler.send_header("Content-Type", "text/html; charset=utf-8")
+        handler.end_headers()
+        handler.wfile.write(body)
 
     # ── Helpers ───────────────────────────────────────────────────────
 

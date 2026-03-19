@@ -7,13 +7,106 @@
 
 Registers MCP routes with the shared HTTP server.
 No server management — that's the http module's job.
+Supports custom filtered endpoints for smaller LLMs.
 """
 
+import json
 import logging
 
 from plugin.framework.module_base import ModuleBase
 
 log = logging.getLogger("nelson.mcp")
+
+# Tool presets — pre-filled tool lists for common use cases
+PRESETS = {
+    "writer-edit": [
+        "list_open_documents", "get_document_info", "get_document_outline",
+        "open_document", "create_document", "save_document", "close_document",
+        "read_paragraphs", "get_heading_content", "find_text",
+        "insert_at_paragraph", "insert_paragraphs_batch", "set_paragraph_text",
+        "set_paragraph_style", "delete_paragraph", "duplicate_paragraph",
+        "insert_image", "insert_hyperlink",
+        "create_table", "write_table_cell",
+        "execute_batch", "undo", "redo",
+        "resolve_locator", "get_document_stats",
+    ],
+    "writer-read": [
+        "list_open_documents", "get_document_info", "get_document_outline",
+        "get_document_content", "read_paragraphs", "get_heading_content",
+        "find_text", "search_in_document", "get_document_stats",
+        "list_images", "list_tables", "list_comments",
+        "resolve_locator", "get_document_tree",
+    ],
+    "calc": [
+        "list_open_documents", "get_document_info",
+        "open_document", "create_document", "save_document",
+        "read_table", "write_table_cell", "write_table_row",
+        "create_chart", "list_tables",
+        "execute_batch", "undo", "redo",
+    ],
+    "gallery": [
+        "gallery_list", "gallery_search", "gallery_get",
+        "gallery_providers", "gallery_update",
+        "insert_image", "list_images", "download_image",
+        "docs_gallery_list", "docs_gallery_search",
+    ],
+    "minimal": [
+        "list_open_documents", "get_document_info",
+        "open_document", "create_document", "save_document",
+        "read_paragraphs", "insert_at_paragraph",
+        "insert_image",
+    ],
+}
+
+
+def on_tool_reference():
+    """Open the tool reference page in the browser."""
+    import webbrowser
+    from plugin.main import get_services
+    services = get_services()
+    if services:
+        cfg = services.config.proxy_for("http")
+        port = cfg.get("port", 8766)
+        webbrowser.open("http://localhost:%s/api/tools" % port)
+
+
+def on_create_preset():
+    """Create a custom endpoint from the selected preset."""
+    from plugin.main import get_services
+    from plugin.framework.dialogs import msgbox
+    from plugin.framework.uno_context import get_ctx
+
+    ctx = get_ctx()
+    services = get_services()
+    if not services:
+        return
+
+    cfg = services.config.proxy_for("mcp")
+    preset_name = cfg.get("preset") or "minimal"
+
+    if preset_name not in PRESETS:
+        msgbox(ctx, "Nelson", "Unknown preset: %s" % preset_name)
+        return
+
+    tools_list = PRESETS[preset_name]
+    tools_text = "\n".join(tools_list)
+
+    raw = cfg.get("custom_endpoints") or "[]"
+    try:
+        items = json.loads(raw) if isinstance(raw, str) else raw
+    except (json.JSONDecodeError, TypeError):
+        items = []
+
+    items.append({
+        "name": preset_name,
+        "path": "/mcp/%s" % preset_name.replace("-", "/"),
+        "tools": tools_text,
+    })
+    cfg.set("custom_endpoints", json.dumps(items))
+    msgbox(ctx, "Nelson",
+           "Endpoint '/mcp/%s' created with %d tools.\n"
+           "Reopen Options to see it."
+           % (preset_name.replace("-", "/"), len(tools_list)))
 
 
 class MCPModule(ModuleBase):
@@ -61,17 +154,73 @@ class MCPModule(ModuleBase):
         # Health / readiness probe (raw — custom JSON response)
         routes.add("GET", "/health", p.handle_health, raw=True)
 
+        # Tool reference page (HTML)
+        routes.add("GET", "/api/tools", p.handle_tool_reference, raw=True)
+
         self._routes_registered = True
+        self._custom_routes = []
         log.info("MCP routes registered")
+
+        # Register custom filtered endpoints
+        self._register_custom_endpoints(services)
+
+    def _register_custom_endpoints(self, services):
+        """Register custom filtered MCP endpoints from config."""
+        cfg = services.config.proxy_for(self.name)
+        raw = cfg.get("custom_endpoints") or "[]"
+        try:
+            endpoints = json.loads(raw) if isinstance(raw, str) else raw
+        except (json.JSONDecodeError, TypeError):
+            return
+        if not isinstance(endpoints, list):
+            return
+
+        routes = services.http_routes
+
+        for ep in endpoints:
+            name = ep.get("name", "")
+            path = ep.get("path", "")
+            if not path or not path.startswith("/mcp/"):
+                continue
+            if not ep.get("enabled", True):
+                continue
+
+            # Parse tool filter from textarea (one per line, # comments)
+            tools_text = ep.get("tools", "")
+            tool_filter = set()
+            for line in tools_text.strip().split("\n"):
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    tool_filter.add(line)
+
+            if not tool_filter:
+                continue  # skip endpoints with no tools defined
+
+            # Create a filtered protocol handler
+            from plugin.modules.mcp.protocol import MCPProtocolHandler
+            handler = MCPProtocolHandler(services,
+                                         tool_filter=tool_filter)
+
+            routes.add("POST", path, handler.handle_mcp_post, raw=True)
+            routes.add("GET", path, handler.handle_mcp_sse, raw=True)
+            routes.add("DELETE", path, handler.handle_mcp_delete, raw=True)
+            self._custom_routes.append(path)
+            log.info("Custom MCP endpoint: %s (%s, %d tools)",
+                     path, name, len(tool_filter))
 
     def _unregister_routes(self, services):
         routes = services.http_routes
         for method, path in [
             ("POST", "/mcp"), ("GET", "/mcp"), ("DELETE", "/mcp"),
             ("POST", "/sse"), ("POST", "/messages"), ("GET", "/sse"),
-            ("GET", "/health"),
+            ("GET", "/health"), ("GET", "/api/tools"),
         ]:
             routes.remove(method, path)
+        # Unregister custom endpoints
+        for path in getattr(self, "_custom_routes", []):
+            for method in ("POST", "GET", "DELETE"):
+                routes.remove(method, path)
+        self._custom_routes = []
         self._routes_registered = False
         self._protocol = None
         log.info("MCP routes unregistered")
