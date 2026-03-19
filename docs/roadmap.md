@@ -62,15 +62,31 @@ Runtime:  rules.json loaded at boot → _next suggestions from day one
 
 The baseline covers generic patterns (Writer editing, Calc data entry, document lifecycle). As the user works, their own traces accumulate and refine the suggestions over time (see v0.9).
 
+### Per-endpoint rules
+
+Custom MCP endpoints are the sweet spot for this approach. An endpoint with 8-15 tools has a tiny search space — patterns converge fast, suggestions are precise.
+
+Each endpoint gets its own rule partition. The "writer-edit" endpoint learns Writer editing patterns, "calc" learns spreadsheet patterns. When a user creates a custom endpoint for a specific use case (e.g. "report-writer" with 10 tools), the rules naturally specialize for that workflow.
+
+```
+rules.json:
+  _default:       generic patterns (148 tools, broad)
+  writer-edit:    Writer editing patterns (25 tools, focused)
+  calc:           spreadsheet patterns (13 tools, focused)
+  my-custom:      user's custom endpoint (10 tools, very precise)
+```
+
+Smaller tool sets = faster convergence = better suggestions. This is why custom endpoints + learned rules work so well together: the user constrains the tool set, Nelson learns the optimal paths within it.
+
 ### Session trace collection
 
 Nelson logs every tool call to a local SQLite database:
 
 ```sql
-session_traces (session_id, seq, tool_name, doc_type, success, prev_tool, ts)
+session_traces (session_id, seq, tool_name, doc_type, success, prev_tool, endpoint, ts)
 ```
 
-No telemetry, no cloud — just local data that accumulates alongside the baseline and eventually personalizes the suggestions.
+No telemetry, no cloud — just local data partitioned by endpoint, accumulating alongside the baseline.
 
 ---
 
