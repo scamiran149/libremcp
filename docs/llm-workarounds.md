@@ -34,11 +34,3 @@ Models sometimes pass range names as lists or wrap them in extra quotes.
 
 **Workaround**: Tool dispatchers check if `range_name` is a list or string and loop automatically rather than crashing.
 
-## Streaming edge cases
-
-Adopted from LiteLLM analysis (see `legacy_docs/dev/litellm-integration.md` for full references):
-
-1. **`finish_reason="error"`** — treated as hard failure, shown to user
-2. **Repeated identical chunks** — detected after 20 identical chunks, raises error
-3. **`finish_reason="stop"` with tool_calls** — remapped to `"tool_calls"` so tool loop executes
-4. **Delta normalization** — `role`, `tool.type`, `function.arguments` can be `None` from some providers; normalized to defaults

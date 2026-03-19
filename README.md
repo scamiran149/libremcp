@@ -86,6 +86,7 @@ See [DEVEL.md](DEVEL.md) for the complete developer guide and [docs/modules.md](
 - [`QUICKSTART.md`](QUICKSTART.md) — agent guide: discovery, workflows, tool patterns
 - [`AGENTS.md`](AGENTS.md) — developer cheatsheet: project structure, build pipeline, critical rules
 - [`docs/howto/`](docs/howto/) — user guides: Tailscale + ChatGPT, Forge, Ollama indexation, image galleries
+- [`docs/roadmap.md`](docs/roadmap.md) — what's planned next
 - [`CHANGELOG.md`](CHANGELOG.md) — version history
 
 ## Acknowledgments

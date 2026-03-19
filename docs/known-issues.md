@@ -10,7 +10,7 @@ Character offsets from `find_text` (cursor-based) don't match offsets used by ra
 
 **Workaround**: Avoid `scope="range"` for section replacement. Use `target="search"` with full section text instead.
 
-See `legacy_docs/architecture/section-replace-options.md` for detailed analysis of all options.
+Workaround: use `target="search"` with full section text instead of range coordinates.
 
 ## AI Horde improvements
 
