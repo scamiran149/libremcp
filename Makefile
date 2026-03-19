@@ -154,6 +154,14 @@ docker-build:
 	docker compose -f builder/docker-compose.yml up --build
 	@echo "Done: build/nelson.oxt"
 
+docker-dev:
+	docker compose -f dev/docker/docker-compose.yml run --rm dev-build
+	@echo "Done: build/nelson.oxt"
+
+docker-dev-rebuild:
+	docker compose -f dev/docker/docker-compose.yml run --rm dev-build rebuild
+	@echo "Done: build/nelson.oxt (rebuilt)"
+
 # ── RDB (UNO type library) ────────────────────────────────────────────────
 # Requires LibreOffice SDK (unoidl-write).
 
