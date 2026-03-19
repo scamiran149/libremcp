@@ -438,7 +438,15 @@ def _dispatch_command(command):
 
     # Framework actions
     if mod_name == "main":
-        if action == "about":
+        if action == "help":
+            import webbrowser
+            ext_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            help_path = os.path.join(ext_dir, "help", "index.html")
+            if os.path.isfile(help_path):
+                webbrowser.open("file:///" + help_path.replace("\\", "/"))
+            else:
+                log.warning("Help not found: %s", help_path)
+        elif action == "about":
             from plugin.framework.uno_context import get_ctx
             from plugin.framework.dialogs import about_dialog
             about_dialog(get_ctx())

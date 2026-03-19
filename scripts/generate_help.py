@@ -8,23 +8,27 @@ Scans all modules for:
 Produces:
     build/help/index.md          — master index
     build/help/<module>.md       — per-module page (manual + auto tools)
-
-Then converts to XHP via md2xhp if available.
+    build/help/html/index.html   — HTML index (with --html)
+    build/help/html/<module>.html
 
 Usage:
     python scripts/generate_help.py
-    python scripts/generate_help.py --xhp   # also convert to XHP
+    python scripts/generate_help.py --html   # also convert to HTML
+    python scripts/generate_help.py --xhp    # also convert to XHP
 """
 
 import argparse
 import importlib
 import inspect
 import os
+import re
+import shutil
 import sys
 import yaml
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES_DIR = os.path.join(PROJECT_ROOT, "plugin", "modules")
+HOWTO_DIR = os.path.join(PROJECT_ROOT, "docs", "howto")
 HELP_DIR = os.path.join(PROJECT_ROOT, "build", "help")
 
 
@@ -180,11 +184,36 @@ def _generate_module_help(module, tools):
     return "\n".join(lines)
 
 
-def _generate_index(modules_with_tools):
+def _discover_howtos():
+    """Discover how-to guides from docs/howto/*.md."""
+    howtos = []
+    if not os.path.isdir(HOWTO_DIR):
+        return howtos
+    for fn in sorted(os.listdir(HOWTO_DIR)):
+        if not fn.endswith(".md"):
+            continue
+        path = os.path.join(HOWTO_DIR, fn)
+        with open(path, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+        title = first_line[2:].strip() if first_line.startswith("# ") else fn[:-3]
+        howtos.append({"file": fn, "path": path, "slug": fn[:-3], "title": title})
+    return howtos
+
+
+def _generate_index(modules_with_tools, howtos=None):
     """Generate the index.md."""
     lines = []
     lines.append("# Nelson MCP — Help Index")
     lines.append("")
+
+    # How-To Guides
+    if howtos:
+        lines.append("## How-To Guides")
+        lines.append("")
+        for h in howtos:
+            lines.append("- [%s](howto_%s.md)" % (h["title"], h["slug"]))
+        lines.append("")
+
     lines.append("## Modules")
     lines.append("")
 
@@ -215,9 +244,123 @@ def _generate_index(modules_with_tools):
     return "\n".join(lines)
 
 
+HTML_TEMPLATE = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} — Nelson MCP</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+       margin: 0; padding: 0; color: #222; line-height: 1.5; display: flex; }}
+nav {{ position: fixed; left: 0; top: 0; bottom: 0; width: 14em;
+       background: #f8fafc; border-right: 1px solid #e2e8f0;
+       padding: 1em; overflow-y: auto; font-size: .9em; }}
+nav a {{ display: block; padding: .3em .5em; border-radius: 4px; }}
+nav a:hover {{ background: #e2e8f0; }}
+nav a.current {{ background: #2563eb; color: #fff; }}
+nav .nav-title {{ font-weight: 600; margin-bottom: .5em; font-size: 1.1em; }}
+nav .nav-section {{ font-size: .75em; text-transform: uppercase; color: #64748b;
+       margin-top: .8em; margin-bottom: .2em; letter-spacing: .05em; }}
+main {{ margin-left: 15em; max-width: 52em; padding: 2em 2em 2em 1.5em; }}
+h1 {{ border-bottom: 2px solid #2563eb; padding-bottom: .3em; }}
+h2 {{ color: #2563eb; margin-top: 1.8em; }}
+h3 {{ margin-top: 1.4em; }}
+code {{ background: #f3f4f6; padding: .15em .35em; border-radius: 3px; font-size: .9em; }}
+pre {{ background: #f3f4f6; padding: 1em; border-radius: 6px; overflow-x: auto; }}
+pre code {{ background: none; padding: 0; }}
+a {{ color: #2563eb; text-decoration: none; }}
+a:hover {{ text-decoration: underline; }}
+</style>
+</head>
+<body>
+<nav>
+<div class="nav-title">Nelson MCP</div>
+<a href="https://github.com/quazardous/nelson-mcp" target="_blank">GitHub</a>
+<a href="index.html">Index</a>
+{nav_links}</nav>
+<main>
+{body}
+</main>
+</body>
+</html>
+"""
+
+
+def _convert_to_html(help_dir, modules_with_tools, howtos=None):
+    """Convert Markdown help files to HTML using the markdown library."""
+    try:
+        import markdown
+    except ImportError:
+        print("WARNING: 'markdown' package not installed, skipping HTML conversion")
+        return
+
+    html_dir = os.path.join(help_dir, "html")
+    os.makedirs(html_dir, exist_ok=True)
+
+    # Build nav links (one per line in sidebar)
+    nav_parts = []
+    if howtos:
+        nav_parts.append('<div class="nav-section">How-To</div>')
+        for h in howtos:
+            nav_parts.append('<a href="howto_%s.html">%s</a>' % (
+                h["slug"], h["title"]))
+    nav_parts.append('<div class="nav-section">Modules</div>')
+    for mod, _ in modules_with_tools:
+        name = mod["name"]
+        title = mod.get("title", name)
+        nav_parts.append('<a href="%s.html">%s</a>' % (
+            name.replace(".", "_"), title))
+    nav_links = "\n".join(nav_parts)
+
+    md_ext = ["tables", "fenced_code", "toc"]
+    md_converter = markdown.Markdown(extensions=md_ext)
+
+    # Convert each .md file in help_dir
+    count = 0
+    for fn in sorted(os.listdir(help_dir)):
+        if not fn.endswith(".md"):
+            continue
+        md_path = os.path.join(help_dir, fn)
+        with open(md_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+
+        md_converter.reset()
+        body = md_converter.convert(md_content)
+
+        # Extract title from first h1
+        title = fn[:-3]
+        first_line = md_content.split("\n", 1)[0]
+        if first_line.startswith("# "):
+            title = first_line[2:].strip()
+
+        # Fix links: .md → .html, howto cross-refs get howto_ prefix
+        body = re.sub(
+            r'href="([^"]*?)\.md"',
+            lambda m: 'href="%s.html"' % (
+                "howto_" + m.group(1) if not m.group(1).startswith("howto_")
+                and any(h["slug"] == m.group(1) for h in (howtos or []))
+                else m.group(1)),
+            body)
+        body = body.replace(".md)", ".html)")
+
+        html = HTML_TEMPLATE.format(
+            title=title, nav_links=nav_links, body=body)
+
+        out_path = os.path.join(html_dir, fn[:-3] + ".html")
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(html)
+        count += 1
+
+    print("Converted %d pages to HTML in %s" % (count, html_dir))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate help documentation from modules and tools")
+    parser.add_argument("--html", action="store_true",
+                        help="Also convert to HTML format")
     parser.add_argument("--xhp", action="store_true",
                         help="Also convert to XHP format")
     args = parser.parse_args()
@@ -251,15 +394,28 @@ def main():
         modules_with_tools.append((mod, tools))
         print("  %s — %d tools" % (name, len(tools)))
 
+    # Discover and copy how-to guides
+    howtos = _discover_howtos()
+    for h in howtos:
+        dest = os.path.join(HELP_DIR, "howto_%s.md" % h["slug"])
+        shutil.copy2(h["path"], dest)
+    if howtos:
+        print("  %d how-to guides" % len(howtos))
+
     # Generate index
-    index_content = _generate_index(modules_with_tools)
+    index_content = _generate_index(modules_with_tools, howtos)
     index_path = os.path.join(HELP_DIR, "index.md")
     with open(index_path, "w", encoding="utf-8") as f:
         f.write(index_content)
 
     total_tools = sum(len(t) for _, t in modules_with_tools)
     print("Generated %d help pages (%d tools) in %s" % (
-        len(modules_with_tools) + 1, total_tools, HELP_DIR))
+        len(modules_with_tools) + 1 + len(howtos), total_tools, HELP_DIR))
+
+    # Convert to HTML (static pages for Help menu)
+    if args.html:
+        _convert_to_html(HELP_DIR, modules_with_tools, howtos)
+        print("HTML help ready for bundling in .oxt")
 
     # Convert to XHP if requested
     if args.xhp:

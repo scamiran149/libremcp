@@ -254,7 +254,7 @@ build/generated/Addons.xcu: $(MANIFEST_SOURCES) $(SCRIPTS)/generate_manifest.py
 
 docs:
 	@echo "Generating help documentation..."
-	$(DOCKER_EXEC) python3 $(SCRIPTS)/generate_help.py --xhp
+	$(DOCKER_EXEC) python3 $(SCRIPTS)/generate_help.py --html
 
 xcu: manifest
 

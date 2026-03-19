@@ -84,6 +84,7 @@ GENERATED_INCLUDES = [
     "build/generated/OptionsDialog.xcu",
     "build/generated/Addons.xcu",
     "build/generated/Accelerators.xcu",
+    "build/help/html/",
 ]
 
 BUNDLE_DIR = "build/bundle"
@@ -124,6 +125,8 @@ def remap_path(f):
         return f[len("extension/"):]
     if f.startswith("build/generated/"):
         return f[len("build/generated/"):]
+    if f.startswith("build/help/html/"):
+        return "help/" + f[len("build/help/html/"):]
     return f
 
 

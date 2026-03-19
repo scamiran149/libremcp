@@ -2,11 +2,14 @@ name: main
 title: Nelson MCP global settings
 
 actions:
+  help:
+    title: "Help"
   about:
     title: "About Nelson MCP"
 
 menus:
   - separator: true
+  - action: help
   - action: about
 
 # config:

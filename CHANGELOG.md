@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.1] — 2026-03-19
+
+### Added
+
+- **HTML help system** — `generate_help.py --html` converts module docs to static HTML pages with sidebar navigation. Bundled in .oxt at `help/`, opened from Help menu entry via default browser
+- **How-To guides** — 4 guides in `docs/howto/`: Connect ChatGPT via Tailscale, Generate images with Forge, Index photos with Ollama, Set up an image gallery
+- **Help menu entry** — "Help" action in Nelson menu opens HTML help index in browser
+
+### Changed
+
+- **Makefile `docs` target** — switched from `--xhp` to `--html`
+- **Help sidebar nav** — left-side fixed panel with section headers (How-To / Modules), one link per line, GitHub link at top
+
 ## [0.7.0] — 2026-03-19
 
 ### Added
