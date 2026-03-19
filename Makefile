@@ -345,26 +345,16 @@ lo-restart:
 
 deploy:
 	$(MAKE) lo-kill
-	@sleep 3
-	@rm -f $(LO_CONF)/.lock $(LO_CONF)/user/.lock
+	powershell -c "Start-Sleep 3"
+	-powershell -c "Remove-Item '$(LO_CONF)/.lock','$(LO_CONF)/user/.lock' -ErrorAction SilentlyContinue"
 	$(MAKE) build
-	-unopkg remove org.extension.nelson 2>/dev/null; sleep 1
+	-unopkg remove org.extension.nelson
+	powershell -c "Start-Sleep 1"
 	unopkg add build/$(EXTENSION_NAME).oxt
-	@rm -f $(HOME_DIR)/nelson.log
-	@sleep 1
+	-powershell -c "Remove-Item '$(HOME_DIR)/nelson.log' -ErrorAction SilentlyContinue"
+	powershell -c "Start-Sleep 1"
 	$(MAKE) lo-start
-	@echo "Waiting for LibreOffice..."
-	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
-		if grep -q "main.py loaded" $(HOME_DIR)/nelson.log 2>/dev/null; then \
-			echo "Nelson loaded."; \
-			if curl -sf http://localhost:8766/health >/dev/null 2>&1; then \
-				echo "MCP ready."; \
-				curl -sf http://localhost:8766/health 2>/dev/null | head -1; \
-			fi; \
-			break; \
-		fi; \
-		sleep 2; \
-	done
+	@echo "Deploy done. LO is starting..."
 
 log:
 	@cat $(HOME_DIR)/nelson.log 2>/dev/null || echo "No nelson.log found"
