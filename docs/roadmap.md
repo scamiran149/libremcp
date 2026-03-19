@@ -6,7 +6,9 @@ Nelson MCP v0.7 exposes 148 tools via MCP to cloud AI agents (Claude, ChatGPT, G
 
 ## Where we're going
 
-The next versions shift Nelson from a passive tool server ("here are 148 tools, figure it out") to an active collaborator that adapts to the agent's capabilities, learns from real usage, and guides agents through workflows.
+**The mission: make small local models (7B–14B) as productive as GPT-4 or Claude on document tasks.**
+
+A 70B cloud model can browse 148 tools and figure out the right sequence. A 7B local model can't — it needs to be guided step by step, with fewer choices at each point and clear suggestions for what to do next. Nelson should bridge that gap: not by dumbing down the tools, but by being smarter about how it presents them.
 
 ---
 
@@ -61,23 +63,56 @@ No telemetry, no cloud — just local data that fuels the learning cycle (see v0
 
 ## v0.9 — Learn from usage
 
-The key insight: every agent session is a training signal. Nelson collects traces at runtime (zero cost), then uses an LLM offline to extract patterns and generate rules that improve the next session.
+The key insight: every agent session is a training signal. Nelson collects traces at runtime (zero cost), then uses established techniques from process mining and sequential analysis to extract patterns — and optionally an LLM to interpret them into actionable rules.
+
+### Research foundations
+
+This approach builds on well-established fields:
+
+- **Process Mining** (van der Aalst, 2011) — extracting workflow models from event logs. Our session traces are classic event logs; algorithms like the Alpha Miner produce process graphs (Petri nets) from tool call sequences. Implementation: `pm4py` or lightweight custom miner.
+- **Sequential Pattern Mining** (PrefixSpan, Pei et al. 2001) — finding frequent subsequences in logs. "80% of sessions that do A→B end up doing C" — more robust than counting bigrams.
+- **Markov chains** — tool transitions form a natural Markov chain. The matrix `P(next_tool | current_tool, doc_type)` is computed directly from traces. No ML needed — pure statistics.
+- **Voyager** (Wang et al. 2023) — Minecraft agent that builds a *skill library* from gameplay traces, analyzed by an LLM. Our `rules.json` is their skill library: patterns extracted from experience, refined over time.
+- **LATM — LLM As Tool Maker** (Cai et al. 2023) — LLM identifies repetitive tool sequences and synthesizes composite tools. If `resolve_locator → get_heading_content → insert_at_paragraph` appears 50 times, the LLM can generate `insert_under_heading` as a reusable workflow.
+
+### Three-level analysis
+
+Pattern extraction runs in layers, each adding intelligence without requiring the next:
+
+```
+Level 1 — Statistics (zero deps, always on)
+  Markov transition matrix from traces
+  → P(next_tool | current_tool, doc_type)
+  → Basic _next suggestions
+
+Level 2 — Sequential mining (lightweight, on-demand)
+  PrefixSpan on accumulated traces
+  → Frequent multi-step workflows discovered
+  → Anti-patterns detected (sequences ending in undo/failure)
+
+Level 3 — LLM interpretation (offline, when GPU is free)
+  Feed Level 1+2 outputs to LLM
+  → Human-readable hints and reasons
+  → Composite tool generation (LATM)
+  → System prompt enrichment with proven workflows
+```
+
+Level 1 works from day one with just a few sessions. Level 2 kicks in after enough data accumulates. Level 3 runs only when the user's GPU is idle — no conflict with the client model.
 
 ### The learning cycle
 
 ```
 Runtime                    Idle / on-demand              Next boot
 ─────────                  ────────────────              ─────────
-Agent calls tools    →     LLM analyzes traces    →     rules.json loaded
-Traces saved to SQLite     Extracts patterns             State machine applies rules
-Zero overhead              Runs when GPU is free         Zero overhead
+Agent calls tools    →     L1: Markov matrix update      rules.json loaded
+Traces saved to SQLite     L2: PrefixSpan mining    →    State machine applies rules
+Zero overhead              L3: LLM interprets patterns   Zero overhead
+                           (only when GPU is free)
 ```
 
-The LLM doesn't run during agent sessions — no GPU conflict with the client model. It processes traces offline (when the machine is idle, or on user request), like a coach reviewing game replays.
+### Output: `rules.json`
 
-### What the LLM extracts
-
-From accumulated session traces, the LLM generates `rules.json`:
+All three levels feed a single rules file, loaded at boot:
 
 ```json
 [
@@ -85,23 +120,28 @@ From accumulated session traces, the LLM generates `rules.json`:
     "after": ["list_open_documents", "get_document_outline"],
     "doc_type": "writer",
     "suggest": ["get_heading_content", "find_text"],
-    "confidence": 0.85
+    "confidence": 0.85,
+    "source": "markov"
   },
   {
     "after": ["insert_at_paragraph"],
     "followed_by_undo_rate": 0.30,
-    "hint": "Verify paragraph_index with resolve_locator before inserting"
+    "hint": "Verify paragraph_index with resolve_locator before inserting",
+    "source": "prefixspan"
   },
   {
-    "pattern": "get_heading_content → insert_at_paragraph → save_document",
+    "pattern": "resolve_locator → get_heading_content → insert_at_paragraph → save",
     "name": "edit_section",
-    "frequency": 0.60
+    "frequency": 0.60,
+    "source": "llm",
+    "composite_tool": true
   }
 ]
 ```
 
-- **Workflow patterns** — common sequences that work, ranked by frequency
+- **Workflow patterns** — common sequences that work, ranked by frequency and confidence
 - **Anti-patterns** — sequences that lead to undo or failure, with corrective hints
+- **Composite tools** — auto-generated high-level tools from repeated patterns (LATM)
 - **Suggestion weights** — what to propose after each tool, specific to this user's habits and document types
 
 ### `_next` suggestions
@@ -130,11 +170,13 @@ Both MCP and `/api/do` return `_next` after every action, powered by the learned
 }
 ```
 
-Large cloud models can ignore `_next`. Small local models use it as a guide — effectively turning Nelson into a copilot for the copilot.
+Large cloud models can ignore `_next`. Small local models follow it like breadcrumbs — at each step, Nelson tells them exactly what makes sense next. A 7B model doesn't need to understand 148 tools if Nelson says "you just read a heading, here are the 3 things you can do now."
+
+The effect: a small model guided by `_next` behaves like a much larger model that figured out the workflow on its own.
 
 ### System prompt enrichment
 
-Nelson injects the most reliable workflow patterns into the MCP `instructions` field at initialize time, tailored to the active document type and endpoint. The agent starts with knowledge of what works, learned from real sessions.
+Nelson injects the most reliable workflow patterns into the MCP `instructions` field at initialize time, tailored to the active document type and endpoint. Instead of a generic "here are tools", the agent starts with: "to edit a section, do X→Y→Z. To insert an image, do A→B." Learned from real sessions, not hardcoded.
 
 ---
 
