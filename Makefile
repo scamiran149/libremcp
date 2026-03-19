@@ -211,7 +211,7 @@ endif
 # Build: always via dev Docker container (tools + make inside container)
 # The container runs `make _build` which uses local targets with deps.
 # Use `make _build` directly if running inside the container or locally.
-build: dev-up vendor manifest rdb icons sqlite3
+build: dev-up vendor manifest rdb icons sqlite3 docs
 	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt --check
 
 rebuild: clean build
@@ -252,7 +252,7 @@ build/generated/Addons.xcu: $(MANIFEST_SOURCES) $(SCRIPTS)/generate_manifest.py
 	@echo "Generating manifest and XCS/XCU..."
 	$(DOCKER_EXEC) python3 $(SCRIPTS)/generate_manifest.py
 
-help:
+docs:
 	@echo "Generating help documentation..."
 	$(DOCKER_EXEC) python3 $(SCRIPTS)/generate_help.py --xhp
 

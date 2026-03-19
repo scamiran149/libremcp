@@ -190,6 +190,10 @@ def assemble_bundle(base_dir, modules):
         if vendor_count:
             print("Vendored %d packages into plugin/lib/" % vendor_count)
 
+    # XHP help: disabled — LO extensions don't support .xhp help natively
+    # Help is served via /api/tools HTML endpoint instead.
+    # The generated Markdown in build/help/ can be used as documentation.
+
     print("Assembled %d files in %s" % (count, BUNDLE_DIR))
     return count
 
