@@ -16,6 +16,7 @@ class ListImages(ToolBase):
     """List images from a gallery provider with pagination."""
 
     name = "gallery_list"
+    requires_service = "images"
     description = (
         "List images from the image gallery with optional path filtering "
         "and pagination. Returns image metadata including file paths."

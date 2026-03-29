@@ -16,6 +16,7 @@ class SearchImages(ToolBase):
     """Search for images across gallery providers using full-text search."""
 
     name = "gallery_search"
+    requires_service = "images"
     description = (
         "Search for images in the image gallery using full-text search. "
         "Matches against image title, description, keywords, and filename. "

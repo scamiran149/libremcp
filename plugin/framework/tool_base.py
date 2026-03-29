@@ -71,6 +71,10 @@ class ToolBase(ABC):
         requires_doc: Whether the tool needs an open document.  Set to
                      False for tools like create_document, open_document
                      that should work without any document open.
+        requires_service: Service name that must have at least one
+                     registered instance for this tool to be visible.
+                     E.g. "images" hides gallery tools when no image
+                     gallery is configured.  None = always visible.
     """
 
     name: Optional[str] = None
@@ -83,6 +87,7 @@ class ToolBase(ABC):
     is_mutation: Optional[bool] = None
     long_running: bool = False
     requires_doc: bool = True
+    requires_service: Optional[str] = None
 
     def detects_mutation(self) -> bool:
         """Return True if the tool mutates the document."""

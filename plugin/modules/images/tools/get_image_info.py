@@ -16,6 +16,7 @@ class GetImageInfo(ToolBase):
     """Get detailed metadata for a specific image in the gallery."""
 
     name = "gallery_get"
+    requires_service = "images"
     description = (
         "Get detailed metadata for a specific image in the gallery, "
         "including title, description, keywords, dimensions, and file path."

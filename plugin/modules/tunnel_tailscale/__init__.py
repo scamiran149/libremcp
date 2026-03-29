@@ -6,7 +6,9 @@
 """Tailscale Funnel tunnel provider — pre/post reset, HTTPS support."""
 
 import logging
+import os
 import subprocess
+import sys
 
 from plugin.framework.module_base import ModuleBase
 
@@ -15,9 +17,32 @@ log = logging.getLogger("nelson.tunnel.tailscale")
 # Windows: hide subprocess console window
 _CREATION_FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
+
+def _find_tailscale():
+    """Resolve the full path to the tailscale binary.
+
+    On Windows, LibreOffice's Python may not inherit the user's full PATH,
+    so we check common install locations before falling back to bare name.
+    """
+    if sys.platform == "win32":
+        candidates = [
+            os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"),
+                         "Tailscale", "tailscale.exe"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                         "Tailscale", "tailscale.exe"),
+        ]
+        for path in candidates:
+            if path and os.path.isfile(path):
+                log.debug("Found tailscale at %s", path)
+                return path
+    return "tailscale"
+
+
+_TAILSCALE = _find_tailscale()
+
 _RESET_COMMANDS = [
-    ["tailscale", "funnel", "reset"],
-    ["tailscale", "serve", "reset"],
+    [_TAILSCALE, "funnel", "reset"],
+    [_TAILSCALE, "serve", "reset"],
 ]
 
 
@@ -30,8 +55,8 @@ class TailscaleProvider:
     """
 
     name = "tailscale"
-    binary_name = "tailscale"
-    version_args = ["tailscale", "version"]
+    binary_name = _TAILSCALE
+    version_args = [_TAILSCALE, "version"]
     install_url = "https://tailscale.com/download"
 
     def build_command(self, port, scheme, config):
@@ -40,7 +65,7 @@ class TailscaleProvider:
         else:
             target = str(port)
 
-        cmd = ["tailscale", "funnel", target]
+        cmd = [_TAILSCALE, "funnel", target]
         url_regex = r"(https://[\w.-]+\.ts\.net)"
         return cmd, url_regex
 

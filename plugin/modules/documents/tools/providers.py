@@ -12,6 +12,7 @@ class ListDocProviders(ToolBase):
     """List all registered document gallery provider instances."""
 
     name = "docs_gallery_providers"
+    requires_service = "documents"
     description = (
         "List all available document gallery providers with their instance "
         "IDs. Use the returned IDs with other docs_gallery tools to target "

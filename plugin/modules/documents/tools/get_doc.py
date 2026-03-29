@@ -12,6 +12,7 @@ class GetDocInfo(ToolBase):
     """Get detailed metadata for a specific document in the gallery."""
 
     name = "docs_gallery_get"
+    requires_service = "documents"
     description = (
         "Get detailed metadata for a specific document in the gallery, "
         "including title, description, keywords, doc_type, and file path."

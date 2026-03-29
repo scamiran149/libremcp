@@ -115,11 +115,28 @@ class ToolRegistry:
         """Return all registered tool names."""
         return list(self._tools.keys())
 
+    def _service_available(self, service_name):
+        """Check if a service has at least one registered instance."""
+        svc = self._services.get(service_name)
+        if svc is None:
+            return False
+        lister = getattr(svc, "list_instances", None)
+        if lister is None:
+            return True  # service exists but has no instance concept
+        try:
+            return bool(lister())
+        except Exception:
+            return False
+
     def tools_for_doc_type(self, doc_type):
         """Return tools compatible with *doc_type* (or all if doc_type is None)."""
         for tool in self._tools.values():
-            if tool.doc_types is None or doc_type in tool.doc_types:
-                yield tool
+            if tool.doc_types is not None and doc_type not in tool.doc_types:
+                continue
+            if tool.requires_service and not self._service_available(
+                    tool.requires_service):
+                continue
+            yield tool
 
     # ── Schema generation ─────────────────────────────────────────────
 

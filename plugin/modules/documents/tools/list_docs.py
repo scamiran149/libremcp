@@ -12,6 +12,7 @@ class ListDocs(ToolBase):
     """List documents from a gallery provider with pagination."""
 
     name = "docs_gallery_list"
+    requires_service = "documents"
     description = (
         "List documents from the document gallery with optional path and "
         "type filtering and pagination. Returns document metadata including "

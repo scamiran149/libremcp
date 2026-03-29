@@ -20,6 +20,7 @@ class GenerateImage(ToolBase):
     """Generate an image from a text prompt and insert it."""
 
     name = "generate_image"
+    requires_service = "ai_images"
     intent = "media"
     description = (
         "Generate an image from a text prompt and insert it "

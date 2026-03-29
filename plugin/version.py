@@ -5,4 +5,4 @@
 
 """Single source of truth for extension version."""
 
-EXTENSION_VERSION = "0.7.1"
+EXTENSION_VERSION = "0.7.2"

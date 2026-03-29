@@ -12,6 +12,7 @@ class ListProviders(ToolBase):
     """List all registered gallery provider instances."""
 
     name = "gallery_providers"
+    requires_service = "images"
     description = (
         "List all available image gallery providers with their instance IDs. "
         "Use the returned IDs with other gallery tools to target a specific provider."

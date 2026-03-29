@@ -17,6 +17,7 @@ class UpdateDocMetadata(ToolBase):
     """
 
     name = "docs_gallery_update"
+    requires_service = "documents"
     description = (
         "Update document metadata (title, description, subject, keywords) "
         "in the gallery. Writes directly into ODF or OOXML file properties "

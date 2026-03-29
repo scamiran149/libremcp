@@ -18,6 +18,7 @@ class EditImage(ToolBase):
     """Edit the currently selected image using img2img."""
 
     name = "edit_image"
+    requires_service = "ai_images"
     intent = "media"
     description = (
         "Edit the selected image using a text prompt (Img2Img). "

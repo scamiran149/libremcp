@@ -16,6 +16,7 @@ class RescanImageFolder(ToolBase):
     """Rescan folder gallery providers to pick up new/changed images."""
 
     name = "images_folder_rescan"
+    requires_service = "images"
     description = (
         "Rescan image gallery folders to discover new, changed or deleted "
         "images. Rescans all folder providers by default, or a specific one."

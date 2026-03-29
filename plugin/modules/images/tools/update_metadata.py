@@ -16,6 +16,7 @@ class UpdateMetadata(ToolBase):
     """Update XMP sidecar metadata for an image in the gallery."""
 
     name = "gallery_update"
+    requires_service = "images"
     description = (
         "Update metadata (title, description, keywords, rating) for an image "
         "in the gallery. Writes an XMP sidecar file and re-indexes. "

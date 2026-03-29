@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.2] — 2026-03-29
+
+### Added
+
+- **`requires_service` tool attribute** — tools can declare a service dependency (`requires_service = "images"`). If the service has no registered instances, the tool is hidden from `tools/list`. Applied to image gallery (6 tools), document gallery (6 tools), and AI image generation (2 tools). Agents on a fresh install without galleries configured see only relevant tools
+
+### Fixed
+
+- **Tailscale tunnel not starting on fresh Windows installs** — LibreOffice's Python may not inherit the user's full PATH. `_find_tailscale()` now checks `C:\Program Files\Tailscale\` and `%LOCALAPPDATA%\Tailscale\` before falling back to bare `tailscale` name
+
 ## [0.7.1] — 2026-03-19
 
 ### Added

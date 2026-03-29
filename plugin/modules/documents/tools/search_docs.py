@@ -12,6 +12,7 @@ class SearchDocs(ToolBase):
     """Search for documents in gallery providers."""
 
     name = "docs_gallery_search"
+    requires_service = "documents"
     description = (
         "Search for documents in the document gallery. "
         "Matches against filename, title, description, and keywords. "

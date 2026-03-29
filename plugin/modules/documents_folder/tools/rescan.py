@@ -16,6 +16,7 @@ class RescanDocFolder(ToolBase):
     """Rescan folder document providers to pick up new/changed documents."""
 
     name = "docs_folder_rescan"
+    requires_service = "documents"
     description = (
         "Rescan document gallery folders to discover new, changed or "
         "deleted documents. Rescans all folder providers by default, "
