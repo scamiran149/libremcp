@@ -357,15 +357,20 @@ def bootstrap(ctx=None):
 
         from plugin.framework.main_thread import execute_on_main_thread
 
+        started_count = 0
         for mod in _modules:
             try:
-                execute_on_main_thread(mod.start, _services)
+                execute_on_main_thread(mod.start, _services, timeout=5.0)
+                started_count += 1
                 log.info("Module started: %s", mod.name)
+            except TimeoutError:
+                log.warning("Module start timed out (VCL not ready?): %s",
+                            mod.name)
             except Exception:
                 log.exception("Failed to start module: %s", mod.name)
 
-        log.info("── Phase 2a complete: %d modules started ────────────",
-                 len(_modules))
+        log.info("── Phase 2a complete: %d/%d modules started ──────────",
+                 started_count, len(_modules))
 
         # ── Phase 2b: start_background on Job thread ─────────────────
         log.info("── Phase 2b: start_background (job thread) ──────────")
