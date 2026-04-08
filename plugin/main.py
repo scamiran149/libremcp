@@ -46,7 +46,17 @@ try:
                 break
 except Exception:
     pass
-log.info("=== Nelson MCP %s — main.py loaded ===", _version)
+_build_id = "dev"
+try:
+    _bid_path = os.path.join(os.path.dirname(__file__), "_build_id.py")
+    with open(_bid_path) as _bf:
+        for _bl in _bf:
+            if _bl.startswith("BUILD_ID"):
+                _build_id = _bl.split("=", 1)[1].strip().strip("\"'")
+                break
+except Exception:
+    pass
+log.info("=== Nelson MCP %s (build %s) — main.py loaded ===", _version, _build_id)
 
 # Extension identifier (matches description.xml)
 EXTENSION_ID = "org.extension.nelson"
@@ -65,8 +75,9 @@ def _setup_bundled_sqlite3(base_path):
 
     LO's Python on Windows doesn't include sqlite3, and LO's custom
     python312.dll is missing symbols that the official _sqlite3.pyd
-    needs.  Instead we bundle pysqlite3 (statically linked) and shim
-    it into sys.modules so `import sqlite3` works transparently.
+    needs.  If pysqlite3 is present in plugin/lib/ (either bundled at
+    build time or installed by the deps framework at first startup),
+    shim it into sys.modules so `import sqlite3` works transparently.
     """
     if sys.platform != "win32":
         return
@@ -80,7 +91,8 @@ def _setup_bundled_sqlite3(base_path):
     lib_dir = os.path.join(base_path, "plugin", "lib")
     pysqlite3_dir = os.path.join(lib_dir, "pysqlite3")
     if not os.path.isdir(pysqlite3_dir):
-        log.debug("No bundled pysqlite3 at %s", pysqlite3_dir)
+        # Will be installed by deps framework in Phase 2b (start_background)
+        log.info("pysqlite3 not yet available — will be installed at first startup")
         return
 
     # pysqlite3 is vendored into plugin/lib/ — lib/ should already
@@ -316,12 +328,6 @@ def bootstrap(ctx=None):
                     config_svc.set_manifest(manifest_dict)
                     log.info("Config defaults loaded for %d modules",
                              len(manifest_dict))
-                    # Apply configured log level
-                    from plugin.framework.logging import set_log_level
-                    level = config_svc.proxy_for("core").get(
-                        "log_level", "DEBUG")
-                    set_log_level(level)
-                    log.info("Log level set to %s", level)
 
             # Auto-discover tools from this module's tools/ subpackage
             # Directory convention: dots in name map to underscores
@@ -331,17 +337,24 @@ def bootstrap(ctx=None):
                 os.path.dirname(__file__), "modules", dir_name, "tools")
             if os.path.isdir(tools_dir):
                 tools_pkg = "plugin.modules.%s.tools" % dir_name
-                _tools.discover(tools_dir, tools_pkg)
+                log.info("Discovering tools: %s", tools_pkg)
+                try:
+                    _tools.discover(tools_dir, tools_pkg)
+                except Exception:
+                    log.exception("Tool discovery failed: %s", tools_pkg)
 
         # Wire event bus into config service
+        log.info("Wiring event bus into config service...")
         if config_svc:
             events_svc = _services.get("events")
             if events_svc:
                 config_svc.set_events(events_svc)
 
         # Initialize services that need a UNO context
+        log.info("Initializing services with UNO context...")
         if ctx:
             _services.initialize_all(ctx)
+        log.info("Services initialized.")
 
         log.info("── Phase 1 complete: %d modules initialized ────────",
                  len(_modules))
@@ -403,6 +416,19 @@ def bootstrap(ctx=None):
         _initialized = True
         log.info("Framework bootstrap complete: %d modules, %d tools",
                  len(_modules), len(_tools))
+
+        # Apply configured log level (deferred until after bootstrap
+        # so all bootstrap messages are visible regardless of config).
+        # NELSON_LOG_LEVEL env var overrides the config value.
+        from plugin.framework.logging import set_log_level
+        env_level = os.environ.get("NELSON_LOG_LEVEL")
+        if env_level:
+            set_log_level(env_level)
+            log.info("Log level set to %s (from env)", env_level)
+        elif config_svc:
+            level = config_svc.proxy_for("core").get("log_level", "DEBUG")
+            set_log_level(level)
+            log.info("Log level set to %s", level)
 
 
 def shutdown():

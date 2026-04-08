@@ -104,12 +104,6 @@ def get_default_cwd(services):
     return _DEFAULT_CWD
 
 
-def on_install():
-    """Callback for the Install button in Options."""
-    from plugin.modules.launcher import run_install_for_provider
-    run_install_for_provider("claude")
-
-
 class ClaudeModule(ModuleBase):
 
     def initialize(self, services):

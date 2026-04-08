@@ -197,7 +197,24 @@ def assemble_bundle(base_dir, modules):
     # Help is served via /api/tools HTML endpoint instead.
     # The generated Markdown in build/help/ can be used as documentation.
 
-    print("Assembled %d files in %s" % (count, BUNDLE_DIR))
+    # Generate build ID (timestamp + short hash of assembled files)
+    import hashlib
+    import datetime
+    h = hashlib.md5()
+    for root, dirs, files in os.walk(bundle_path):
+        for fn in sorted(files):
+            fp = os.path.join(root, fn)
+            h.update(os.path.relpath(fp, bundle_path).encode())
+            h.update(str(os.path.getsize(fp)).encode())
+    build_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    build_hash = h.hexdigest()[:8]
+    build_id_path = os.path.join(bundle_path, "plugin", "_build_id.py")
+    with open(build_id_path, "w") as f:
+        f.write('BUILD_ID = "%s-%s"\n' % (build_ts, build_hash))
+    count += 1
+
+    print("Assembled %d files in %s (build %s-%s)" % (
+        count, BUNDLE_DIR, build_ts, build_hash))
     return count
 
 

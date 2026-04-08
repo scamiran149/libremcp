@@ -36,7 +36,10 @@ config:
     options_provider: "plugin.modules.launcher_opencode:get_ollama_models"
     label: Ollama Model
     helper: "Select an installed model. Custom values are preserved if typed in config."
+
+scripts:
   install:
-    widget: button
     label: Install OpenCode
-    action: "plugin.modules.launcher_opencode:on_install"
+    description: "Downloads and installs the OpenCode CLI."
+    install: true
+    button: true

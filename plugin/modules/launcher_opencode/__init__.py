@@ -132,12 +132,6 @@ def get_ollama_models(services):
         return []
 
 
-def on_install():
-    """Callback for the Install button in Options."""
-    from plugin.modules.launcher import run_install_for_provider
-    run_install_for_provider("opencode")
-
-
 class OpenCodeModule(ModuleBase):
 
     def initialize(self, services):
