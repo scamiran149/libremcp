@@ -9,6 +9,7 @@ extension/description.xml
 vendor/
 plugin/lib/snowballstemmer/
 plugin/lib/pysqlite3/
+plugin/lib/sqlite3/
 plugin/_build_id.py
 
 # Python

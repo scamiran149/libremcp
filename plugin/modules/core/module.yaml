@@ -42,18 +42,3 @@ config:
       Automatically scroll the document view to the location of MCP
       mutation operations (page granularity). This helps track what
       the AI is modifying in real time.
-
-scripts:
-  install-deps:
-    label: Install Dependencies
-    description: "Downloads pysqlite3 from PyPI (LibreOffice's Python on Windows lacks sqlite3)."
-    platform: win32
-    install: true
-    auto: true
-    once: true
-    version: "1"
-    check: "import sqlite3"
-    button: true
-    pause: false
-    args:
-      - "{lib_dir}"

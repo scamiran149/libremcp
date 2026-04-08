@@ -111,9 +111,20 @@ def _setup_bundled_sqlite3(base_path):
 
         log.info("Bundled pysqlite3 (sqlite %s) loaded from %s",
                  pysqlite3.sqlite_version, lib_dir)
-    except ImportError as e:
-        log.warning("Failed to import bundled pysqlite3 from %s: %s",
-                    lib_dir, e)
+        return
+    except (ImportError, Exception) as e:
+        log.info("pysqlite3 not usable: %s", e)
+
+    # Fallback: pure-Python ctypes wrapper around sqlite3.dll
+    try:
+        from plugin.framework import sqlite3_ctypes
+        sys.modules["sqlite3"] = sqlite3_ctypes
+        sys.modules["sqlite3.dbapi2"] = sqlite3_ctypes
+        log.info("sqlite3_ctypes loaded (sqlite %s) from %s",
+                 sqlite3_ctypes.sqlite_version,
+                 sqlite3_ctypes._get_lib()._name)
+    except Exception as e:
+        log.warning("sqlite3 unavailable — indexing will be disabled: %s", e)
 
 
 def _ensure_extension_on_path(ctx):
