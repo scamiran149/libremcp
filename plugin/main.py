@@ -316,12 +316,8 @@ def bootstrap(ctx=None):
                     config_svc.set_manifest(manifest_dict)
                     log.info("Config defaults loaded for %d modules",
                              len(manifest_dict))
-                    # Apply configured log level
-                    from plugin.framework.logging import set_log_level
-                    level = config_svc.proxy_for("core").get(
-                        "log_level", "DEBUG")
-                    set_log_level(level)
-                    log.info("Log level set to %s", level)
+                    # Log level is deferred until after bootstrap completes
+                    # so all bootstrap messages are visible regardless of config
 
             # Auto-discover tools from this module's tools/ subpackage
             # Directory convention: dots in name map to underscores
@@ -403,6 +399,18 @@ def bootstrap(ctx=None):
         _initialized = True
         log.info("Framework bootstrap complete: %d modules, %d tools",
                  len(_modules), len(_tools))
+
+        # Apply configured log level now that bootstrap is done.
+        # NELSON_LOG_LEVEL env var overrides the config value.
+        from plugin.framework.logging import set_log_level
+        env_level = os.environ.get("NELSON_LOG_LEVEL")
+        if env_level:
+            set_log_level(env_level)
+            log.info("Log level set to %s (from env)", env_level)
+        elif config_svc:
+            level = config_svc.proxy_for("core").get("log_level", "DEBUG")
+            set_log_level(level)
+            log.info("Log level set to %s", level)
 
 
 def shutdown():
