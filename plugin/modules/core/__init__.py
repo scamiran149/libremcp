@@ -12,6 +12,22 @@ from plugin.framework.module_base import ModuleBase
 log = logging.getLogger("nelson.core")
 
 
+def check_sqlite3(services):
+    """Check if sqlite3 is functional. Used by Options check widget."""
+    try:
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("SELECT sqlite_version()")
+        version = conn.execute("SELECT sqlite_version()").fetchone()[0]
+        conn.close()
+        return {"status": "ok", "message": "sqlite3 %s (via %s)" % (
+            version, getattr(sqlite3, '__name__', 'unknown'))}
+    except ImportError:
+        return {"status": "ko", "message": "sqlite3 not available"}
+    except Exception as e:
+        return {"status": "ko", "message": "sqlite3 broken: %s" % e}
+
+
 class Module(ModuleBase):
 
     def initialize(self, services):

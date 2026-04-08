@@ -29,6 +29,10 @@ config:
       Automatically enable track changes (change recording) before any
       mutation tool called via MCP. This ensures all AI edits are visible
       and reversible.
+  sqlite3_status:
+    widget: check
+    label: SQLite3 Status
+    check_provider: "plugin.modules.core:check_sqlite3"
   follow_activity:
     type: boolean
     default: true
