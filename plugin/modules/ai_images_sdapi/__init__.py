@@ -148,6 +148,11 @@ def _save_auto_instance(endpoint):
     return True
 
 
+def pre_install():
+    """Hook called before the install script runs (via deps framework)."""
+    _save_auto_instance(_DEFAULT_ENDPOINT)
+
+
 def on_create_preset():
     """Create an optimized instance for the currently selected starter model."""
     from plugin.framework.dialogs import msgbox
@@ -246,18 +251,6 @@ def _open_browser():
     webbrowser.open(_DEFAULT_ENDPOINT)
 
 
-def on_install():
-    """Run install/update script — always re-entrant.
-
-    The script itself is idempotent: skips clone if dir exists (does git pull),
-    skips venv if already created, skips deps if installed, downloads model
-    only if not already present.  Auto-configures the 'auto' instance.
-    """
-    from plugin.framework.uno_context import get_ctx
-
-    ctx = get_ctx()
-    _save_auto_instance(_DEFAULT_ENDPOINT)
-    _run_install_script(ctx)
 
 
 def on_launch():
@@ -319,56 +312,6 @@ def on_launch():
                "Check ~/nelson.log for details.")
 
 
-def _get_starter_model():
-    """Read starter_model from saved config."""
-    try:
-        from plugin.main import get_services
-        services = get_services()
-        if services:
-            cfg = services.config.proxy_for("ai_images.sdapi")
-            return cfg.get("starter_model") or "dreamshaper8"
-    except Exception:
-        log.debug("Could not read starter_model from config", exc_info=True)
-    return "dreamshaper8"
-
-
-def _run_install_script(ctx):
-    """Launch the install script in a terminal."""
-    from plugin.framework.dialogs import msgbox
-
-    model = _get_starter_model()
-    scripts_dir = os.path.join(os.path.dirname(__file__), "scripts")
-    if sys.platform == "win32":
-        script_path = os.path.join(scripts_dir, "install.ps1")
-        ps_cmd = 'powershell -ExecutionPolicy Bypass -File "%s" -StarterModel %s' % (
-            script_path, model)
-        full_cmd = 'cmd /c start "Forge Install" cmd /c %s' % ps_cmd
-    else:
-        script_path = os.path.join(scripts_dir, "install.sh")
-        full_cmd = _build_terminal_cmd([
-            "bash", script_path, model,
-        ])
-
-    if not os.path.isfile(script_path):
-        msgbox(ctx, "Nelson",
-               "Install script not found:\n%s" % script_path)
-        return
-
-    # Pre-configure instance for after install
-    _save_auto_instance(_DEFAULT_ENDPOINT)
-
-    try:
-        subprocess.Popen(
-            full_cmd,
-            shell=isinstance(full_cmd, str),
-            start_new_session=True,
-            creationflags=_CREATION_FLAGS,
-        )
-    except Exception:
-        log.exception("Failed to launch install script")
-        msgbox(ctx, "Nelson",
-               "Failed to launch install script.\n"
-               "Check ~/nelson.log for details.")
 
 
 def _shell_quote(s):

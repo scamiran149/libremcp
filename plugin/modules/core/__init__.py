@@ -38,6 +38,17 @@ class Module(ModuleBase):
         # self._rebuilding = False
 
     def start_background(self, services):
+        # Auto-install declared dependencies (e.g. pysqlite3 on Windows)
+        try:
+            from plugin.framework.deps import check_and_run_auto
+            from plugin._manifest import MODULES
+            manifest = next((m for m in MODULES if m["name"] == "core"), {})
+            scripts = manifest.get("scripts", {})
+            if scripts:
+                check_and_run_auto("core", scripts, services)
+        except Exception:
+            log.debug("Auto-deps check failed", exc_info=True)
+
         self._attach_page_logger()
         # Pre-build paragraph cache in background after doc is loaded
         import threading
