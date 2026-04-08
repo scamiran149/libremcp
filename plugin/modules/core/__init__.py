@@ -46,6 +46,15 @@ class Module(ModuleBase):
             scripts = manifest.get("scripts", {})
             if scripts:
                 check_and_run_auto("core", scripts, services)
+                # Re-run sqlite3 shim after install (first startup)
+                import sys
+                if sys.platform == "win32":
+                    try:
+                        import sqlite3  # noqa: F401
+                    except ImportError:
+                        from plugin.main import _setup_bundled_sqlite3
+                        from plugin.framework.deps import _extension_dir
+                        _setup_bundled_sqlite3(_extension_dir())
         except Exception:
             log.debug("Auto-deps check failed", exc_info=True)
 

@@ -49,6 +49,7 @@ scripts:
     once: true
     version: "1"
     check: "import sqlite3"
+    visible: false
     button: true
     pause: false
     args:
