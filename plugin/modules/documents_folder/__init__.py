@@ -13,6 +13,22 @@ from plugin.framework.module_base import ModuleBase
 log = logging.getLogger("nelson.documents.folder")
 
 
+def get_instance_label(item):
+    """Label function for list_detail — shows name + document count."""
+    import os
+    name = item.get("name") or "?"
+    path = item.get("path") or ""
+    if not path or not os.path.isdir(path):
+        return "%s (no folder)" % name
+    try:
+        from plugin.modules.documents_folder.indexer import FolderIndex
+        idx = FolderIndex(path)
+        count = idx.count()
+        return "%s (%d documents)" % (name, count)
+    except Exception:
+        return name
+
+
 def _show_statusbar(text, duration=5.0):
     """Show a message in the LibreOffice status bar for a few seconds."""
     try:

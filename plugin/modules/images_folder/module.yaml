@@ -11,6 +11,7 @@ config:
     label: Image Folders
     helper: "Local folders to index as image galleries"
     name_field: name
+    label_func: "plugin.modules.images_folder:get_instance_label"
     item_fields:
       name:
         type: string

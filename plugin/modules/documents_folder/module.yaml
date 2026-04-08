@@ -11,6 +11,7 @@ config:
     label: Document Folders
     helper: "Local folders to browse as document galleries"
     name_field: name
+    label_func: "plugin.modules.documents_folder:get_instance_label"
     item_fields:
       name:
         type: string
