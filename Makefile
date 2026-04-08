@@ -225,6 +225,11 @@ rebuild: clean build
 
 # Internal targets (called inside container or locally)
 _build: vendor manifest rdb icons sqlite3
+ifneq ($(BUILD_TAG),)
+	@echo ""
+	@echo "  *** WARNING: BUILD_TAG = '$(BUILD_TAG)' — reset to '' in plugin/version.py for a clean release ***"
+	@echo ""
+endif
 	@echo "Building $(OXT_NAME).oxt..."
 	$(PYTHON) $(SCRIPTS)/build_oxt.py --output build/$(OXT_NAME).oxt
 	@cp build/$(OXT_NAME).oxt build/$(EXTENSION_NAME).oxt
