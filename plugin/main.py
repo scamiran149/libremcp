@@ -116,8 +116,11 @@ def _ensure_extension_on_path(ctx):
     if parent not in sys.path:
         sys.path.insert(0, parent)
 
-    # Load bundled sqlite3 binaries (Windows: _sqlite3.pyd + sqlite3.dll)
-    _setup_bundled_sqlite3(ext_path or parent)
+    # Load bundled sqlite3 via ctypes wrapper (Windows)
+    try:
+        _setup_bundled_sqlite3(ext_path or parent)
+    except Exception:
+        log.exception("_setup_bundled_sqlite3 failed")
 
 
 def _load_manifest():
