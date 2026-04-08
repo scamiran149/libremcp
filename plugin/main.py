@@ -101,28 +101,6 @@ def _setup_bundled_sqlite3(base_path):
         sys.path.insert(0, lib_dir)
 
     try:
-        # LO's _uno_import hook blocks loading .pyd files via normal import.
-        # Load the native extension manually via importlib to bypass the hook.
-        import importlib
-        import importlib.util
-
-        pyd_name = "_sqlite3.cp312-win_amd64.pyd"
-        pyd_path = os.path.join(pysqlite3_dir, pyd_name)
-        if not os.path.isfile(pyd_path):
-            # Fallback: scan for any _sqlite3*.pyd
-            for fn in os.listdir(pysqlite3_dir):
-                if fn.startswith("_sqlite3") and fn.endswith(".pyd"):
-                    pyd_path = os.path.join(pysqlite3_dir, fn)
-                    break
-
-        if os.path.isfile(pyd_path):
-            log.info("Loading pysqlite3 native: %s", pyd_path)
-            spec = importlib.util.spec_from_file_location(
-                "pysqlite3._sqlite3", pyd_path)
-            _sqlite3_mod = importlib.util.module_from_spec(spec)
-            sys.modules["pysqlite3._sqlite3"] = _sqlite3_mod
-            spec.loader.exec_module(_sqlite3_mod)
-
         import pysqlite3
         import pysqlite3.dbapi2
 
@@ -133,9 +111,9 @@ def _setup_bundled_sqlite3(base_path):
 
         log.info("Bundled pysqlite3 (sqlite %s) loaded from %s",
                  pysqlite3.sqlite_version, lib_dir)
-    except Exception as e:
+    except ImportError as e:
         log.warning("Failed to import bundled pysqlite3 from %s: %s",
-                    lib_dir, e, exc_info=True)
+                    lib_dir, e)
 
 
 def _ensure_extension_on_path(ctx):
