@@ -520,10 +520,6 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                         _ButtonActionListener(action_path,
                                               confirm_msg=schema.get("confirm"),
                                               flush=flush))
-                # Update helper with last-launch info for script buttons
-                if field_name.startswith("__script_") and field_name.endswith("__"):
-                    self._update_script_helper(
-                        xWindow, ctrl_id, module_name, field_name, schema)
                 continue  # buttons don't store config values
 
             if widget == "check":
@@ -1305,40 +1301,6 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             return schema
 
     # ── Check widget ───────────────────────────────────────────────
-
-    def _update_script_helper(self, xWindow, ctrl_id, module_name, field_name,
-                              schema):
-        """Append last-launch timestamp to a script button's helper text."""
-        try:
-            hlp_ctrl = self._get_control(xWindow, "hlp_%s" % ctrl_id)
-            if not hlp_ctrl:
-                return
-            # Decode script identity from field_name: __script_install_deps__
-            script_key = field_name[len("__script_"):-len("__")]
-            script_name = script_key.replace("_", "-")
-
-            from plugin.framework.deps import get_last_launch, _get_script_def
-            script_def = _get_script_def(module_name, script_name)
-            last = get_last_launch(module_name, script_name)
-            base = schema.get("helper") or schema.get("description") or ""
-
-            # Check if a version bump requires re-run
-            needs_update = False
-            if script_def and script_def.get("once"):
-                from plugin.framework.deps import _is_done
-                version = str(script_def.get("version", "1"))
-                if last and not _is_done(module_name, script_name, version):
-                    needs_update = True
-
-            if needs_update:
-                suffix = " [update available — click to re-run]"
-            elif last:
-                suffix = " [last run: %s]" % last
-            else:
-                suffix = " [never launched]"
-            hlp_ctrl.getModel().Label = base + suffix
-        except Exception:
-            log.debug("Failed to update script helper", exc_info=True)
 
     _CHECK_ICONS = {"ok": "[OK]", "ko": "[FAIL]", "unknown": "[?]"}
 

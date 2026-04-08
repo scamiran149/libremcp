@@ -16,14 +16,12 @@ menus:
       - action: ollama_launch
       - action: ollama_stop
 
-scripts:
-  install:
-    label: Detect / Install Ollama
-    description: "Checks if Ollama is installed, installs it if needed, and pulls the starter model."
-    install: true
-    button: true
-
 config:
+  install:
+    widget: button
+    label: Detect / Install Ollama
+    helper: "Checks if Ollama is installed, installs it if needed, and pulls the starter model."
+    action: "plugin.modules.ai_ollama:on_install"
   create_preset:
     widget: button
     label: Create Default Instance

@@ -17,10 +17,7 @@ config:
     widget: text
     label: Extra Arguments
     helper: "Additional CLI arguments. Placeholders: {mcp_url}, {port}, {host}."
-
-scripts:
   install:
+    widget: button
     label: Install Gemini CLI
-    description: "Downloads and installs the Gemini CLI."
-    install: true
-    button: true
+    action: "plugin.modules.launcher_gemini:on_install"

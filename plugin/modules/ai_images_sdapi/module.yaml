@@ -19,23 +19,6 @@ menus:
       - action: sdapi_stop
       - action: sdapi_browser
 
-scripts:
-  install:
-    label: Detect / Install Forge
-    description: "Checks if SD WebUI API is running, looks for existing installations, or clones Forge with the selected model."
-    install: true
-    args:
-      - "{config:starter_model}"
-    button:
-      before: "plugin.modules.ai_images_sdapi:pre_install"
-  launch:
-    label: Launch Forge
-    description: "Starts SD WebUI Forge with --api flag."
-  stop:
-    label: Stop Forge
-    description: "Stops the running Forge instance."
-    platform: win32
-
 config:
   starter_model:
     type: string
@@ -52,6 +35,11 @@ config:
         label: "DreamShaper XL (SDXL — 8 GB VRAM — 6 GB)"
       - value: none
         label: "None (I'll add my own model)"
+  install:
+    widget: button
+    label: Detect / Install Forge
+    helper: "Checks if SD WebUI API is running, looks for existing installations, or clones Forge with the selected model. Reopen Options to see the auto-configured instance."
+    action: "plugin.modules.ai_images_sdapi:on_install"
   create_preset:
     widget: button
     label: Create Optimized Instance

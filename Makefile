@@ -77,8 +77,6 @@ else
     HOME_DIR = $(HOME)
 endif
 
-EXTENSION_VERSION := $(shell $(PYTHON) -c "from plugin.version import EXTENSION_VERSION; print(EXTENSION_VERSION)" 2>/dev/null || echo "0.0.0")
-
 # ── Phony targets ────────────────────────────────────────────────────────────
 
 .PHONY: help build rebuild repack repack-deploy xcu clean dev-up dev-down \
@@ -216,17 +214,13 @@ endif
 build: dev-up vendor manifest rdb icons sqlite3 docs
 	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt --check
 
-build-force: dev-up vendor manifest rdb icons sqlite3
-	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt
-
 rebuild: clean build
 
 # Internal targets (called inside container or locally)
 _build: vendor manifest rdb icons sqlite3
-	@echo "Building $(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt..."
-	$(PYTHON) $(SCRIPTS)/build_oxt.py --output build/$(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt
-	@cp build/$(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt build/$(EXTENSION_NAME).oxt
-	@echo "Done: build/$(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt  (bundle in build/bundle/)"
+	@echo "Building $(EXTENSION_NAME).oxt..."
+	$(PYTHON) $(SCRIPTS)/build_oxt.py --output build/$(EXTENSION_NAME).oxt
+	@echo "Done: build/$(EXTENSION_NAME).oxt  (bundle in build/bundle/)"
 
 _rebuild: clean _build
 
@@ -357,7 +351,7 @@ deploy:
 	$(MAKE) lo-kill
 	powershell -c "Start-Sleep 3"
 	-powershell -c "Remove-Item '$(LO_CONF)/.lock','$(LO_CONF)/user/.lock' -ErrorAction SilentlyContinue"
-	$(MAKE) build-force
+	$(MAKE) build
 	-unopkg remove org.extension.nelson
 	powershell -c "Start-Sleep 1"
 	unopkg add build/$(EXTENSION_NAME).oxt

@@ -159,7 +159,6 @@ def generate_manifest_py(modules, output_path):
             "requires": m.get("requires", []),
             "provides_services": m.get("provides_services", []),
             "config": m.get("config", {}),
-            "scripts": m.get("scripts", {}),
             "actions": list(m.get("actions", {}).keys()),
             "action_icons": {k: v["icon"] for k, v in m.get("actions", {}).items() if v.get("icon")},
         }
@@ -1722,31 +1721,6 @@ def patch_description_xml(extension_dir):
     print("  Generated description.xml with version %s" % EXTENSION_VERSION)
 
 
-def _synthesize_script_buttons(modules):
-    """Inject config button entries for scripts with button: true or button: {hooks}.
-
-    Mutates each module's config dict in-place so all downstream generators
-    (XDL, XCS/XCU, _manifest.py) see the synthesized buttons.
-    """
-    for m in modules:
-        scripts = m.get("scripts", {})
-        if not scripts:
-            continue
-        config = m.setdefault("config", {})
-        for script_name, script_def in scripts.items():
-            if not script_def.get("button"):
-                continue
-            safe_name = script_name.replace("-", "_")
-            mod_safe = m["name"].replace(".", "_dot_")
-            config["__script_%s__" % safe_name] = {
-                "widget": "button",
-                "label": script_def.get("label", script_name),
-                "helper": script_def.get("description", ""),
-                "action": "plugin.framework.deps:run__%s__%s" % (
-                    mod_safe, safe_name),
-            }
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Generate _manifest.py and XCS/XCU from module.yaml files")
@@ -1784,10 +1758,6 @@ def main():
     names = [m["name"] for m in sorted_modules]
     print("  Module order: %s" % " -> ".join(names))
 
-    # Synthesize config buttons from scripts declarations.
-    # Done early so all generators (XDL, XCS, manifest.py) see them.
-    _synthesize_script_buttons(sorted_modules)
-
     build_dir = os.path.join(PROJECT_ROOT, "build", "generated")
 
     # 1. Addons.xcu (menus) — run first to collect conditional menus
@@ -1824,62 +1794,8 @@ def main():
     # 8. Patch version
     patch_description_xml(os.path.join(PROJECT_ROOT, "extension"))
 
-    # 9. Validate scripts declarations
-    _validate_scripts(sorted_modules, modules_dir)
-
     print("Done.")
     return 0
-
-
-def _validate_scripts(modules, modules_dir):
-    """Validate that declared scripts have files and vice versa."""
-    errors = []
-    warnings = []
-
-    for m in modules:
-        name = m["name"]
-        scripts = m.get("scripts", {})
-        mod_dir_name = name.replace(".", "_")
-        mod_scripts_dir = os.path.join(modules_dir, mod_dir_name, "scripts")
-
-        # Check declared scripts have at least one file (.ps1 or .sh)
-        for script_name, script_def in scripts.items():
-            ps1 = os.path.join(mod_scripts_dir, "%s.ps1" % script_name)
-            sh = os.path.join(mod_scripts_dir, "%s.sh" % script_name)
-            platform = script_def.get("platform")
-
-            if platform == "win32":
-                if not os.path.isfile(ps1):
-                    errors.append(
-                        "%s: script '%s' declared but %s.ps1 not found"
-                        % (name, script_name, script_name))
-            elif platform in ("linux", "darwin"):
-                if not os.path.isfile(sh):
-                    errors.append(
-                        "%s: script '%s' declared but %s.sh not found"
-                        % (name, script_name, script_name))
-            else:
-                # No platform filter — expect at least one
-                if not os.path.isfile(ps1) and not os.path.isfile(sh):
-                    errors.append(
-                        "%s: script '%s' declared but no .ps1 or .sh found"
-                        % (name, script_name))
-
-        # Check script files are declared in YAML
-        if os.path.isdir(mod_scripts_dir):
-            for fn in os.listdir(mod_scripts_dir):
-                if not (fn.endswith(".ps1") or fn.endswith(".sh")):
-                    continue
-                base = fn.rsplit(".", 1)[0]
-                if base not in scripts:
-                    warnings.append(
-                        "%s: script file '%s' not declared in module.yaml"
-                        % (name, fn))
-
-    for w in warnings:
-        print("  WARNING: %s" % w)
-    for e in errors:
-        print("  ERROR: %s" % e, file=sys.stderr)
 
 
 if __name__ == "__main__":

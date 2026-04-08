@@ -70,6 +70,46 @@ def _stop_ollama():
         log.debug("Failed to stop Ollama", exc_info=True)
 
 
+def on_install():
+    """Run install/detect script in a visible terminal."""
+    from plugin.framework.dialogs import msgbox
+    from plugin.framework.uno_context import get_ctx
+    from plugin.main import get_services
+
+    ctx = get_ctx()
+    services = get_services()
+    model = "llama3.2:latest"
+    if services:
+        cfg = services.config.proxy_for("ai.ollama")
+        try:
+            raw = cfg.get("instances") or "[]"
+            items = json.loads(raw) if isinstance(raw, str) else raw
+            if items and isinstance(items, list):
+                model = items[0].get("model") or model
+        except Exception:
+            pass
+
+    scripts_dir = os.path.join(os.path.dirname(__file__), "scripts")
+
+    if sys.platform == "win32":
+        script = os.path.join(scripts_dir, "install.ps1")
+        cmd = ('cmd /c start "Install Ollama" powershell -ExecutionPolicy Bypass'
+               ' -File "%s" -Model "%s"' % (script, model))
+    else:
+        script = os.path.join(scripts_dir, "install.sh")
+        cmd = 'x-terminal-emulator -e bash "%s" "%s" || bash "%s" "%s"' % (
+            script, model, script, model)
+
+    if not os.path.isfile(script):
+        msgbox(ctx, "Nelson", "Install script not found:\n%s" % script)
+        return
+
+    try:
+        subprocess.Popen(cmd, shell=True, start_new_session=True,
+                         creationflags=_CREATION_FLAGS)
+    except Exception:
+        log.exception("Failed to launch install script")
+        msgbox(ctx, "Nelson", "Failed to launch install script.")
 
 
 def on_create_preset():

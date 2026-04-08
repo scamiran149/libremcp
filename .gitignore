@@ -8,8 +8,6 @@ extension/description.xml
 # Vendored dependencies (make vendor)
 vendor/
 plugin/lib/snowballstemmer/
-plugin/lib/pysqlite3/
-plugin/_build_id.py
 
 # Python
 *.pyc
