@@ -100,70 +100,22 @@ def _setup_bundled_sqlite3(base_path):
     if lib_dir not in sys.path:
         sys.path.insert(0, lib_dir)
 
-    # Strategy: try multiple approaches to get sqlite3 working.
-    # 1. Try LO's own _sqlite3.pyd + sqlite3.dll (most compatible)
-    # 2. Try bundled pysqlite3 via importlib (bypass UNO import hook)
-    # 3. Give up and log a warning
-    import importlib
-    import importlib.util
-
-    # --- Approach 1: LO's own _sqlite3.pyd ---
-    # LO ships _sqlite3.pyd + sqlite3.dll in python-core but the import
-    # may fail because the path is not on sys.path or _uno_import blocks it.
-    lo_python_lib = None
     try:
-        # Find LO's python-core lib directory
-        lo_program = os.path.dirname(sys.executable)
-        for entry in os.listdir(lo_program):
-            if entry.startswith("python-core"):
-                lo_python_lib = os.path.join(lo_program, entry, "lib")
-                break
-    except Exception:
-        pass
+        # LO's _uno_import hook blocks loading .pyd files via normal import.
+        # Load the native extension manually via importlib to bypass the hook.
+        import importlib
+        import importlib.util
 
-    if lo_python_lib:
-        lo_pyd = os.path.join(lo_python_lib, "_sqlite3.pyd")
-        lo_dll = os.path.join(lo_python_lib, "sqlite3.dll")
-        if os.path.isfile(lo_pyd) and os.path.isfile(lo_dll):
-            try:
-                log.info("Trying LO native sqlite3: %s", lo_pyd)
-                # Preload sqlite3.dll so _sqlite3.pyd can find it
-                import ctypes
-                ctypes.CDLL(lo_dll)
-                if hasattr(os, "add_dll_directory"):
-                    os.add_dll_directory(lo_python_lib)
-                # Load _sqlite3.pyd via importlib (bypass _uno_import)
-                spec = importlib.util.spec_from_file_location(
-                    "_sqlite3", lo_pyd)
-                _sqlite3_mod = importlib.util.module_from_spec(spec)
-                sys.modules["_sqlite3"] = _sqlite3_mod
-                spec.loader.exec_module(_sqlite3_mod)
-                # Now import sqlite3 stdlib wrapper
-                sqlite3_dir = os.path.join(lo_python_lib, "sqlite3")
-                if os.path.isdir(sqlite3_dir):
-                    # Add to path so sqlite3/__init__.py can be found
-                    if lo_python_lib not in sys.path:
-                        sys.path.insert(0, lo_python_lib)
-                import sqlite3
-                sqlite3.connect(":memory:").close()
-                log.info("LO native sqlite3 (v%s) loaded from %s",
-                         sqlite3.sqlite_version, lo_python_lib)
-                return  # Success!
-            except Exception as e:
-                log.info("LO native sqlite3 failed: %s", e)
+        pyd_name = "_sqlite3.cp312-win_amd64.pyd"
+        pyd_path = os.path.join(pysqlite3_dir, pyd_name)
+        if not os.path.isfile(pyd_path):
+            # Fallback: scan for any _sqlite3*.pyd
+            for fn in os.listdir(pysqlite3_dir):
+                if fn.startswith("_sqlite3") and fn.endswith(".pyd"):
+                    pyd_path = os.path.join(pysqlite3_dir, fn)
+                    break
 
-    # --- Approach 2: bundled pysqlite3 ---
-    try:
-        pyd_path = None
-        for fn in os.listdir(pysqlite3_dir):
-            if fn.startswith("_sqlite3") and fn.endswith(".pyd"):
-                pyd_path = os.path.join(pysqlite3_dir, fn)
-                break
-
-        if pyd_path and os.path.isfile(pyd_path):
-            if hasattr(os, "add_dll_directory"):
-                os.add_dll_directory(pysqlite3_dir)
-
+        if os.path.isfile(pyd_path):
             log.info("Loading pysqlite3 native: %s", pyd_path)
             spec = importlib.util.spec_from_file_location(
                 "pysqlite3._sqlite3", pyd_path)
