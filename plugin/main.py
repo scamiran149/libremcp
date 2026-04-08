@@ -78,15 +78,15 @@ def _setup_bundled_sqlite3(base_path):
     needs.  If pysqlite3 is present in plugin/lib/ (either bundled at
     build time or installed by the deps framework at first startup),
     shim it into sys.modules so `import sqlite3` works transparently.
+
+    We always prefer pysqlite3 over the system sqlite3 on Windows because
+    LO's Python may have a broken/partial sqlite3 module that passes
+    `import sqlite3` but fails on actual use (e.g. connect()).
     """
     if sys.platform != "win32":
         return
-    # Check if sqlite3 already works
-    try:
-        import sqlite3  # noqa: F401
-        return
-    except ImportError:
-        pass
+
+    log.info("_setup_bundled_sqlite3: checking for pysqlite3...")
 
     lib_dir = os.path.join(base_path, "plugin", "lib")
     pysqlite3_dir = os.path.join(lib_dir, "pysqlite3")
