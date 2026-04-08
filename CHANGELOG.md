@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.1] — 2026-04-08
+
+### Added
+
+- **Scripts framework** — scripts are now declared in `module.yaml` with tags (`install`, `auto`, `once`, `button`, `visible`, `pause`). Centralized launch via `plugin/framework/deps.py` and `plugin/framework/terminal.py`. Build validates declared scripts vs files
+- **`sqlite3_ctypes`** — pure-Python DB-API 2.0 wrapper using `ctypes.CDLL` to load `sqlite3.dll` directly. No `.pyd` needed — works on all Windows machines regardless of LO's custom `python312.dll`. Bundled `sqlite3.dll` v3.51.3 from sqlite.org (FTS5 included)
+- **Build ID** — each `.oxt` is stamped with a `timestamp-hash` for traceability (visible in first log line)
+- **BUILD_TAG** — `plugin/version.py` supports patch release suffixes (e.g. `nelson-0.8.1-2.oxt`)
+- **SQLite3 status check** — Options > Nelson MCP shows `[OK] sqlite3 3.51.3` or `[FAIL]`
+- **`NELSON_LOG_LEVEL`** — env var overrides configured log level
+- **`NELSON_SQLITE3_DLL`** — env var overrides sqlite3 DLL path
+- **Dynamic gallery sync** — adding/removing image or document folders in Options takes effect immediately (no restart needed)
+
+### Changed
+
+- **Log level deferred** — configured log level is applied after bootstrap completes, so all boot messages are visible
+- **`make deploy`** uses `build-force` (no stale docker cache)
+- **Versioned `.oxt`** — build output is `nelson-0.8.1.oxt` (was `nelson.oxt`)
+
+### Fixed
+
+- **sqlite3 on Windows** (#3) — `_sqlite3.pyd` from both pysqlite3 and LO fails to load due to missing symbols in LO's `python312.dll`. Replaced with pure-ctypes approach + bundled DLL
+
 ## [0.7.2] — 2026-03-29
 
 ### Added

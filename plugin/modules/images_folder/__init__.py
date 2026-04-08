@@ -125,29 +125,67 @@ def on_reset_db():
 class ImagesFolderModule(ModuleBase):
 
     def initialize(self, services):
+        self._svc = services.images
+        self._services = services
+        self._sync_instances(services)
+
+    def start(self, services):
+        # Subscribe to config changes to re-sync instances at runtime
+        bus = services.events
+        bus.subscribe("config:changed", self._on_config_changed)
+
+    def _on_config_changed(self, key=None, changes=None, **_kw):
+        """Re-sync gallery instances when images.folder.instances changes."""
+        # Single-key change
+        if key == "images.folder.instances":
+            self._sync_instances(self._services)
+            return
+        # Batch change
+        if changes:
+            for diff in changes:
+                if diff.get("key") == "images.folder.instances":
+                    self._sync_instances(self._services)
+                    return
+
+    def _sync_instances(self, services):
+        """Register/unregister gallery instances to match current config."""
         from plugin.modules.images.service import GalleryInstance
 
-        svc = services.images
+        svc = self._svc
         cfg = services.config.proxy_for(self.name)
         raw = cfg.get("instances") or "[]"
         try:
             items = json.loads(raw) if isinstance(raw, str) else raw
         except (json.JSONDecodeError, TypeError):
-            return
+            items = []
         if not isinstance(items, list):
-            return
+            items = []
 
-        self._items = items
-        self._svc = svc
-
+        # Build desired set
+        desired = {}
         for item in items:
             name = item.get("name") or "default"
             instance_id = "folder:%s" % name
-            svc.register_instance(instance_id, GalleryInstance(
-                name=name,
-                module_name="images.folder",
-                provider=_LazyProvider(item),
-            ))
+            desired[instance_id] = item
+
+        # Remove instances no longer in config
+        current_ids = [iid for iid, inst in svc._instances.items()
+                       if inst.module_name == "images.folder"]
+        for iid in current_ids:
+            if iid not in desired:
+                svc.unregister_instance(iid)
+                log.info("Gallery instance removed: %s", iid)
+
+        # Add new instances
+        for instance_id, item in desired.items():
+            name = item.get("name") or "default"
+            if instance_id not in current_ids:
+                svc.register_instance(instance_id, GalleryInstance(
+                    name=name,
+                    module_name="images.folder",
+                    provider=_LazyProvider(item),
+                ))
+                log.info("Gallery instance added: %s", instance_id)
 
     def start_background(self, services):
         """Trigger initial rescan for all folder instances if enabled."""
