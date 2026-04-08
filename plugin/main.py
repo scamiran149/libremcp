@@ -71,58 +71,24 @@ _initialized = False
 
 
 def _setup_bundled_sqlite3(base_path):
-    """Make sqlite3 importable on Windows via bundled pysqlite3.
+    """Make sqlite3 importable on Windows via bundled sqlite3.dll + ctypes.
 
-    LO's Python on Windows doesn't include sqlite3, and LO's custom
-    python312.dll is missing symbols that the official _sqlite3.pyd
-    needs.  If pysqlite3 is present in plugin/lib/ (either bundled at
-    build time or installed by the deps framework at first startup),
-    shim it into sys.modules so `import sqlite3` works transparently.
+    LO's Python on Windows doesn't include a working sqlite3 module.
+    We bundle sqlite3.dll (from sqlite.org) and wrap it via ctypes in
+    sqlite3_ctypes.py — pure Python, no .pyd needed.  This is always
+    used on Windows for consistent behavior across all machines.
     """
     if sys.platform != "win32":
         return
-    # Check if sqlite3 already works
-    try:
-        import sqlite3  # noqa: F401
-        return
-    except ImportError:
-        pass
 
-    lib_dir = os.path.join(base_path, "plugin", "lib")
-    pysqlite3_dir = os.path.join(lib_dir, "pysqlite3")
-    if not os.path.isdir(pysqlite3_dir):
-        # Will be installed by deps framework in Phase 2b (start_background)
-        log.info("pysqlite3 not yet available — will be installed at first startup")
-        return
-
-    # pysqlite3 is vendored into plugin/lib/ — lib/ should already
-    # be on sys.path from _ensure_extension_on_path, but make sure
-    if lib_dir not in sys.path:
-        sys.path.insert(0, lib_dir)
-
-    try:
-        import pysqlite3
-        import pysqlite3.dbapi2
-
-        # Shim: make `import sqlite3` use pysqlite3
-        sys.modules["_sqlite3"] = pysqlite3._sqlite3
-        sys.modules["sqlite3"] = pysqlite3
-        sys.modules["sqlite3.dbapi2"] = pysqlite3.dbapi2
-
-        log.info("Bundled pysqlite3 (sqlite %s) loaded from %s",
-                 pysqlite3.sqlite_version, lib_dir)
-        return
-    except (ImportError, Exception) as e:
-        log.info("pysqlite3 not usable: %s", e)
-
-    # Fallback: pure-Python ctypes wrapper around sqlite3.dll
     try:
         from plugin.framework import sqlite3_ctypes
         sys.modules["sqlite3"] = sqlite3_ctypes
         sys.modules["sqlite3.dbapi2"] = sqlite3_ctypes
-        log.info("sqlite3_ctypes loaded (sqlite %s) from %s",
-                 sqlite3_ctypes.sqlite_version,
-                 sqlite3_ctypes._get_lib()._name)
+        # Verify it actually works
+        sqlite3_ctypes.connect(":memory:").close()
+        log.info("sqlite3_ctypes loaded (sqlite %s)",
+                 sqlite3_ctypes.sqlite_version)
     except Exception as e:
         log.warning("sqlite3 unavailable — indexing will be disabled: %s", e)
 
