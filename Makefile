@@ -78,8 +78,6 @@ else
 endif
 
 EXTENSION_VERSION := $(shell $(PYTHON) -c "from plugin.version import EXTENSION_VERSION; print(EXTENSION_VERSION)" 2>/dev/null || echo "0.0.0")
-BUILD_TAG := $(shell $(PYTHON) -c "from plugin.version import BUILD_TAG; print(BUILD_TAG)" 2>/dev/null || echo "")
-OXT_NAME = $(EXTENSION_NAME)-$(EXTENSION_VERSION)$(BUILD_TAG)
 
 # ── Phony targets ────────────────────────────────────────────────────────────
 
@@ -225,10 +223,10 @@ rebuild: clean build
 
 # Internal targets (called inside container or locally)
 _build: vendor manifest rdb icons sqlite3
-	@echo "Building $(OXT_NAME).oxt..."
-	$(PYTHON) $(SCRIPTS)/build_oxt.py --output build/$(OXT_NAME).oxt
-	@cp build/$(OXT_NAME).oxt build/$(EXTENSION_NAME).oxt
-	@echo "Done: build/$(OXT_NAME).oxt  (bundle in build/bundle/)"
+	@echo "Building $(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt..."
+	$(PYTHON) $(SCRIPTS)/build_oxt.py --output build/$(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt
+	@cp build/$(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt build/$(EXTENSION_NAME).oxt
+	@echo "Done: build/$(EXTENSION_NAME)-$(EXTENSION_VERSION).oxt  (bundle in build/bundle/)"
 
 _rebuild: clean _build
 
