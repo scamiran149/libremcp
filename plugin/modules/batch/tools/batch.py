@@ -60,17 +60,17 @@ def _follow_result(ctx, result):
 class ExecuteBatch(ToolBase):
     name = "execute_batch"
     description = (
-        "Execute multiple tool calls in a single request. "
-        "Operations run sequentially with batch mode "
-        "(cache invalidation deferred to end). "
-        "Stops on first error by default. "
-        "BATCH VARIABLES: $last = paragraph_index from previous step, "
-        "$last+N / $last-N = offset, "
+        "Execute multiple tool calls in a single request (up to 50). "
+        "Operations run sequentially; cache invalidation is deferred to the end for performance. "
+        "Stops on first error by default (set stop_on_error=false to continue). "
+        "BATCH VARIABLES for chaining operations: "
+        "$last = paragraph_index from previous step, "
+        "$last+N/$last-N = offset (e.g. $last+1 means next paragraph), "
         "$last.bookmark = bookmark from previous step, "
-        "$step.N = paragraph_index from step N, "
+        "$step.N = paragraph_index from a specific step, "
         "$step.N.bookmark = bookmark from step N. "
-        "Variables resolve to integers in numeric fields, "
-        "strings in text fields (e.g. locator: 'paragraph:$last+1'). "
+        "Use in string fields as 'paragraph:$last+1' or in numeric fields as plain $last. "
+        "Example: step 1 inserts a heading, step 2 uses $last+1 to insert body text after it. "
         "Cannot call execute_batch recursively."
     )
     parameters = {

@@ -226,10 +226,30 @@ class MCPProtocolHandler:
                 "version": self.version,
             },
             "instructions": (
-                "LibreMCP — AI document workspace. "
-                "WORKFLOW: 1) Use tools to interact with LibreOffice documents. "
-                "2) Tools are filtered by document type (writer/calc/draw). "
-                "3) All UNO operations run on the main thread for thread safety."
+                "LibreMCP — AI document workspace for LibreOffice.\n"
+                "\n"
+                "LOCATORS: Many tools accept a 'locator' string for stable positioning: "
+                "paragraph:N, bookmark:_mcp_xxx, heading_text:Title, heading:N.M. "
+                "get_document_tree creates _mcp_ bookmarks on headings — always call it "
+                "before edits so you have stable anchors. Use resolve_locator to verify positions.\n"
+                "\n"
+                "WORKFLOW: Read first, then write.\n"
+                "1. get_document_tree(depth=0) for full outline with bookmarks.\n"
+                "2. get_heading_children(locator) or read_paragraphs(locator) for detail.\n"
+                "3. apply_document_content, set_paragraph_text, or insert_paragraphs_batch for edits.\n"
+                "\n"
+                "BATCH VARIABLES: In execute_batch, use $last (paragraph_index from previous step), "
+                "$last+N, $step.N (paragraph_index from step N), $last.bookmark, $step.N.bookmark.\n"
+                "\n"
+                "CONTENT FORMATTING: apply_document_content and insert_paragraphs_batch accept "
+                "HTML and Markdown. Use <b>, <i>, <ul>, <li>, <h1>-<h6> for basic formatting.\n"
+                "\n"
+                "DOC-TYPE PARAMS: Unified tools (insert_image, create_shape, download_image, etc.) "
+                "accept nested objects: writer:{paragraph_index:0}, draw:{page_index:0}, "
+                "calc:{sheet_name:'Sheet1'}.\n"
+                "\n"
+                "TOOL FILTERING: Only tools matching the active document type "
+                "(writer/calc/draw/impress) appear in tools/list."
             ),
         }
 

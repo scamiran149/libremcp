@@ -14,10 +14,11 @@ class GetDocumentTree(ToolBase):
     intent = "navigate"
     description = (
         "Get the document heading tree with bookmarks and content previews. "
-        "Creates _mcp_ bookmarks on headings for stable addressing. "
-        "Content strategies: heading_only, first_lines (default), "
-        "ai_summary_first, full. "
-        "depth=0 for unlimited, depth=1 (default) for top-level only."
+        "ALWAYS call this before editing to get stable _mcp_ bookmarks for headings "
+        "(e.g. bookmark:_mcp_a1b2c3d4). These bookmarks survive edits unlike paragraph indices. "
+        "Use depth=0 for the complete tree (recommended for AI), depth=1 for top-level only. "
+        "Content strategies: heading_only (just headings), first_lines (default, first line per section), "
+        "full (all text, can be large)."
     )
     parameters = {
         "type": "object",
@@ -25,11 +26,11 @@ class GetDocumentTree(ToolBase):
             "content_strategy": {
                 "type": "string",
                 "enum": ["heading_only", "first_lines", "ai_summary_first", "full"],
-                "description": "Content to include with headings (default: first_lines)",
+                "description": "Content to include: heading_only=just headings, first_lines=preview per section (default), full=all text",
             },
             "depth": {
                 "type": "integer",
-                "description": "Max tree depth (0=unlimited, default: 1)",
+                "description": "Tree depth: 0=unlimited full tree (recommended), 1=top-level only (default). Use depth=0 for AI navigation.",
             },
         },
         "required": [],
@@ -51,16 +52,18 @@ class GetHeadingChildren(ToolBase):
     tier = "core"
     intent = "navigate"
     description = (
-        "Drill into a heading's children — body paragraphs and sub-headings. "
-        "Identify the heading by locator (e.g. 'bookmark:_mcp_xxx', "
-        "'heading_text:Title'), heading_para_index, or heading_bookmark."
+        "Drill into a heading's body paragraphs and sub-headings. "
+        "Use after get_document_tree to explore specific sections. "
+        "Identify the heading by locator: 'bookmark:_mcp_xxx' (from get_document_tree), "
+        "'heading_text:Title' (fuzzy match on heading text), or 'paragraph:N'. "
+        "Returns paragraphs with text, style, and bookmark for stable reference."
     )
     parameters = {
         "type": "object",
         "properties": {
             "locator": {
                 "type": "string",
-                "description": "Locator string (e.g. 'bookmark:_mcp_xxx', 'heading:1.2')",
+                "description": "Locator string: 'bookmark:_mcp_xxx', 'heading_text:Title', or 'paragraph:N'",
             },
             "heading_para_index": {
                 "type": "integer",

@@ -361,13 +361,13 @@ class ResolveLocator(ToolBase):
     tier = "core"
     intent = "navigate"
     description = (
-        "Resolve any locator string to its current paragraph position "
-        "with confidence, canonical bookmark, heading context, and "
-        "alternatives (for ambiguous matches). Use this to anchor a "
-        "position before editing, or to validate a locator. "
-        "Supported locator types: paragraph:<N>, bookmark:<name>, "
-        "heading:<level.index>, heading_text:<text>, page:<N>, "
-        "section:<name>, regex:/<pattern>/, cursor:, first:, last:."
+        "Resolve any locator string to a stable paragraph position. "
+        "Returns paragraph_index, canonical bookmark, heading context, and confidence. "
+        "Call this before editing when you need a stable anchor — _mcp_ bookmarks "
+        "survive edits unlike paragraph indices. "
+        "Locator types: bookmark:_mcp_xxx (most stable), heading_text:Title (fuzzy match), "
+        "paragraph:N (index), heading:1.2 (by outline position), page:N, "
+        "section:SectionName, regex:/pattern/."
     )
     parameters = {
         "type": "object",

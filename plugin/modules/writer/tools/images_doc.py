@@ -579,10 +579,12 @@ class InsertImage(ToolBase):
     intent = "media"
     description = (
         "Insert an image from local path or URL into the document. "
-        "URLs are auto-downloaded first. "
-        "In Writer, inserts as a text graphic object at a locator or paragraph. "
-        "In Calc, inserts on the active sheet's drawing layer. "
-        "In Draw/Impress, inserts centered on the current or specified page."
+        "URLs are auto-downloaded. Doc-type-specific params: "
+        "writer: {locator:'bookmark:_mcp_xxx', paragraph_index:5}, "
+        "draw: {page_index:0}, calc: {cell:'B5'}. "
+        "In Writer, inserts as a text graphic object at the specified position. "
+        "In Calc, inserts on the active sheet. "
+        "In Draw/Impress, inserts centered on the current page."
     )
     parameters = {
         "type": "object",

@@ -101,24 +101,30 @@ class ApplyDocumentContent(ToolBase):
 
     name = "apply_document_content"
     description = (
-        "Insert or replace content. Preferred for partial edits: "
-        "target='search' with search= and content=. "
-        "For whole doc: target='full'. "
-        "Use target='range' with start/end."
+        "Primary tool for editing document content. Supports 6 target modes: "
+        "full=replace entire document, search=find and replace text (use with search param), "
+        "range=replace by character offset (needs start+end), "
+        "beginning=insert at top, end=append at bottom, selection=replace current selection. "
+        "Content accepts Markdown (## Headings, **bold**, etc.) and HTML (<b>, <ul>, <h1>). "
+        "For search mode, set all_matches=true to replace every occurrence."
     )
     parameters = {
         "type": "object",
         "properties": {
             "content": {
                 "type": "string",
-                "description": "The new content (Markdown or HTML).",
+                "description": "The new content. Supports Markdown (## Heading, **bold**, - list) and HTML (<b>, <i>, <ul>, <li>, <h1>-<h6>).",
             },
             "target": {
                 "type": "string",
                 "enum": ["beginning", "end", "selection", "search", "full", "range"],
                 "description": (
-                    "Where to apply: full, range (start+end), "
-                    "search (needs search), beginning, end, selection."
+                    "Where to apply content: "
+                    "full=replace entire document, "
+                    "search=find and replace (requires search param), "
+                    "range=replace by character offset (requires start+end), "
+                    "beginning=insert at top, end=append at bottom, "
+                    "selection=replace current selection."
                 ),
             },
             "start": {
@@ -305,7 +311,10 @@ class ReadParagraphs(ToolBase):
     name = "read_paragraphs"
     description = (
         "Read a range of paragraphs by index or locator. "
-        "Useful for scanning text between headings."
+        "Returns each paragraph's text, style, index, and bookmark. "
+        "Locator formats: 'paragraph:N' (index), 'bookmark:_mcp_xxx' (from get_document_tree), "
+        "'heading_text:Title' (heading containing that text). "
+        "Default count is 10. Use after get_document_tree to navigate by heading."
     )
     parameters = {
         "type": "object",
@@ -776,9 +785,10 @@ class InsertParagraphsBatch(ToolBase):
     tier = "core"
     intent = "edit"
     description = (
-        "Insert multiple paragraphs in a single operation. "
-        'Each item in paragraphs is {"text": "...", "style": "..."}. '
-        "Style is optional."
+        "Insert multiple paragraphs in a single operation, each with optional style. "
+        'Paragraphs format: [{"text": "Hello", "style": "Heading 1"}, {"text": "Body text"}]. '
+        "Style names match LibreOffice styles (e.g. 'Heading 1', 'Text Body', 'List Bullet'). "
+        "Position: defaults to after the target paragraph. Use position='before' to insert above."
     )
     parameters = {
         "type": "object",
