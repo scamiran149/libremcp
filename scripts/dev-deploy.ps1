@@ -26,7 +26,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
-$ExtName = "nelson"
+$ExtName = "libremcp"
 
 # ── Find LO extensions dir ──────────────────────────────────────────────────
 

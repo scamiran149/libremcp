@@ -2,7 +2,7 @@
 """
 mcp-bridge — Stdio-to-HTTP MCP proxy.
 
-Translates stdio MCP (JSON-RPC on stdin/stdout) to Nelson's HTTP MCP
+Translates stdio MCP (JSON-RPC on stdin/stdout) to LibreMCP's HTTP MCP
 endpoint. Handles session management and auto-reinitialize on 409.
 
 Usage:
@@ -11,7 +11,7 @@ Usage:
 Configure in .mcp.json:
     {
       "mcpServers": {
-        "nelson": {
+        "libremcp": {
           "type": "stdio",
           "command": "python",
           "args": ["dev/mcp-bridge/server.py"]
@@ -64,11 +64,13 @@ class MCPBridge:
             init_resp = self._post(init_msg)
             if init_resp and init_resp.get("_status") != 409:
                 # Send initialized notification
-                self._post({
-                    "jsonrpc": "2.0",
-                    "method": "notifications/initialized",
-                    "params": {},
-                })
+                self._post(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "notifications/initialized",
+                        "params": {},
+                    }
+                )
                 # Retry the original message
                 resp = self._post(msg)
 
@@ -83,7 +85,8 @@ class MCPBridge:
             headers["Mcp-Session-Id"] = self.session_id
 
         req = urllib.request.Request(
-            self.url, data=data, headers=headers, method="POST")
+            self.url, data=data, headers=headers, method="POST"
+        )
 
         try:
             with urllib.request.urlopen(req, timeout=120) as resp:
@@ -119,6 +122,7 @@ def main():
     # Force UTF-8 on all I/O (Windows defaults to cp1252)
     if sys.platform == "win32":
         import os
+
         os.environ["PYTHONUTF8"] = "1"
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")

@@ -1,14 +1,14 @@
 # Set Up an Image Gallery
 
-This guide explains how to configure a folder of images as a searchable gallery in Nelson MCP, so you can browse, search, and insert images into your documents.
+This guide explains how to configure a folder of images as a searchable gallery in LibreMCP, so you can browse, search, and insert images into your documents.
 
 ## Overview
 
-Nelson MCP's image gallery system indexes local folders and makes their contents available through MCP tools (`gallery_list`, `gallery_search`, `gallery_get`). Images are indexed in a local SQLite database with full-text search. Metadata is stored in standard XMP sidecar files.
+LibreMCP's image gallery system indexes local folders and makes their contents available through MCP tools (`gallery_list`, `gallery_search`, `gallery_get`). Images are indexed in a local SQLite database with full-text search. Metadata is stored in standard XMP sidecar files.
 
 ## Step 1 — Add a Folder
 
-Open **Tools > Options > Nelson MCP > Image Folders**.
+Open **Tools > Options > LibreMCP > Image Folders**.
 
 Click **Add** to create a new folder instance:
 
@@ -18,7 +18,7 @@ Click **Add** to create a new folder instance:
 ### Options
 
 - **Recursive**: scan subfolders (default: yes)
-- **Writable**: allow Nelson to save metadata (XMP sidecars) and add images. Required for AI indexing
+- **Writable**: allow LibreMCP to save metadata (XMP sidecars) and add images. Required for AI indexing
 - **Extensions**: file types to index (default: jpg, jpeg, png, gif, bmp, tiff, webp, svg)
 - **AI Auto-Index**: enable automatic AI tagging when the indexer runs (requires Ollama + Forge)
 - **Sync to LO Gallery**: copy indexed images to a LibreOffice Gallery theme for use in Insert > Media > Gallery
@@ -60,7 +60,7 @@ Use `insert_image` with the image path returned by gallery tools to insert direc
 
 ### XMP Sidecars
 
-If your images already have XMP sidecar files (`.xmp`), Nelson reads them automatically. Supported fields:
+If your images already have XMP sidecar files (`.xmp`), LibreMCP reads them automatically. Supported fields:
 
 - **Title** (dc:title)
 - **Description** (dc:description)
@@ -81,7 +81,7 @@ You can add as many folder galleries as needed. Each gets its own index database
 ## Database Management
 
 - **Reset DB**: deletes the index and rebuilds from scratch. Use this if the index seems corrupted or after changing folder structure
-- Database location: `~/.config/nelson/images_<hash>.db`
+- Database location: `~/.config/libremcp/images_<hash>.db`
 - The database is lightweight — it stores metadata only, not image data
 
 ## Troubleshooting

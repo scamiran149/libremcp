@@ -14,7 +14,7 @@ import pkgutil
 from plugin.framework.tool_base import ToolBase
 from plugin.framework.schema_convert import to_mcp_schema
 
-log = logging.getLogger("nelson.tools")
+log = logging.getLogger("libremcp.tools")
 
 _DOC_TYPE_KEYS = frozenset(("writer", "calc", "draw", "impress"))
 
@@ -134,7 +134,8 @@ class ToolRegistry:
             if tool.doc_types is not None and doc_type not in tool.doc_types:
                 continue
             if tool.requires_service and not self._service_available(
-                    tool.requires_service):
+                tool.requires_service
+            ):
                 continue
             yield tool
 
@@ -169,12 +170,15 @@ class ToolRegistry:
 
         # Check doc_type compatibility
         if tool.doc_types and ctx.doc_type and ctx.doc_type not in tool.doc_types:
-            err_msg = (
-                "Tool '%s' requires %s but active document is %s."
-                % (tool_name, "/".join(tool.doc_types), ctx.doc_type))
+            err_msg = "Tool '%s' requires %s but active document is %s." % (
+                tool_name,
+                "/".join(tool.doc_types),
+                ctx.doc_type,
+            )
             if bus:
-                bus.emit("tool:failed", name=tool_name, error=err_msg,
-                         caller=ctx.caller)
+                bus.emit(
+                    "tool:failed", name=tool_name, error=err_msg, caller=ctx.caller
+                )
             return {
                 "status": "error",
                 "code": "incompatible_doc_type",
@@ -187,8 +191,7 @@ class ToolRegistry:
         ok, err = tool.validate(**kwargs)
         if not ok:
             if bus:
-                bus.emit("tool:failed", name=tool_name, error=err,
-                         caller=ctx.caller)
+                bus.emit("tool:failed", name=tool_name, error=err, caller=ctx.caller)
             return {
                 "status": "error",
                 "code": "invalid_params",
@@ -201,27 +204,29 @@ class ToolRegistry:
 
         # Emit executing event
         if bus:
-            bus.emit("tool:executing", name=tool_name, caller=ctx.caller,
-                     kwargs=kwargs)
+            bus.emit("tool:executing", name=tool_name, caller=ctx.caller, kwargs=kwargs)
 
         # Cache invalidation moved AFTER execution (see below)
 
         # Auto-enable track changes for MCP mutations
-        if (tool.detects_mutation() and ctx.caller == "mcp"
-                and ctx.doc is not None
-                and tool_name != "set_track_changes"):
+        if (
+            tool.detects_mutation()
+            and ctx.caller == "mcp"
+            and ctx.doc is not None
+            and tool_name != "set_track_changes"
+        ):
             self._ensure_track_changes(ctx.doc)
 
         # Generate action ID for mutations (tracked in undo + result)
         import uuid
+
         action_id = None
         undo_mgr = None
         if tool.detects_mutation() and ctx.doc is not None:
             action_id = uuid.uuid4().hex[:8]
             try:
                 undo_mgr = ctx.doc.getUndoManager()
-                undo_mgr.enterUndoContext(
-                    "Nelson: %s [%s]" % (tool_name, action_id))
+                undo_mgr.enterUndoContext("LibreMCP: %s [%s]" % (tool_name, action_id))
             except Exception:
                 undo_mgr = None
 
@@ -235,7 +240,9 @@ class ToolRegistry:
                     pass
             log.exception("Tool execution failed: %s", tool_name)
             if bus:
-                bus.emit("tool:failed", name=tool_name, error=str(exc), caller=ctx.caller)
+                bus.emit(
+                    "tool:failed", name=tool_name, error=str(exc), caller=ctx.caller
+                )
             return {
                 "status": "error",
                 "code": "execution_error",
@@ -254,9 +261,14 @@ class ToolRegistry:
             result["_action_id"] = action_id
 
         if bus:
-            bus.emit("tool:completed", name=tool_name, caller=ctx.caller,
-                     result=result, is_mutation=tool.detects_mutation(),
-                     doc=ctx.doc)
+            bus.emit(
+                "tool:completed",
+                name=tool_name,
+                caller=ctx.caller,
+                result=result,
+                is_mutation=tool.detects_mutation(),
+                doc=ctx.doc,
+            )
 
         # Invalidate cache AFTER execution so the tool uses valid data
         # and the next tool gets a fresh scan

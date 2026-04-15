@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-"""Nelson MCP framework — base classes, registries, event bus."""
+"""LibreMCP framework — base classes, registries, event bus."""
 
 from plugin.framework.module_base import ModuleBase
 from plugin.framework.tool_base import ToolBase

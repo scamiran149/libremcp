@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-"""XContainerWindowEventHandler for Tools > Options > Nelson MCP pages.
+"""XContainerWindowEventHandler for Tools > Options > LibreMCP pages.
 
 Each module with config gets its own Options page (XDL generated at build time).
 A hidden ``__module__`` control in each XDL identifies which module the page belongs to.
@@ -31,23 +31,28 @@ if _parent not in sys.path:
 import uno
 import unohelper
 from com.sun.star.awt import (
-    XContainerWindowEventHandler, XActionListener, XItemListener,
-    XAdjustmentListener)
+    XContainerWindowEventHandler,
+    XActionListener,
+    XItemListener,
+    XAdjustmentListener,
+)
 from com.sun.star.lang import XServiceInfo
 
-log = logging.getLogger("nelson.options")
+log = logging.getLogger("libremcp.options")
 
-# Ensure nelson logger has a handler (options_handler may load before main.py)
-_nelson_logger = logging.getLogger("nelson")
-if not _nelson_logger.handlers:
-    _nelson_logger.propagate = False
-    _lp = os.environ.get("NELSON_LOG_PATH",
-                         os.path.join(os.path.expanduser("~"), "nelson.log"))
+# Ensure libremcp logger has a handler (options_handler may load before main.py)
+_libremcp_logger = logging.getLogger("libremcp")
+if not _libremcp_logger.handlers:
+    _libremcp_logger.propagate = False
+    _lp = os.environ.get(
+        "LIBREMCP_LOG_PATH", os.path.join(os.path.expanduser("~"), "libremcp.log")
+    )
     _h = logging.FileHandler(_lp, mode="a", encoding="utf-8")
-    _h.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(name)s — %(message)s"))
-    _nelson_logger.addHandler(_h)
-    _nelson_logger.setLevel(logging.DEBUG)
+    _h.setFormatter(
+        logging.Formatter("%(asctime)s [%(levelname)s] %(name)s — %(message)s")
+    )
+    _libremcp_logger.addHandler(_h)
+    _libremcp_logger.setLevel(logging.DEBUG)
 
 log.info("options_handler.py module loaded")
 
@@ -57,12 +62,29 @@ log.info("options_handler.py module loaded")
 class _ListDetailState:
     """State for a list_detail widget on an Options page."""
 
-    __slots__ = ("items", "item_fields", "field_name", "xWindow",
-                 "selected_idx", "full_key", "name_field",
-                 "label_func", "_updating", "_item_options")
+    __slots__ = (
+        "items",
+        "item_fields",
+        "field_name",
+        "xWindow",
+        "selected_idx",
+        "full_key",
+        "name_field",
+        "label_func",
+        "_updating",
+        "_item_options",
+    )
 
-    def __init__(self, items, item_fields, field_name, full_key, xWindow,
-                 name_field="name", label_func=None):
+    def __init__(
+        self,
+        items,
+        item_fields,
+        field_name,
+        full_key,
+        xWindow,
+        name_field="name",
+        label_func=None,
+    ):
         self.items = items
         self.item_fields = item_fields
         self.field_name = field_name
@@ -109,7 +131,8 @@ class _LDItemListener(unohelper.Base, XItemListener):
             return
         try:
             listbox = self._handler._get_control(
-                self._state.xWindow, "lst_%s" % self._state.field_name)
+                self._state.xWindow, "lst_%s" % self._state.field_name
+            )
             if listbox:
                 new_idx = listbox.getSelectedItemPos()
                 if new_idx != self._state.selected_idx:
@@ -198,10 +221,12 @@ class _ButtonActionListener(unohelper.Base, XActionListener):
                 try:
                     self._flush()
                 except Exception:
-                    log.debug("Button: config flush failed (non-critical)",
-                              exc_info=True)
+                    log.debug(
+                        "Button: config flush failed (non-critical)", exc_info=True
+                    )
             module_path, func_name = self._action_path.rsplit(":", 1)
             import importlib
+
             mod = importlib.import_module(module_path)
             func = getattr(mod, func_name)
             func()
@@ -212,21 +237,19 @@ class _ButtonActionListener(unohelper.Base, XActionListener):
         """Show a Yes/No confirmation dialog. Returns True if user clicks Yes."""
         try:
             from plugin.framework.uno_context import get_ctx
+
             ctx = get_ctx()
             if not ctx:
                 return True
             smgr = ctx.ServiceManager
-            desktop = smgr.createInstanceWithContext(
-                "com.sun.star.frame.Desktop", ctx)
+            desktop = smgr.createInstanceWithContext("com.sun.star.frame.Desktop", ctx)
             frame = desktop.getCurrentFrame()
             if frame is None:
                 return True
             window = frame.getContainerWindow()
-            toolkit = smgr.createInstanceWithContext(
-                "com.sun.star.awt.Toolkit", ctx)
+            toolkit = smgr.createInstanceWithContext("com.sun.star.awt.Toolkit", ctx)
             # MessageBoxType QUERYBOX=4, MessageBoxButtons YES_NO=3
-            box = toolkit.createMessageBox(
-                window, 4, 3, "Confirm", self._confirm_msg)
+            box = toolkit.createMessageBox(window, 4, 3, "Confirm", self._confirm_msg)
             result = box.execute()
             return result == 2  # YES
         except Exception:
@@ -251,40 +274,44 @@ class _BrowseListener(unohelper.Base, XActionListener):
     def actionPerformed(self, evt):
         try:
             from plugin.framework.uno_context import get_ctx
+
             ctx = get_ctx()
             if not ctx:
                 return
             smgr = ctx.ServiceManager
             if self._widget == "folder":
                 picker = smgr.createInstanceWithContext(
-                    "com.sun.star.ui.dialogs.FolderPicker", ctx)
+                    "com.sun.star.ui.dialogs.FolderPicker", ctx
+                )
                 current = self._text_ctrl.getModel().Text
                 if current:
                     import uno
-                    picker.setDisplayDirectory(
-                        uno.systemPathToFileUrl(current))
+
+                    picker.setDisplayDirectory(uno.systemPathToFileUrl(current))
                 if picker.execute() == 1:
                     import uno
+
                     path = uno.fileUrlToSystemPath(picker.getDirectory())
                     self._text_ctrl.getModel().Text = path
             else:
                 picker = smgr.createInstanceWithContext(
-                    "com.sun.star.ui.dialogs.FilePicker", ctx)
+                    "com.sun.star.ui.dialogs.FilePicker", ctx
+                )
                 if self._file_filter:
                     parts = self._file_filter.split("|")
                     for i in range(0, len(parts) - 1, 2):
-                        picker.appendFilter(parts[i].strip(),
-                                            parts[i + 1].strip())
+                        picker.appendFilter(parts[i].strip(), parts[i + 1].strip())
                 current = self._text_ctrl.getModel().Text
                 if current:
                     import uno
                     import os
+
                     parent = os.path.dirname(current)
                     if parent:
-                        picker.setDisplayDirectory(
-                            uno.systemPathToFileUrl(parent))
+                        picker.setDisplayDirectory(uno.systemPathToFileUrl(parent))
                 if picker.execute() == 1:
                     import uno
+
                     files = picker.getFiles()
                     if files:
                         path = uno.fileUrlToSystemPath(files[0])
@@ -302,14 +329,14 @@ class _BrowseListener(unohelper.Base, XActionListener):
 # Layout constants — single source of truth in plugin/_layout.py
 # Loaded via exec() because UNO's import system can't resolve plugin._layout
 _layout_ns = {}
-with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '_layout.py')) as _f:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "_layout.py")) as _f:
     exec(_f.read(), _layout_ns)
-_PAGE_WIDTH = _layout_ns['PAGE_WIDTH']
-_PAGE_HEIGHT = _layout_ns['PAGE_HEIGHT']
-_SCROLLBAR_WIDTH = _layout_ns['SCROLLBAR_WIDTH']
-_CONTENT_WIDTH = _layout_ns['CONTENT_WIDTH']
-_VISIBLE_HEIGHT = 185   # actual visible area in LO Options (official max)
-_OVERFLOW_TWEAK = 60    # extra DLU so last controls are fully visible when scrolled
+_PAGE_WIDTH = _layout_ns["PAGE_WIDTH"]
+_PAGE_HEIGHT = _layout_ns["PAGE_HEIGHT"]
+_SCROLLBAR_WIDTH = _layout_ns["SCROLLBAR_WIDTH"]
+_CONTENT_WIDTH = _layout_ns["CONTENT_WIDTH"]
+_VISIBLE_HEIGHT = 185  # actual visible area in LO Options (official max)
+_OVERFLOW_TWEAK = 60  # extra DLU so last controls are fully visible when scrolled
 
 
 class _ScrollListener(unohelper.Base, XAdjustmentListener):
@@ -384,23 +411,28 @@ def _apply_tab_visibility(xWindow, tab_data, active_idx):
         except Exception:
             missing += 1
 
-    log.debug("Tab visibility: active=%s shown=%d hidden=%d missing=%d",
-              active_tab, shown, hidden, missing)
+    log.debug(
+        "Tab visibility: active=%s shown=%d hidden=%d missing=%d",
+        active_tab,
+        shown,
+        hidden,
+        missing,
+    )
 
 
 # ── Main handler ─────────────────────────────────────────────────────
 
 
 class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo):
-    """Handles initialize / ok / back events for all Nelson MCP Options pages."""
+    """Handles initialize / ok / back events for all LibreMCP Options pages."""
 
-    IMPLE_NAME = "org.extension.nelson.OptionsHandler"
+    IMPLE_NAME = "org.extension.libremcp.OptionsHandler"
     SERVICE_NAMES = (IMPLE_NAME,)
 
     def __init__(self, ctx):
         self.ctx = ctx
         self._cached_values = {}  # full_key -> value at init time
-        self._ld_states = {}      # full_key -> _ListDetailState
+        self._ld_states = {}  # full_key -> _ListDetailState
         self._scroll_listeners = {}  # id(xWindow) -> _ScrollListener
 
     # ── XContainerWindowEventHandler ─────────────────────────────────
@@ -459,8 +491,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         config_svc = self._get_config_service()
 
         if mod_config:
-            self._load_module_fields(xWindow, module_name, mod_config,
-                                     config_svc, prefix="")
+            self._load_module_fields(
+                xWindow, module_name, mod_config, config_svc, prefix=""
+            )
 
         # Handle inline submodules (e.g. tunnel.bore, tunnel.ngrok)
         inline_names = self._detect_inline_modules(xWindow)
@@ -471,8 +504,12 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     continue
                 child_safe = child_name.replace(".", "_")
                 self._load_module_fields(
-                    xWindow, child_name, child_config, config_svc,
-                    prefix=child_safe + "__")
+                    xWindow,
+                    child_name,
+                    child_config,
+                    config_svc,
+                    prefix=child_safe + "__",
+                )
 
         self._setup_tabs(xWindow)
         self._setup_scroll(xWindow)
@@ -482,24 +519,46 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         try:
             pos = xWindow.getPosSize()
             model = xWindow.getModel()
-            lines = ["[%s] module=%s win=(%d,%d,%dx%d) model=%dx%ddlu" % (
-                phase, module_name, pos.X, pos.Y, pos.Width, pos.Height,
-                getattr(model, 'Width', 0), getattr(model, 'Height', 0))]
+            lines = [
+                "[%s] module=%s win=(%d,%d,%dx%d) model=%dx%ddlu"
+                % (
+                    phase,
+                    module_name,
+                    pos.X,
+                    pos.Y,
+                    pos.Width,
+                    pos.Height,
+                    getattr(model, "Width", 0),
+                    getattr(model, "Height", 0),
+                )
+            ]
             for ctrl in xWindow.getControls():
                 m = ctrl.getModel()
                 name = getattr(m, "Name", "?")
                 if name.startswith("__") and name != "__scrollbar__":
                     continue  # skip hidden metadata controls
                 cp = ctrl.getPosSize()  # pixel position
-                lines.append("  %s: dlu(%d,%d,%d,%d) px(%d,%d,%d,%d)" % (
-                    name, m.PositionX, m.PositionY, m.Width, m.Height,
-                    cp.X, cp.Y, cp.Width, cp.Height))
+                lines.append(
+                    "  %s: dlu(%d,%d,%d,%d) px(%d,%d,%d,%d)"
+                    % (
+                        name,
+                        m.PositionX,
+                        m.PositionY,
+                        m.Width,
+                        m.Height,
+                        cp.X,
+                        cp.Y,
+                        cp.Width,
+                        cp.Height,
+                    )
+                )
             log.debug("Control positions:\n%s", "\n".join(lines))
         except Exception:
             log.debug("_log_control_positions failed", exc_info=True)
 
-    def _load_module_fields(self, xWindow, module_name, mod_config,
-                            config_svc, prefix=""):
+    def _load_module_fields(
+        self, xWindow, module_name, mod_config, config_svc, prefix=""
+    ):
         """Load config fields into controls, with optional ID prefix."""
         for field_name, schema in mod_config.items():
             widget = schema.get("widget", "text")
@@ -512,18 +571,24 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 ctrl_id = prefix + field_name
                 ctrl = self._get_control(xWindow, ctrl_id)
                 action_path = schema.get("action")
-                log.debug("Button widget: ctrl_id=%s, ctrl=%s, action=%s",
-                          ctrl_id, ctrl, action_path)
+                log.debug(
+                    "Button widget: ctrl_id=%s, ctrl=%s, action=%s",
+                    ctrl_id,
+                    ctrl,
+                    action_path,
+                )
                 if action_path and ctrl:
                     flush = lambda _w=xWindow: self._on_ok(_w)
                     ctrl.addActionListener(
-                        _ButtonActionListener(action_path,
-                                              confirm_msg=schema.get("confirm"),
-                                              flush=flush))
+                        _ButtonActionListener(
+                            action_path, confirm_msg=schema.get("confirm"), flush=flush
+                        )
+                    )
                 # Update helper with last-launch info for script buttons
                 if field_name.startswith("__script_") and field_name.endswith("__"):
                     self._update_script_helper(
-                        xWindow, ctrl_id, module_name, field_name, schema)
+                        xWindow, ctrl_id, module_name, field_name, schema
+                    )
                 continue  # buttons don't store config values
 
             if widget == "check":
@@ -576,8 +641,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             if widget in ("file", "folder"):
                 btn = self._get_control(xWindow, "btn_%s" % ctrl_id)
                 if btn and ctrl:
-                    btn.addActionListener(_BrowseListener(
-                        ctrl, widget, schema.get("file_filter", "")))
+                    btn.addActionListener(
+                        _BrowseListener(ctrl, widget, schema.get("file_filter", ""))
+                    )
 
     def _on_ok(self, xWindow):
         """Write control values via ConfigService and emit event."""
@@ -601,8 +667,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
 
         changes = {}
         if mod_config:
-            changes = self._save_module_fields(xWindow, module_name, mod_config,
-                                               prefix="")
+            changes = self._save_module_fields(
+                xWindow, module_name, mod_config, prefix=""
+            )
 
         # Handle inline submodules
         inline_names = self._detect_inline_modules(xWindow)
@@ -613,8 +680,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     continue
                 child_safe = child_name.replace(".", "_")
                 child_changes = self._save_module_fields(
-                    xWindow, child_name, child_config,
-                    prefix=child_safe + "__")
+                    xWindow, child_name, child_config, prefix=child_safe + "__"
+                )
                 changes.update(child_changes)
 
         if changes:
@@ -646,7 +713,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 continue
 
             try:
-                resolved = self._resolve_options(schema) if widget == "select" else schema
+                resolved = (
+                    self._resolve_options(schema) if widget == "select" else schema
+                )
                 new_val = self._read_control(ctrl, widget, field_type, resolved)
                 changes[full_key] = new_val
             except Exception:
@@ -676,8 +745,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         config_svc = self._get_config_service()
 
         if mod_config:
-            self._load_module_fields(xWindow, module_name, mod_config,
-                                     config_svc, prefix="")
+            self._load_module_fields(
+                xWindow, module_name, mod_config, config_svc, prefix=""
+            )
 
         inline_names = self._detect_inline_modules(xWindow)
         if inline_names:
@@ -687,8 +757,12 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     continue
                 child_safe = child_name.replace(".", "_")
                 self._load_module_fields(
-                    xWindow, child_name, child_config, config_svc,
-                    prefix=child_safe + "__")
+                    xWindow,
+                    child_name,
+                    child_config,
+                    config_svc,
+                    prefix=child_safe + "__",
+                )
 
     # ── List-detail page handlers ────────────────────────────────────
 
@@ -742,7 +816,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 ref_resolved = self._resolve_options(ref_schema)
                 ref_options = ref_resolved.get("options", [])
                 seen = {o.get("value") for o in options}
-                options = [o for o in ref_options if o.get("value") not in seen] + options
+                options = [
+                    o for o in ref_options if o.get("value") not in seen
+                ] + options
             # options_provider: call a function directly
             elif fschema.get("options_provider"):
                 resolved = self._resolve_options(fschema)
@@ -755,8 +831,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         # Populate listbox
         listbox = self._get_control(xWindow, "lst_%s" % field_name)
         if listbox:
-            labels = tuple(
-                self._ld_get_item_label(state, item) for item in items)
+            labels = tuple(self._ld_get_item_label(state, item) for item in items)
             listbox.getModel().StringItemList = labels
             if items:
                 listbox.selectItemPos(0, True)
@@ -789,8 +864,11 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             ctrl = self._get_control(xWindow, ctrl_id)
             btn = self._get_control(xWindow, "btn_%s" % ctrl_id)
             if btn and ctrl:
-                btn.addActionListener(_BrowseListener(
-                    ctrl, fschema["widget"], fschema.get("file_filter", "")))
+                btn.addActionListener(
+                    _BrowseListener(
+                        ctrl, fschema["widget"], fschema.get("file_filter", "")
+                    )
+                )
 
         self._setup_scroll(xWindow)
 
@@ -814,8 +892,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         if config_svc and new_json != old_json:
             config_svc.set(full_key, new_json, caller_module=None)
             self._cached_values[full_key] = new_json
-            log.info("List-detail saved: %s (%d items)",
-                     full_key, len(state.items))
+            log.info("List-detail saved: %s (%d items)", full_key, len(state.items))
 
     def _ld_on_select(self, state, new_idx):
         """Handle listbox selection change."""
@@ -904,16 +981,14 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                     combo_schema = dict(fschema, options=opts) if opts else fschema
                     self._populate_combo(ctrl, combo_schema, val)
                 elif widget == "combo_text":
-                    self._setup_combo_text(
-                        state.xWindow, ctrl_id, fschema, val)
+                    self._setup_combo_text(state.xWindow, ctrl_id, fschema, val)
                 else:
                     ctrl.getModel().Text = str(val) if val else ""
 
                 ctrl.getModel().Enabled = has_item
                 # Also enable/disable the select part of combo_text
                 if widget == "combo_text":
-                    sel = self._get_control(
-                        state.xWindow, "sel_%s" % ctrl_id)
+                    sel = self._get_control(state.xWindow, "sel_%s" % ctrl_id)
                     if sel:
                         sel.getModel().Enabled = has_item
             except Exception:
@@ -995,6 +1070,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         try:
             module_path, func_name = func_path.rsplit(":", 1)
             import importlib
+
             mod = importlib.import_module(module_path)
             return getattr(mod, func_name)
         except Exception:
@@ -1030,7 +1106,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                         if getattr(m, "Name", "") == scroll_id:
                             continue
                         m.PositionY = m.PositionY + scroll_val
-                    log.debug("_reset_scroll: reversed offset %d (fallback)", scroll_val)
+                    log.debug(
+                        "_reset_scroll: reversed offset %d (fallback)", scroll_val
+                    )
 
             # Remove scrollbar control and model
             if has_sb:
@@ -1106,7 +1184,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             # Create scrollbar with model positions (will be repositioned
             # in pixels below to match actual container size)
             sb_model = dialog_model.createInstance(
-                "com.sun.star.awt.UnoControlScrollBarModel")
+                "com.sun.star.awt.UnoControlScrollBarModel"
+            )
             sb_model.Name = scroll_id
             sb_model.Orientation = 1  # vertical
 
@@ -1130,8 +1209,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 self._scroll_listeners[id(xWindow)] = listener
                 sb_ctrl.addAdjustmentListener(listener)
 
-            log.debug("Scrollbar added: content=%d page=%d",
-                      content_height, _PAGE_HEIGHT)
+            log.debug(
+                "Scrollbar added: content=%d page=%d", content_height, _PAGE_HEIGHT
+            )
         except Exception:
             log.exception("_setup_scroll failed")
 
@@ -1157,6 +1237,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                 raw = getattr(model, "Label", "") or getattr(model, "Text", "")
                 if raw:
                     import json as _json
+
                     return _json.loads(raw)
         except Exception:
             log.debug("_detect_tabs: no tab data")
@@ -1168,8 +1249,15 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         """Read the current value from a control."""
         if widget == "checkbox":
             return ctrl.getModel().State == 1
-        elif widget in ("text", "password", "textarea", "file", "folder",
-                         "combo", "combo_text"):
+        elif widget in (
+            "text",
+            "password",
+            "textarea",
+            "file",
+            "folder",
+            "combo",
+            "combo_text",
+        ):
             return ctrl.getModel().Text or ""
         elif widget in ("number", "slider"):
             raw = ctrl.getModel().Value
@@ -1230,8 +1318,8 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             for ctrl in xWindow.getControls():
                 try:
                     container = ctrl.queryInterface(
-                        uno.getTypeByName(
-                            "com.sun.star.awt.XControlContainer"))
+                        uno.getTypeByName("com.sun.star.awt.XControlContainer")
+                    )
                     if container:
                         found = container.getControl(field_name)
                         if found:
@@ -1241,7 +1329,9 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
                             try:
                                 sub_c = sub.queryInterface(
                                     uno.getTypeByName(
-                                        "com.sun.star.awt.XControlContainer"))
+                                        "com.sun.star.awt.XControlContainer"
+                                    )
+                                )
                                 if sub_c:
                                     found = sub_c.getControl(field_name)
                                     if found:
@@ -1258,6 +1348,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         """Get the ConfigService from the framework."""
         try:
             from plugin.main import get_services
+
             services = get_services()
             return services.config if services else None
         except Exception:
@@ -1268,6 +1359,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         """Get the manifest modules list."""
         try:
             from plugin._manifest import MODULES
+
             return MODULES
         except ImportError:
             return []
@@ -1284,9 +1376,11 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         try:
             module_path, func_name = provider_path.rsplit(":", 1)
             import importlib
+
             mod = importlib.import_module(module_path)
             func = getattr(mod, func_name)
             from plugin.main import get_services
+
             return func(get_services())
         except Exception:
             log.exception("Failed to call default_provider: %s", provider_path)
@@ -1306,37 +1400,14 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
 
     # ── Check widget ───────────────────────────────────────────────
 
-    def _update_script_helper(self, xWindow, ctrl_id, module_name, field_name,
-                              schema):
+    def _update_script_helper(self, xWindow, ctrl_id, module_name, field_name, schema):
         """Append last-launch timestamp to a script button's helper text."""
         try:
             hlp_ctrl = self._get_control(xWindow, "hlp_%s" % ctrl_id)
             if not hlp_ctrl:
                 return
-            # Decode script identity from field_name: __script_install_deps__
-            script_key = field_name[len("__script_"):-len("__")]
-            script_name = script_key.replace("_", "-")
-
-            from plugin.framework.deps import get_last_launch, _get_script_def
-            script_def = _get_script_def(module_name, script_name)
-            last = get_last_launch(module_name, script_name)
             base = schema.get("helper") or schema.get("description") or ""
-
-            # Check if a version bump requires re-run
-            needs_update = False
-            if script_def and script_def.get("once"):
-                from plugin.framework.deps import _is_done
-                version = str(script_def.get("version", "1"))
-                if last and not _is_done(module_name, script_name, version):
-                    needs_update = True
-
-            if needs_update:
-                suffix = " [update available — click to re-run]"
-            elif last:
-                suffix = " [last run: %s]" % last
-            else:
-                suffix = " [never launched]"
-            hlp_ctrl.getModel().Label = base + suffix
+            hlp_ctrl.getModel().Label = base
         except Exception:
             log.debug("Failed to update script helper", exc_info=True)
 
@@ -1351,9 +1422,11 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         try:
             module_path, func_name = provider_path.rsplit(":", 1)
             import importlib
+
             mod = importlib.import_module(module_path)
             func = getattr(mod, func_name)
             from plugin.main import get_services
+
             result = func(get_services())
             # result: {"status": "ok"|"ko"|"unknown", "message": "..."}
             if isinstance(result, dict):
@@ -1376,9 +1449,11 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
         """
         module_path, func_name = provider_path.rsplit(":", 1)
         import importlib
+
         mod = importlib.import_module(module_path)
         func = getattr(mod, func_name)
         from plugin.main import get_services
+
         services = get_services()
         return func(services)
 
@@ -1427,8 +1502,7 @@ class OptionsHandler(unohelper.Base, XContainerWindowEventHandler, XServiceInfo)
             model.SelectedItems = (len(labels) - 1,)  # (custom)
 
         # Listener: select → update text
-        sel_ctrl.addItemListener(
-            _ComboTextListener(sel_ctrl, txt_ctrl, values))
+        sel_ctrl.addItemListener(_ComboTextListener(sel_ctrl, txt_ctrl, values))
 
     def _populate_select(self, ctrl, schema, current_value):
         """Populate a menulist/listbox with options and select current value.

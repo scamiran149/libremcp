@@ -1,23 +1,21 @@
-# Nelson MCP — Agent Quickstart
+# LibreMCP — Agent Quickstart
 
-This guide helps LLM agents (ChatGPT, Claude, Gemini, etc.) use Nelson MCP effectively. It covers connection, tool discovery, and common workflows.
+This guide helps LLM agents (ChatGPT, Claude, Gemini, etc.) use LibreMCP effectively. It covers connection, tool discovery, and common workflows.
 
 ## Connect
 
-Nelson MCP runs as an HTTP server inside LibreOffice on port 8766.
+LibreMCP runs as an HTTP server inside LibreOffice on port 8766.
 
 ```json
 {
   "mcpServers": {
-    "nelson": {
+    "libremcp": {
       "type": "http",
       "url": "http://localhost:8766/mcp"
     }
   }
 }
 ```
-
-For remote access via Tailscale tunnel: `https://your-machine.tail1234.ts.net/mcp`
 
 ## Getting Started — Discovery Phase
 
@@ -39,21 +37,7 @@ get_recent_documents
 
 Returns the user's recently opened documents (from LibreOffice history). Useful when nothing is open or the user mentions a document by name — you can find its path here and open it.
 
-### Step 3 — What's available in galleries?
-
-If document or image gallery tools are available, explore what the user has indexed:
-
-```
-docs_gallery_list           → browse indexed document folders
-docs_gallery_search("report")  → search documents by content/metadata
-gallery_providers           → list configured image galleries
-gallery_list                → browse images in a gallery
-gallery_search("safari")    → search images by keywords
-```
-
-Galleries give you access to files the user has organized — you can open documents or insert images from them.
-
-### Step 4 — Understand the active document
+### Step 3 — Understand the active document
 
 Once you know which document to work on, get its structure:
 
@@ -69,13 +53,11 @@ For Writer documents, `get_document_outline` is essential — it gives you the h
 
 ```
 Connected
- ├─ list_open_documents
- │   ├─ Documents open → get_document_info / get_document_outline
- │   └─ Nothing open
- │       ├─ User names a doc → get_recent_documents → open_document
- │       ├─ User wants to find a doc → docs_gallery_search
- │       └─ User wants a new doc → create_document
- └─ User mentions images → gallery_search / gallery_list
+  ├─ list_open_documents
+  │   ├─ Documents open → get_document_info / get_document_outline
+  │   └─ Nothing open
+  │       ├─ User names a doc → get_recent_documents → open_document
+  │       └─ User wants a new doc → create_document
 ```
 
 ### Example: First Exchange
@@ -97,7 +79,7 @@ Don't skip steps 1-3. Without discovery, you risk creating a new document when o
 
 All tools accept an optional `_document` parameter to target a document other than the active one:
 
-- `_document: "id:abc123..."` — by Nelson doc ID (best, survives save-as)
+- `_document: "id:abc123..."` — by LibreMCP doc ID (best, survives save-as)
 - `_document: "title:My Report"` — by window title (partial match)
 - `_document: "path:C:/Users/me/doc.odt"` — by file path
 
@@ -143,7 +125,6 @@ write_table_row             → write an entire row
 ```
 list_images                 → find images in the document
 insert_image                → insert an image (with caption)
-gallery_search              → search image galleries by keyword
 ```
 
 ### Review Workflow
@@ -206,7 +187,6 @@ Custom endpoints may expose a subset of tools. Common presets:
 | writer-edit | 25 | Full Writer editing |
 | writer-read | 14 | Read-only Writer access |
 | calc | 13 | Spreadsheet operations |
-| gallery | 10 | Image gallery browsing |
 
 If you're on a custom endpoint, use `tools/list` to see which tools are available.
 
@@ -227,11 +207,10 @@ If you're on a custom endpoint, use `tools/list` to see which tools are availabl
 2. set_paragraph_text(index=N, text="new text")
 ```
 
-### "Insert an image from gallery"
+### "Insert an image"
 
 ```
-1. gallery_search("sunset beach") → find image path
-2. insert_image(path="/path/to/image.jpg", paragraph_index=10)
+1. insert_image(path="/path/to/image.jpg", paragraph_index=10)
 ```
 
 ### "Create a report from scratch"

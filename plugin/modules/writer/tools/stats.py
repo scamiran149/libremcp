@@ -9,7 +9,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 class GetDocumentStats(ToolBase):
@@ -54,8 +54,12 @@ class GetDocumentStats(ToolBase):
 
         # Heading count from tree.
         try:
-            tree = doc_svc.build_heading_tree(doc)
-            heading_count = _count_headings(tree)
+            tree_svc = ctx.services.get("writer_tree")
+            if tree_svc is not None:
+                tree = tree_svc.build_heading_tree(doc)
+                heading_count = _count_rich_headings(tree)
+            else:
+                heading_count = 0
         except Exception:
             heading_count = 0
 
@@ -78,4 +82,14 @@ def _count_headings(nodes):
     for node in nodes:
         count += 1
         count += _count_headings(node.get("children", []))
+    return count
+
+
+def _count_rich_headings(nodes):
+    """Recursively count heading nodes in a rich tree from TreeService."""
+    count = 0
+    for node in nodes:
+        if node.get("type") == "heading" or "level" in node:
+            count += 1
+        count += _count_rich_headings(node.get("children", []))
     return count

@@ -18,7 +18,7 @@ from plugin.modules.calc.address_utils import (
     parse_range_string,
 )
 
-logger = logging.getLogger("nelson.calc")
+logger = logging.getLogger("libremcp.calc")
 
 
 class CalcBridge:

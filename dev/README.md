@@ -1,6 +1,6 @@
-# Dev Tools for Nelson MCP
+# Dev Tools for LibreMCP
 
-Development tooling for visual debugging and automated testing of the Nelson
+Development tooling for visual debugging and automated testing of the LibreMCP
 LibreOffice extension.
 
 Uses [wbox-mcp](https://github.com/quazardous/wbox-mcp) to run LibreOffice
@@ -19,7 +19,7 @@ dev/
 
   mcp-dev/             # MCP proxy server for dev testing
     server.py          # Exposes mcp_call_tool / mcp_list_tools
-    config.yaml        # Authorized MCP servers (nelson, nelson-dev, lo-wbox)
+    config.yaml        # Authorized MCP servers (libremcp, libremcp-dev, lo-wbox)
     mcp-test.py        # CLI test harness
 ```
 
@@ -67,7 +67,7 @@ Add to `.mcp.json`:
 }
 ```
 
-Allows calling any authorized MCP server (nelson, nelson-dev, lo-wbox) via
+Allows calling any authorized MCP server (libremcp, libremcp-dev, lo-wbox) via
 `mcp_call_tool` / `mcp_list_tools` without restarting Claude Code.
 
 ### CLI testing
@@ -82,5 +82,5 @@ python mcp-test.py lo-wbox --call deploy
 
 ## LO isolation
 
-LibreOffice runs with a separate profile (`/tmp/lo_dev_profile`) and Nelson
-uses port 8767 (vs 8766 production), injected via `NELSON_SET_CONFIG`.
+LibreOffice runs with a separate profile (`/tmp/lo_dev_profile`) and LibreMCP
+uses port 8767 (vs 8766 production), injected via `LIBREMCP_SET_CONFIG`.

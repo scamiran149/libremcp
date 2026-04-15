@@ -17,7 +17,7 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-log = logging.getLogger("nelson.framework.http_server")
+log = logging.getLogger("libremcp.framework.http_server")
 
 
 def read_json_body(handler):
@@ -44,23 +44,24 @@ def send_json(handler, status, data):
     send_cors_headers(handler)
     handler.send_header("Content-Type", "application/json")
     handler.end_headers()
-    handler.wfile.write(json.dumps(
-        data, ensure_ascii=False, default=str).encode("utf-8"))
+    handler.wfile.write(
+        json.dumps(data, ensure_ascii=False, default=str).encode("utf-8")
+    )
 
 
 def send_cors_headers(handler):
     """Send standard CORS headers on an HTTP response."""
     handler.send_header("Access-Control-Allow-Origin", "*")
-    handler.send_header("Access-Control-Allow-Methods",
-                        "GET, POST, DELETE, OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers",
-                        "Content-Type, Authorization, Mcp-Session-Id")
-    handler.send_header("Access-Control-Expose-Headers",
-                        "Mcp-Session-Id")
+    handler.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+    handler.send_header(
+        "Access-Control-Allow-Headers", "Content-Type, Authorization, Mcp-Session-Id"
+    )
+    handler.send_header("Access-Control-Expose-Headers", "Mcp-Session-Id")
 
 
 class _ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     """HTTP server that handles each request in its own thread."""
+
     daemon_threads = True
 
 
@@ -95,6 +96,7 @@ class GenericRequestHandler(BaseHTTPRequestHandler):
             if route.raw:
                 if route.main_thread:
                     from plugin.framework.main_thread import execute_on_main_thread
+
                     execute_on_main_thread(route.handler, self)
                 else:
                     route.handler(self)
@@ -105,8 +107,10 @@ class GenericRequestHandler(BaseHTTPRequestHandler):
                 query = parse_qs(urlparse(self.path).query)
                 if route.main_thread:
                     from plugin.framework.main_thread import execute_on_main_thread
+
                     status, data = execute_on_main_thread(
-                        route.handler, body, self.headers, query)
+                        route.handler, body, self.headers, query
+                    )
                 else:
                     status, data = route.handler(body, self.headers, query)
                 self._send_json(status, data)
@@ -130,8 +134,15 @@ class GenericRequestHandler(BaseHTTPRequestHandler):
 class HttpServer:
     """Generic threaded HTTP server with optional TLS."""
 
-    def __init__(self, route_registry, port=8766, host="localhost",
-                 use_ssl=False, ssl_cert="", ssl_key=""):
+    def __init__(
+        self,
+        route_registry,
+        port=8766,
+        host="localhost",
+        use_ssl=False,
+        ssl_cert="",
+        ssl_key="",
+    ):
         self.route_registry = route_registry
         self.port = port
         self.host = host
@@ -150,10 +161,12 @@ class HttpServer:
         GenericRequestHandler.route_registry = self.route_registry
 
         self._server = _ThreadedHTTPServer(
-            (self.host, self.port), GenericRequestHandler)
+            (self.host, self.port), GenericRequestHandler
+        )
 
         if self.use_ssl:
-            from plugin.modules.http.ssl_certs import ensure_certs, create_ssl_context
+            from plugin.modules.mcp.ssl_certs import ensure_certs, create_ssl_context
+
             if self.ssl_cert and self.ssl_key:
                 cert_path, key_path = self.ssl_cert, self.ssl_key
                 log.info("TLS using custom certs: %s", cert_path)
@@ -162,17 +175,20 @@ class HttpServer:
                 log.info("TLS using auto-generated certs: %s", cert_path)
             ssl_ctx = create_ssl_context(cert_path, key_path)
             self._server.socket = ssl_ctx.wrap_socket(
-                self._server.socket, server_side=True)
+                self._server.socket, server_side=True
+            )
 
         self._running = True
         self._thread = threading.Thread(
-            target=self._run, daemon=True, name="http-server")
+            target=self._run, daemon=True, name="http-server"
+        )
         self._thread.start()
 
         scheme = "https" if self.use_ssl else "http"
         url = "%s://%s:%s" % (scheme, self.host, self.port)
-        log.info("HTTP server ready — %s (%d routes)",
-                 url, self.route_registry.route_count)
+        log.info(
+            "HTTP server ready — %s (%d routes)", url, self.route_registry.route_count
+        )
 
     def stop(self):
         if not self._running:
@@ -204,6 +220,5 @@ class HttpServer:
             "ssl": self.use_ssl,
             "url": "%s://%s:%s" % (scheme, self.host, self.port),
             "routes": self.route_registry.route_count,
-            "thread_alive": (self._thread.is_alive()
-                             if self._thread else False),
+            "thread_alive": (self._thread.is_alive() if self._thread else False),
         }

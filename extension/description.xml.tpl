@@ -5,7 +5,7 @@
   xmlns:xlink="http://www.w3.org/1999/xlink"
   xmlns:d="http://openoffice.org/extensions/description/2006"
   xmlns:l="http://libreoffice.org/extensions/description/2011">
-    <identifier value="org.extension.nelson"/>
+    <identifier value="org.extension.libremcp"/>
     <version value="{{VERSION}}"/>
 	<dependencies>
 		<l:LibreOffice-minimal-version d:name="LibreOffice 4.1" value="4.1"/>
@@ -14,7 +14,7 @@
         <name xlink:href="mailto:berliozdavid@gmail.com">Developer</name>
     </publisher>
     <display-name>
-        <name>Nelson MCP</name>
+        <name>LibreMCP</name>
     </display-name>
 
   <icon>

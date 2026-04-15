@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-setup.sh — Verify the Nelson MCP development stack.
+# check-setup.sh — Verify the LibreMCP development stack.
 #
 # Usage:
 #   ./scripts/check-setup.sh          Check everything
@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 echo ""
-echo -e "${BOLD}Nelson MCP — Development Stack Check${NC}"
+echo -e "${BOLD}LibreMCP — Development Stack Check${NC}"
 echo "====================================="
 echo ""
 
@@ -178,9 +178,9 @@ else
     warn "vendor/ empty — run: make vendor"
 fi
 
-if [[ -f "$PROJECT_ROOT/build/nelson.oxt" ]]; then
-    OXT_SIZE=$(stat -c%s "$PROJECT_ROOT/build/nelson.oxt" 2>/dev/null || stat -f%z "$PROJECT_ROOT/build/nelson.oxt" 2>/dev/null || echo "?")
-    ok "build/nelson.oxt exists ($OXT_SIZE bytes)"
+if [[ -f "$PROJECT_ROOT/build/libremcp.oxt" ]]; then
+    OXT_SIZE=$(stat -c%s "$PROJECT_ROOT/build/libremcp.oxt" 2>/dev/null || stat -f%z "$PROJECT_ROOT/build/libremcp.oxt" 2>/dev/null || echo "?")
+    ok "build/libremcp.oxt exists ($OXT_SIZE bytes)"
 else
     warn "No .oxt built yet — run: make build"
 fi
@@ -188,7 +188,7 @@ fi
 # ── Extension installed? ──────────────────────────────────────────────
 
 if [[ -n "$UNOPKG" ]]; then
-    if $UNOPKG list 2>&1 | grep -q "org.extension.nelson"; then
+    if $UNOPKG list 2>&1 | grep -q "org.extension.libremcp"; then
         ok "Extension registered in LibreOffice"
     else
         warn "Extension not registered — run: make deploy"
@@ -197,7 +197,7 @@ fi
 
 # ── Log symlinks ─────────────────────────────────────────────────────
 
-LOG_FILES="nelson.log soffice-debug.log"
+LOG_FILES="libremcp.log soffice-debug.log"
 for f in $LOG_FILES; do
     target="$HOME/$f"
     link="$PROJECT_ROOT/$f"

@@ -17,7 +17,7 @@ storing a ctx reference from ``initialize()``.
 
 import logging
 
-log = logging.getLogger("nelson.context")
+log = logging.getLogger("libremcp.context")
 
 _fallback_ctx = None
 
@@ -36,6 +36,7 @@ def get_ctx():
     """
     try:
         import uno
+
         ctx = uno.getComponentContext()
         if ctx is not None:
             return ctx

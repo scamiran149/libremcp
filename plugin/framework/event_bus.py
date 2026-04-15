@@ -9,7 +9,7 @@ import logging
 import weakref
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-log = logging.getLogger("nelson.events")
+log = logging.getLogger("libremcp.events")
 
 
 class EventBus:
@@ -33,8 +33,9 @@ class EventBus:
     def __init__(self) -> None:
         self._subscribers: Dict[str, List[Tuple[Any, bool]]] = {}
 
-    def subscribe(self, event: str, callback: Callable[..., Any],
-                  weak: bool = False) -> None:
+    def subscribe(
+        self, event: str, callback: Callable[..., Any], weak: bool = False
+    ) -> None:
         """Register *callback* for *event*.
 
         Args:
@@ -98,6 +99,4 @@ class EventBus:
         """Called when a weakref target is garbage-collected."""
         subs = self._subscribers.get(event)
         if subs:
-            self._subscribers[event] = [
-                (cb, w) for cb, w in subs if cb is not ref
-            ]
+            self._subscribers[event] = [(cb, w) for cb, w in subs if cb is not ref]

@@ -9,21 +9,31 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 # Properties to attempt reading per style family.
 _FAMILY_PROPS = {
     "ParagraphStyles": [
-        "ParentStyle", "FollowStyle",
-        "CharFontName", "CharHeight", "CharWeight",
-        "ParaAdjust", "ParaTopMargin", "ParaBottomMargin",
+        "ParentStyle",
+        "FollowStyle",
+        "CharFontName",
+        "CharHeight",
+        "CharWeight",
+        "ParaAdjust",
+        "ParaTopMargin",
+        "ParaBottomMargin",
     ],
     "CharacterStyles": [
-        "ParentStyle", "CharFontName", "CharHeight",
-        "CharWeight", "CharPosture", "CharColor",
+        "ParentStyle",
+        "CharFontName",
+        "CharHeight",
+        "CharWeight",
+        "CharPosture",
+        "CharColor",
     ],
     "CellStyles": [
-        "ParentStyle", "CellBackColor",
+        "ParentStyle",
+        "CellBackColor",
     ],
 }
 

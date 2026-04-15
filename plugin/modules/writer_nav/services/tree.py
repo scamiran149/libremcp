@@ -11,7 +11,7 @@ Ported from mcp-libre services/writer/tree.py.
 import bisect
 import logging
 
-log = logging.getLogger("nelson.writer.nav.tree")
+log = logging.getLogger("libremcp.writer.nav.tree")
 
 
 class TreeService:
@@ -22,8 +22,7 @@ class TreeService:
         self._bm_svc = bm_svc
         self._tree_cache = {}  # doc_key -> root node
         self._ai_summary_cache = {}  # doc_key -> {para_index: summary}
-        events.subscribe("document:cache_invalidated",
-                         self._on_cache_invalidated)
+        events.subscribe("document:cache_invalidated", self._on_cache_invalidated)
 
     def _on_cache_invalidated(self, doc=None, **_kw):
         if doc is None:
@@ -49,17 +48,20 @@ class TreeService:
 
         text = doc.getText()
         enum = text.createEnumeration()
-        root = {"level": 0, "text": "root", "para_index": -1,
-                "children": [], "body_paragraphs": 0}
+        root = {
+            "level": 0,
+            "text": "root",
+            "para_index": -1,
+            "children": [],
+            "body_paragraphs": 0,
+        }
         stack = [root]
         para_index = 0
 
         while enum.hasMoreElements():
             element = enum.nextElement()
-            is_para = element.supportsService(
-                "com.sun.star.text.Paragraph")
-            is_table = element.supportsService(
-                "com.sun.star.text.TextTable")
+            is_para = element.supportsService("com.sun.star.text.Paragraph")
+            is_table = element.supportsService("com.sun.star.text.TextTable")
 
             if is_para:
                 outline_level = 0
@@ -68,13 +70,15 @@ class TreeService:
                 except Exception:
                     pass
                 if outline_level > 0:
-                    while (len(stack) > 1
-                           and stack[-1]["level"] >= outline_level):
+                    while len(stack) > 1 and stack[-1]["level"] >= outline_level:
                         stack.pop()
-                    node = {"level": outline_level,
-                            "text": element.getString(),
-                            "para_index": para_index,
-                            "children": [], "body_paragraphs": 0}
+                    node = {
+                        "level": outline_level,
+                        "text": element.getString(),
+                        "para_index": para_index,
+                        "children": [],
+                        "body_paragraphs": 0,
+                    }
                     stack[-1]["children"].append(node)
                     stack.append(node)
                 else:
@@ -119,11 +123,13 @@ class TreeService:
 
     def _collect_headings(self, children, result):
         for child in children:
-            result.append({
-                "para_index": child["para_index"],
-                "level": child["level"],
-                "text": child["text"],
-            })
+            result.append(
+                {
+                    "para_index": child["para_index"],
+                    "level": child["level"],
+                    "text": child["text"],
+                }
+            )
             if child.get("children"):
                 self._collect_headings(child["children"], result)
 
@@ -186,12 +192,11 @@ class TreeService:
         enum = text.createEnumeration()
         idx = 0
         preview_parts = []
-        found_heading = (heading_para_index == -1)
+        found_heading = heading_para_index == -1
 
         while enum.hasMoreElements():
             element = enum.nextElement()
-            is_para = element.supportsService(
-                "com.sun.star.text.Paragraph")
+            is_para = element.supportsService("com.sun.star.text.Paragraph")
             if idx == heading_para_index:
                 found_heading = True
                 idx += 1
@@ -221,12 +226,11 @@ class TreeService:
         enum = text.createEnumeration()
         idx = 0
         parts = []
-        found_heading = (heading_para_index == -1)
+        found_heading = heading_para_index == -1
 
         while enum.hasMoreElements():
             element = enum.nextElement()
-            is_para = element.supportsService(
-                "com.sun.star.text.Paragraph")
+            is_para = element.supportsService("com.sun.star.text.Paragraph")
             if idx == heading_para_index:
                 found_heading = True
                 idx += 1
@@ -258,8 +262,7 @@ class TreeService:
 
             while enum.hasMoreElements():
                 field = enum.nextElement()
-                if not field.supportsService(
-                        "com.sun.star.text.textfield.Annotation"):
+                if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                     continue
                 try:
                     author = field.getPropertyValue("Author")
@@ -270,7 +273,8 @@ class TreeService:
                 content = field.getPropertyValue("Content")
                 anchor = field.getAnchor()
                 para_idx = self._doc_svc.find_paragraph_for_range(
-                    anchor, para_ranges, doc.getText())
+                    anchor, para_ranges, doc.getText()
+                )
                 if para_idx >= 0:
                     summaries[para_idx] = content
         except Exception as e:
@@ -279,8 +283,7 @@ class TreeService:
         self._ai_summary_cache[key] = summaries
         return summaries
 
-    def _apply_content_strategy(self, node, doc, ai_summaries, strategy,
-                                max_chars=100):
+    def _apply_content_strategy(self, node, doc, ai_summaries, strategy, max_chars=100):
         para_idx = node.get("para_index", -1)
         if strategy in ("none", "heading_only"):
             pass
@@ -288,19 +291,24 @@ class TreeService:
             if para_idx in ai_summaries:
                 node["ai_summary"] = ai_summaries[para_idx]
             else:
-                node["body_preview"] = self._get_body_preview(
-                    doc, para_idx, max_chars)
+                node["body_preview"] = self._get_body_preview(doc, para_idx, max_chars)
         elif strategy == "first_lines":
-            node["body_preview"] = self._get_body_preview(
-                doc, para_idx, max_chars)
+            node["body_preview"] = self._get_body_preview(doc, para_idx, max_chars)
             if para_idx in ai_summaries:
                 node["ai_summary"] = ai_summaries[para_idx]
         elif strategy == "full":
             node["body_text"] = self._get_full_body_text(doc, para_idx)
 
-    def _serialize_tree_node(self, child, doc, ai_summaries,
-                             content_strategy, depth, current_depth=1,
-                             bookmark_map=None):
+    def _serialize_tree_node(
+        self,
+        child,
+        doc,
+        ai_summaries,
+        content_strategy,
+        depth,
+        current_depth=1,
+        bookmark_map=None,
+    ):
         node = {
             "type": "heading",
             "level": child["level"],
@@ -310,34 +318,44 @@ class TreeService:
             "children_count": self._count_all_children(child),
             "body_paragraphs": child["body_paragraphs"],
         }
-        self._apply_content_strategy(
-            node, doc, ai_summaries, content_strategy)
+        self._apply_content_strategy(node, doc, ai_summaries, content_strategy)
         if depth == 0 or current_depth < depth:
             if child.get("children"):
                 node["children"] = [
                     self._serialize_tree_node(
-                        sub, doc, ai_summaries, content_strategy,
-                        depth, current_depth + 1, bookmark_map)
+                        sub,
+                        doc,
+                        ai_summaries,
+                        content_strategy,
+                        depth,
+                        current_depth + 1,
+                        bookmark_map,
+                    )
                     for sub in child["children"]
                 ]
         return node
 
     # ── Public tree API ────────────────────────────────────────────
 
-    def get_document_tree(self, doc, content_strategy="first_lines",
-                          depth=1):
+    def get_document_tree(self, doc, content_strategy="first_lines", depth=1):
         """Get serialized document tree with content strategies."""
         tree = self.build_heading_tree(doc)
         bookmark_map = self._bm_svc.ensure_heading_bookmarks(doc)
         ai_summaries = (
             self.get_ai_summaries_map(doc)
             if content_strategy in ("ai_summary_first", "first_lines")
-            else {})
+            else {}
+        )
 
         children = [
             self._serialize_tree_node(
-                child, doc, ai_summaries, content_strategy,
-                depth, bookmark_map=bookmark_map)
+                child,
+                doc,
+                ai_summaries,
+                content_strategy,
+                depth,
+                bookmark_map=bookmark_map,
+            )
             for child in tree["children"]
         ]
 
@@ -366,45 +384,58 @@ class TreeService:
             "page_count": page_count,
         }
 
-    def get_heading_children(self, doc, heading_para_index=None,
-                             heading_bookmark=None, locator=None,
-                             content_strategy="first_lines", depth=1):
+    def get_heading_children(
+        self,
+        doc,
+        heading_para_index=None,
+        heading_bookmark=None,
+        locator=None,
+        content_strategy="first_lines",
+        depth=1,
+    ):
         """Get children of a heading (body paragraphs + sub-headings)."""
         if locator is not None and heading_para_index is None:
             resolved = self._doc_svc.resolve_locator(doc, locator)
             heading_para_index = resolved.get("para_index")
         elif heading_bookmark is not None and heading_para_index is None:
             if not hasattr(doc, "getBookmarks"):
-                return {"status": "error",
-                        "error": "Document doesn't support bookmarks"}
+                return {
+                    "status": "error",
+                    "error": "Document doesn't support bookmarks",
+                }
             bm_sup = doc.getBookmarks()
             if not bm_sup.hasByName(heading_bookmark):
-                return {"status": "error",
-                        "error": "Bookmark '%s' not found"
-                                 % heading_bookmark}
+                return {
+                    "status": "error",
+                    "error": "Bookmark '%s' not found" % heading_bookmark,
+                }
             bm = bm_sup.getByName(heading_bookmark)
             anchor = bm.getAnchor()
             para_ranges = self._doc_svc.get_paragraph_ranges(doc)
             heading_para_index = self._doc_svc.find_paragraph_for_range(
-                anchor, para_ranges, doc.getText())
+                anchor, para_ranges, doc.getText()
+            )
 
         if heading_para_index is None:
-            return {"status": "error",
-                    "error": "Provide locator, heading_para_index, "
-                             "or heading_bookmark"}
+            return {
+                "status": "error",
+                "error": "Provide locator, heading_para_index, or heading_bookmark",
+            }
 
         tree = self.build_heading_tree(doc)
         bookmark_map = self._bm_svc.ensure_heading_bookmarks(doc)
         target = self._find_node_by_para_index(tree, heading_para_index)
         if target is None:
-            return {"status": "error",
-                    "error": "Heading at paragraph %d not found"
-                             % heading_para_index}
+            return {
+                "status": "error",
+                "error": "Heading at paragraph %d not found" % heading_para_index,
+            }
 
         ai_summaries = (
             self.get_ai_summaries_map(doc)
             if content_strategy in ("ai_summary_first", "first_lines")
-            else {})
+            else {}
+        )
 
         children = []
         text = doc.getText()
@@ -415,8 +446,7 @@ class TreeService:
 
         while enum.hasMoreElements():
             element = enum.nextElement()
-            is_para = element.supportsService(
-                "com.sun.star.text.Paragraph")
+            is_para = element.supportsService("com.sun.star.text.Paragraph")
             if idx == heading_para_index:
                 found_heading = True
                 idx += 1
@@ -432,26 +462,29 @@ class TreeService:
                 if outline_level > 0:
                     break
                 para_text = element.getString()
-                preview = (para_text[:100] + "..."
-                           if len(para_text) > 100 else para_text)
+                preview = para_text[:100] + "..." if len(para_text) > 100 else para_text
                 if content_strategy == "full":
-                    children.append({"type": "body",
-                                     "para_index": idx,
-                                     "text": para_text})
+                    children.append(
+                        {"type": "body", "para_index": idx, "text": para_text}
+                    )
                 elif content_strategy not in ("none", "heading_only"):
-                    children.append({"type": "body",
-                                     "para_index": idx,
-                                     "preview": preview})
+                    children.append(
+                        {"type": "body", "para_index": idx, "preview": preview}
+                    )
                 else:
-                    children.append({"type": "body",
-                                     "para_index": idx})
+                    children.append({"type": "body", "para_index": idx})
             idx += 1
             self._doc_svc.yield_to_gui()
 
         for child in target["children"]:
             node = self._serialize_tree_node(
-                child, doc, ai_summaries, content_strategy,
-                depth, bookmark_map=bookmark_map)
+                child,
+                doc,
+                ai_summaries,
+                content_strategy,
+                depth,
+                bookmark_map=bookmark_map,
+            )
             children.append(node)
 
         return {
@@ -469,33 +502,28 @@ class TreeService:
 
     # ── AI annotations ─────────────────────────────────────────────
 
-    def add_ai_summary(self, doc, para_index=None, summary="",
-                       locator=None):
+    def add_ai_summary(self, doc, para_index=None, summary="", locator=None):
         """Add an MCP-AI annotation at a paragraph."""
         if locator is not None and para_index is None:
             resolved = self._doc_svc.resolve_locator(doc, locator)
             para_index = resolved.get("para_index")
         if para_index is None:
-            return {"status": "error",
-                    "error": "Provide locator or para_index"}
+            return {"status": "error", "error": "Provide locator or para_index"}
 
         doc_text = doc.getText()
         self._remove_ai_annotation_at(doc, para_index)
 
         target, _ = self._doc_svc.find_paragraph_element(doc, para_index)
         if target is None:
-            return {"status": "error",
-                    "error": "Paragraph %d not found" % para_index}
+            return {"status": "error", "error": "Paragraph %d not found" % para_index}
 
-        annotation = doc.createInstance(
-            "com.sun.star.text.textfield.Annotation")
+        annotation = doc.createInstance("com.sun.star.text.textfield.Annotation")
         annotation.setPropertyValue("Author", "MCP-AI")
         annotation.setPropertyValue("Content", summary)
         cursor = doc_text.createTextCursorByRange(target.getStart())
         doc_text.insertTextContent(cursor, annotation, False)
 
-        self._ai_summary_cache.pop(
-            self._doc_svc.doc_key(doc), None)
+        self._ai_summary_cache.pop(self._doc_svc.doc_key(doc), None)
 
         try:
             if doc.hasLocation():
@@ -503,18 +531,21 @@ class TreeService:
         except Exception:
             pass
 
-        return {"status": "ok",
-                "message": "Added AI summary at paragraph %d" % para_index,
-                "para_index": para_index,
-                "summary_length": len(summary)}
+        return {
+            "status": "ok",
+            "message": "Added AI summary at paragraph %d" % para_index,
+            "para_index": para_index,
+            "summary_length": len(summary),
+        }
 
     def get_ai_summaries(self, doc):
         """List all MCP-AI annotations."""
         summaries_map = self.get_ai_summaries_map(doc)
-        summaries = [{"para_index": idx, "summary": text}
-                     for idx, text in sorted(summaries_map.items())]
-        return {"status": "ok", "summaries": summaries,
-                "count": len(summaries)}
+        summaries = [
+            {"para_index": idx, "summary": text}
+            for idx, text in sorted(summaries_map.items())
+        ]
+        return {"status": "ok", "summaries": summaries, "count": len(summaries)}
 
     def remove_ai_summary(self, doc, para_index=None, locator=None):
         """Remove MCP-AI annotation at a paragraph."""
@@ -522,19 +553,16 @@ class TreeService:
             resolved = self._doc_svc.resolve_locator(doc, locator)
             para_index = resolved.get("para_index")
         if para_index is None:
-            return {"status": "error",
-                    "error": "Provide locator or para_index"}
+            return {"status": "error", "error": "Provide locator or para_index"}
         removed = self._remove_ai_annotation_at(doc, para_index)
-        self._ai_summary_cache.pop(
-            self._doc_svc.doc_key(doc), None)
+        self._ai_summary_cache.pop(self._doc_svc.doc_key(doc), None)
         if removed:
             try:
                 if doc.hasLocation():
                     doc.store()
             except Exception:
                 pass
-        return {"status": "ok", "removed": removed,
-                "para_index": para_index}
+        return {"status": "ok", "removed": removed, "para_index": para_index}
 
     def _remove_ai_annotation_at(self, doc, para_index):
         try:
@@ -544,8 +572,7 @@ class TreeService:
             text_obj = doc.getText()
             while enum.hasMoreElements():
                 field = enum.nextElement()
-                if not field.supportsService(
-                        "com.sun.star.text.textfield.Annotation"):
+                if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                     continue
                 try:
                     author = field.getPropertyValue("Author")
@@ -555,7 +582,8 @@ class TreeService:
                     continue
                 anchor = field.getAnchor()
                 idx = self._doc_svc.find_paragraph_for_range(
-                    anchor, para_ranges, text_obj)
+                    anchor, para_ranges, text_obj
+                )
                 if idx == para_index:
                     text_obj.removeTextContent(field)
                     return True
@@ -589,8 +617,7 @@ class TreeService:
             try:
                 controller = doc.getCurrentController()
                 vc = controller.getViewCursor()
-                saved = doc.getText().createTextCursorByRange(
-                    vc.getStart())
+                saved = doc.getText().createTextCursorByRange(vc.getStart())
                 saved_page = vc.getPage()
                 doc.lockControllers()
                 try:
@@ -605,12 +632,12 @@ class TreeService:
                 para_ranges = self._doc_svc.get_paragraph_ranges(doc)
                 text_obj = doc.getText()
                 para_idx = self._doc_svc.find_paragraph_for_range(
-                    anchor, para_ranges, text_obj)
+                    anchor, para_ranges, text_obj
+                )
                 result["para_index"] = para_idx
                 result["confidence"] = "exact"
             except Exception as e:
-                raise ValueError(
-                    "Cannot resolve page:%s — %s" % (loc_value, e))
+                raise ValueError("Cannot resolve page:%s — %s" % (loc_value, e))
 
         elif loc_type == "section":
             if not hasattr(doc, "getTextSections"):
@@ -623,7 +650,8 @@ class TreeService:
             para_ranges = self._doc_svc.get_paragraph_ranges(doc)
             text_obj = doc.getText()
             para_idx = self._doc_svc.find_paragraph_for_range(
-                anchor, para_ranges, text_obj)
+                anchor, para_ranges, text_obj
+            )
             result["para_index"] = para_idx
             result["section_name"] = loc_value
             result["confidence"] = "exact"
@@ -637,7 +665,8 @@ class TreeService:
                 if part < 1 or part > len(children):
                     raise ValueError(
                         "Heading index %d out of range (1..%d) "
-                        "in 'heading:%s'" % (part, len(children), loc_value))
+                        "in 'heading:%s'" % (part, len(children), loc_value)
+                    )
                 node = children[part - 1]
             result["para_index"] = node["para_index"]
             result["confidence"] = "exact"
@@ -645,8 +674,7 @@ class TreeService:
         elif loc_type == "heading_text":
             match = self._find_heading_by_text_enriched(doc, loc_value)
             if match is None:
-                raise ValueError(
-                    "No heading matching '%s' found" % loc_value)
+                raise ValueError("No heading matching '%s' found" % loc_value)
             result["para_index"] = match["para_index"]
             result["confidence"] = match["confidence"]
             if match.get("alternatives"):
@@ -673,27 +701,23 @@ class TreeService:
         if not bookmarks.hasByName(bookmark_name):
             hint = "Bookmark '%s' not found." % bookmark_name
             if bookmark_name.startswith("_mcp_"):
-                hint += (" Use heading_text:<text> locator for resilient "
-                         "heading addressing, or call get_document_tree "
-                         "to refresh bookmarks.")
-                existing = [n for n in bookmarks.getElementNames()
-                            if n.startswith("_mcp_")]
+                hint += (
+                    " Use heading_text:<text> locator for resilient "
+                    "heading addressing, or call get_document_tree "
+                    "to refresh bookmarks."
+                )
+                existing = [
+                    n for n in bookmarks.getElementNames() if n.startswith("_mcp_")
+                ]
                 if existing:
-                    hint += (" Existing bookmarks: "
-                             + ", ".join(existing[:10]))
+                    hint += " Existing bookmarks: " + ", ".join(existing[:10])
             raise ValueError(hint)
         bm = bookmarks.getByName(bookmark_name)
         anchor = bm.getAnchor()
         para_ranges = self._doc_svc.get_paragraph_ranges(doc)
         text_obj = doc.getText()
-        para_idx = self._doc_svc.find_paragraph_for_range(
-            anchor, para_ranges, text_obj)
+        para_idx = self._doc_svc.find_paragraph_for_range(anchor, para_ranges, text_obj)
         return {"para_index": para_idx}
-
-    def _find_heading_by_text(self, doc, search_text):
-        """Find heading by text (case-insensitive, fuzzy)."""
-        result = self._find_heading_by_text_enriched(doc, search_text)
-        return result
 
     def _find_heading_by_text_enriched(self, doc, search_text):
         """Find heading by text with confidence and ambiguity detection.
@@ -714,49 +738,57 @@ class TreeService:
             return h
 
         # Pass 1: exact match
-        exact = [h for h in headings
-                 if h["text"].lower().strip() == search_lower]
+        exact = [h for h in headings if h["text"].lower().strip() == search_lower]
         if exact:
             result = _enrich(exact[0])
             result["confidence"] = "exact"
             if len(exact) > 1:
                 result["confidence"] = "ambiguous"
                 result["alternatives"] = [
-                    {"text": h["text"], "para_index": h["para_index"],
-                     "level": h["level"],
-                     "bookmark": bookmark_map.get(h["para_index"])}
+                    {
+                        "text": h["text"],
+                        "para_index": h["para_index"],
+                        "level": h["level"],
+                        "bookmark": bookmark_map.get(h["para_index"]),
+                    }
                     for h in exact
                 ]
             return result
 
         # Pass 2: prefix match
-        prefix = [h for h in headings
-                  if h["text"].lower().strip().startswith(search_lower)]
+        prefix = [
+            h for h in headings if h["text"].lower().strip().startswith(search_lower)
+        ]
         if prefix:
             result = _enrich(prefix[0])
             result["confidence"] = "prefix"
             if len(prefix) > 1:
                 result["confidence"] = "ambiguous"
                 result["alternatives"] = [
-                    {"text": h["text"], "para_index": h["para_index"],
-                     "level": h["level"],
-                     "bookmark": bookmark_map.get(h["para_index"])}
+                    {
+                        "text": h["text"],
+                        "para_index": h["para_index"],
+                        "level": h["level"],
+                        "bookmark": bookmark_map.get(h["para_index"]),
+                    }
                     for h in prefix
                 ]
             return result
 
         # Pass 3: substring match
-        substr = [h for h in headings
-                  if search_lower in h["text"].lower()]
+        substr = [h for h in headings if search_lower in h["text"].lower()]
         if substr:
             result = _enrich(substr[0])
             result["confidence"] = "substring"
             if len(substr) > 1:
                 result["confidence"] = "ambiguous"
                 result["alternatives"] = [
-                    {"text": h["text"], "para_index": h["para_index"],
-                     "level": h["level"],
-                     "bookmark": bookmark_map.get(h["para_index"])}
+                    {
+                        "text": h["text"],
+                        "para_index": h["para_index"],
+                        "level": h["level"],
+                        "bookmark": bookmark_map.get(h["para_index"]),
+                    }
                     for h in substr
                 ]
             return result
@@ -766,10 +798,12 @@ class TreeService:
     def _flatten_headings(self, node):
         result = []
         for child in node.get("children", []):
-            result.append({
-                "text": child["text"],
-                "para_index": child["para_index"],
-                "level": child["level"],
-            })
+            result.append(
+                {
+                    "text": child["text"],
+                    "para_index": child["para_index"],
+                    "level": child["level"],
+                }
+            )
             result.extend(self._flatten_headings(child))
         return result

@@ -6,7 +6,7 @@
 """ConfigService — namespaced config via LO's native configuration registry.
 
 Uses the XCS/XCU schema files generated at build time.  Each module's config
-lives in the LO registry under ``/org.nelson.<module>.<Group>/<Group>``.
+lives in the LO registry under ``/org.libremcp.<module>.<Group>/<Group>``.
 
 Access control:
   - Read own keys: always OK
@@ -22,7 +22,7 @@ import os
 from plugin.framework.service_base import ServiceBase
 from plugin.framework.uno_context import get_ctx
 
-log = logging.getLogger("nelson.config")
+log = logging.getLogger("libremcp.config")
 
 
 class ConfigAccessError(Exception):
@@ -33,9 +33,9 @@ class ConfigService(ServiceBase):
     name = "config"
 
     def __init__(self):
-        self._defaults = {}   # "module.key" -> default_value
-        self._manifest = {}   # "module.key" -> field schema
-        self._events = None   # EventBus, set after init
+        self._defaults = {}  # "module.key" -> default_value
+        self._manifest = {}  # "module.key" -> field schema
+        self._events = None  # EventBus, set after init
 
     def initialize(self, ctx):
         # ctx is no longer stored — we use get_ctx() for fresh context
@@ -110,8 +110,7 @@ class ConfigService(ServiceBase):
         by_node = {}
         for key, new_value in changes.items():
             nodepath, field_name = self._registry_nodepath(key)
-            by_node.setdefault(nodepath, []).append(
-                (field_name, key, new_value))
+            by_node.setdefault(nodepath, []).append((field_name, key, new_value))
 
         for nodepath, fields in by_node.items():
             self._registry_write_node(nodepath, fields)
@@ -122,11 +121,13 @@ class ConfigService(ServiceBase):
             for key, new_value in changes.items():
                 old_value = old_values.get(key)
                 if new_value != old_value:
-                    diffs.append({
-                        "key": key,
-                        "value": new_value,
-                        "old_value": old_value,
-                    })
+                    diffs.append(
+                        {
+                            "key": key,
+                            "value": new_value,
+                            "old_value": old_value,
+                        }
+                    )
 
         if diffs:
             if self._events:
@@ -165,20 +166,18 @@ class ConfigService(ServiceBase):
             return
         module, _ = self._parse_key(key)
         if module != caller_module:
-            raise ConfigAccessError(
-                f"Module '{caller_module}' cannot write to '{key}'"
-            )
+            raise ConfigAccessError(f"Module '{caller_module}' cannot write to '{key}'")
 
     # ── Environment overrides ────────────────────────────────────────
 
     def _apply_env_overrides(self):
-        """Apply config overrides from NELSON_SET_CONFIG env var.
+        """Apply config overrides from LIBREMCP_SET_CONFIG env var.
 
         Format: "key=value,key=value,..."
         Values are coerced to the type declared in the module schema.
         Overrides are written to the LO registry.
         """
-        raw = os.environ.get("NELSON_SET_CONFIG", "").strip()
+        raw = os.environ.get("LIBREMCP_SET_CONFIG", "").strip()
         if not raw:
             return
 
@@ -197,8 +196,7 @@ class ConfigService(ServiceBase):
             log.info("Config override: %s = %r", key, value)
 
         if count:
-            log.info("Applied %d config override(s) from NELSON_SET_CONFIG",
-                     count)
+            log.info("Applied %d config override(s) from LIBREMCP_SET_CONFIG", count)
 
     def _coerce_value(self, key, raw):
         """Coerce a string value to the type declared in the manifest schema."""
@@ -244,7 +242,7 @@ class ConfigService(ServiceBase):
         """Convert "module.field" to (nodepath, field_name) for LO registry."""
         module_name, field_name = self._parse_key(key)
         safe = module_name.replace(".", "_")
-        nodepath = f"/org.nelson.{safe}.{safe}/{safe}"
+        nodepath = f"/org.libremcp.{safe}.{safe}/{safe}"
         return nodepath, field_name
 
     def _registry_read(self, key):
@@ -254,20 +252,26 @@ class ConfigService(ServiceBase):
             return None
         try:
             from com.sun.star.beans import PropertyValue
+
             nodepath, field_name = self._registry_nodepath(key)
             provider = ctx.ServiceManager.createInstanceWithContext(
-                "com.sun.star.configuration.ConfigurationProvider", ctx)
+                "com.sun.star.configuration.ConfigurationProvider", ctx
+            )
             args = (PropertyValue("nodepath", 0, nodepath, 0),)
             access = provider.createInstanceWithArguments(
-                "com.sun.star.configuration.ConfigurationAccess", args)
+                "com.sun.star.configuration.ConfigurationAccess", args
+            )
             val = access.getPropertyValue(field_name)
             schema = self._manifest.get(key, {})
             result = self._coerce_registry_value(val, schema)
             log.debug("Registry read: %s = %r (path=%s)", key, result, nodepath)
             return result
         except Exception:
-            log.debug("Registry read failed: %s (path=%s/%s)",
-                      key, *self._registry_nodepath(key))
+            log.debug(
+                "Registry read failed: %s (path=%s/%s)",
+                key,
+                *self._registry_nodepath(key),
+            )
             return None
 
     def _registry_write(self, key, value):
@@ -293,11 +297,14 @@ class ConfigService(ServiceBase):
             return
         try:
             from com.sun.star.beans import PropertyValue
+
             provider = ctx.ServiceManager.createInstanceWithContext(
-                "com.sun.star.configuration.ConfigurationProvider", ctx)
+                "com.sun.star.configuration.ConfigurationProvider", ctx
+            )
             args = (PropertyValue("nodepath", 0, nodepath, 0),)
             update = provider.createInstanceWithArguments(
-                "com.sun.star.configuration.ConfigurationUpdateAccess", args)
+                "com.sun.star.configuration.ConfigurationUpdateAccess", args
+            )
             for field_name, full_key, value in fields:
                 update.setPropertyValue(field_name, value)
                 log.debug("Registry set: %s = %r (path=%s)", full_key, value, nodepath)

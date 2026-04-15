@@ -9,7 +9,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.calc")
+log = logging.getLogger("libremcp.calc")
 
 
 def _resolve_sheet(doc, sheet_name=None):

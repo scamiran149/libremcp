@@ -17,7 +17,7 @@ except ImportError:
     EMPTY, VALUE, TEXT, FORMULA = 0, 1, 2, 3
     UNO_AVAILABLE = False
 
-logger = logging.getLogger("nelson.calc")
+logger = logging.getLogger("libremcp.calc")
 
 
 class SheetAnalyzer:

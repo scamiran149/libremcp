@@ -14,7 +14,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.draw")
+log = logging.getLogger("libremcp.draw")
 
 # Presentation object types (from com.sun.star.presentation.PresentationObjectType)
 # Shapes on Impress slides have a "PresObj" property or can be identified

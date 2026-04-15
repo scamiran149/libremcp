@@ -1,5 +1,5 @@
 [project]
-name = "nelson-mcp"
+name = "libremcp"
 dynamic = ["version"]
 description = "LibreOffice MCP server — document tools for AI clients"
 requires-python = ">=3.8"

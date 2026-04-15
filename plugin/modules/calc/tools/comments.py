@@ -13,7 +13,7 @@ from plugin.modules.calc.address_utils import (
     parse_range_string,
 )
 
-log = logging.getLogger("nelson.calc")
+log = logging.getLogger("libremcp.calc")
 
 
 def _resolve_sheet(doc, sheet_name=None):

@@ -10,12 +10,13 @@ import logging
 from plugin.framework.tool_base import ToolBase
 from plugin.modules.writer import format_support
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 # ------------------------------------------------------------------
 # GetDocumentContent
 # ------------------------------------------------------------------
+
 
 class GetDocumentContent(ToolBase):
     """Export the document (or a portion) as formatted content."""
@@ -63,12 +64,19 @@ class GetDocumentContent(ToolBase):
         range_end = kwargs.get("end") if scope == "range" else None
 
         if scope == "range" and (range_start is None or range_end is None):
-            return {"status": "error", "message": "scope 'range' requires start and end."}
+            return {
+                "status": "error",
+                "message": "scope 'range' requires start and end.",
+            }
 
         content = format_support.document_to_content(
-            ctx.doc, ctx.ctx, ctx.services,
-            max_chars=max_chars, scope=scope,
-            range_start=range_start, range_end=range_end,
+            ctx.doc,
+            ctx.ctx,
+            ctx.services,
+            max_chars=max_chars,
+            scope=scope,
+            range_start=range_start,
+            range_end=range_end,
         )
         doc_len = ctx.services.document.get_document_length(ctx.doc)
         result = {
@@ -86,6 +94,7 @@ class GetDocumentContent(ToolBase):
 # ------------------------------------------------------------------
 # ApplyDocumentContent
 # ------------------------------------------------------------------
+
 
 class ApplyDocumentContent(ToolBase):
     """Insert or replace content in the document."""
@@ -154,7 +163,9 @@ class ApplyDocumentContent(ToolBase):
 
         # Detect markup BEFORE any HTML wrapping.
         raw_content = content
-        use_preserve = isinstance(content, str) and not format_support.content_has_markup(content)
+        use_preserve = isinstance(
+            content, str
+        ) and not format_support.content_has_markup(content)
 
         config_svc = ctx.services.get("config")
 
@@ -162,19 +173,28 @@ class ApplyDocumentContent(ToolBase):
         if target == "search":
             search = kwargs.get("search")
             if not search and search != "":
-                return {"status": "error", "message": "search is required when target is 'search'."}
+                return {
+                    "status": "error",
+                    "message": "search is required when target is 'search'.",
+                }
             all_matches = kwargs.get("all_matches", False)
             case_sensitive = kwargs.get("case_sensitive", True)
             try:
                 if use_preserve:
                     count = _preserving_search_replace(
-                        ctx.doc, ctx.ctx, raw_content, search,
+                        ctx.doc,
+                        ctx.ctx,
+                        raw_content,
+                        search,
                         all_matches=all_matches,
                         case_sensitive=case_sensitive,
                     )
                 else:
                     count = format_support.apply_content_at_search(
-                        ctx.doc, ctx.ctx, content, search,
+                        ctx.doc,
+                        ctx.ctx,
+                        content,
+                        search,
                         all_matches=all_matches,
                         case_sensitive=case_sensitive,
                         config_svc=config_svc,
@@ -196,12 +216,16 @@ class ApplyDocumentContent(ToolBase):
             try:
                 if use_preserve:
                     from plugin.modules.writer.ops import get_text_cursor_at_range
+
                     doc_len = ctx.services.document.get_document_length(ctx.doc)
                     rng = get_text_cursor_at_range(ctx.doc, 0, doc_len)
                     format_support.replace_preserving_format(
                         ctx.doc, rng, raw_content, ctx.ctx
                     )
-                    return {"status": "ok", "message": "Replaced entire document. (formatting preserved)"}
+                    return {
+                        "status": "ok",
+                        "message": "Replaced entire document. (formatting preserved)",
+                    }
                 else:
                     format_support.replace_full_document(
                         ctx.doc, ctx.ctx, content, config_svc=config_svc
@@ -215,10 +239,14 @@ class ApplyDocumentContent(ToolBase):
             start_val = kwargs.get("start")
             end_val = kwargs.get("end")
             if start_val is None or end_val is None:
-                return {"status": "error", "message": "target 'range' requires start and end."}
+                return {
+                    "status": "error",
+                    "message": "target 'range' requires start and end.",
+                }
             try:
                 if use_preserve:
                     from plugin.modules.writer.ops import get_text_cursor_at_range
+
                     rng = get_text_cursor_at_range(
                         ctx.doc, int(start_val), int(end_val)
                     )
@@ -232,8 +260,11 @@ class ApplyDocumentContent(ToolBase):
                     }
                 else:
                     format_support.apply_content_at_range(
-                        ctx.doc, ctx.ctx, content,
-                        int(start_val), int(end_val),
+                        ctx.doc,
+                        ctx.ctx,
+                        content,
+                        int(start_val),
+                        int(end_val),
                         config_svc=config_svc,
                     )
                     return {
@@ -247,7 +278,10 @@ class ApplyDocumentContent(ToolBase):
         if target in ("beginning", "end", "selection"):
             try:
                 format_support.insert_content_at_position(
-                    ctx.doc, ctx.ctx, content, target,
+                    ctx.doc,
+                    ctx.ctx,
+                    content,
+                    target,
                     config_svc=config_svc,
                 )
                 return {
@@ -263,6 +297,7 @@ class ApplyDocumentContent(ToolBase):
 # ------------------------------------------------------------------
 # FindText
 # ------------------------------------------------------------------
+
 
 class FindText(ToolBase):
     """Find text in the document."""
@@ -306,8 +341,12 @@ class FindText(ToolBase):
         case_sensitive = kwargs.get("case_sensitive", True)
 
         ranges = format_support.find_text_ranges(
-            ctx.doc, ctx.ctx, search,
-            start=start, limit=limit, case_sensitive=case_sensitive,
+            ctx.doc,
+            ctx.ctx,
+            search,
+            start=start,
+            limit=limit,
+            case_sensitive=case_sensitive,
         )
         return {"status": "ok", "ranges": ranges}
 
@@ -315,6 +354,7 @@ class FindText(ToolBase):
 # ------------------------------------------------------------------
 # ReadParagraphs
 # ------------------------------------------------------------------
+
 
 class ReadParagraphs(ToolBase):
     """Read a range of paragraphs by index."""
@@ -379,6 +419,7 @@ class ReadParagraphs(ToolBase):
 # ------------------------------------------------------------------
 # InsertAtParagraph
 # ------------------------------------------------------------------
+
 
 class InsertAtParagraph(ToolBase):
     """Insert text at a specific paragraph index."""
@@ -471,6 +512,7 @@ class InsertAtParagraph(ToolBase):
 # SetParagraphText
 # ------------------------------------------------------------------
 
+
 class SetParagraphText(ToolBase):
     """Replace the entire text of a paragraph, preserving its style."""
 
@@ -509,14 +551,15 @@ class SetParagraphText(ToolBase):
         text = kwargs.get("text", "")
         para_index = _resolve_para_index(ctx, kwargs)
         if para_index is None:
-            return {"status": "error",
-                    "message": "Provide locator or paragraph_index."}
+            return {"status": "error", "message": "Provide locator or paragraph_index."}
 
         doc_svc = ctx.services.document
         target, _ = doc_svc.find_paragraph_element(ctx.doc, para_index)
         if target is None:
-            return {"status": "error",
-                    "message": "Paragraph %d not found." % para_index}
+            return {
+                "status": "error",
+                "message": "Paragraph %d not found." % para_index,
+            }
 
         old_text = target.getString()
         target.setString(text)
@@ -542,14 +585,14 @@ class SetParagraphText(ToolBase):
 # SetParagraphStyle
 # ------------------------------------------------------------------
 
+
 class SetParagraphStyle(ToolBase):
     """Change the paragraph style of a paragraph."""
 
     name = "set_paragraph_style"
     intent = "edit"
     description = (
-        "Set the paragraph style (e.g. 'Heading 1', 'Text Body', "
-        "'List Bullet')."
+        "Set the paragraph style (e.g. 'Heading 1', 'Text Body', 'List Bullet')."
     )
     parameters = {
         "type": "object",
@@ -579,14 +622,15 @@ class SetParagraphStyle(ToolBase):
         style = kwargs.get("style", "")
         para_index = _resolve_para_index(ctx, kwargs)
         if para_index is None:
-            return {"status": "error",
-                    "message": "Provide locator or paragraph_index."}
+            return {"status": "error", "message": "Provide locator or paragraph_index."}
 
         doc_svc = ctx.services.document
         target, _ = doc_svc.find_paragraph_element(ctx.doc, para_index)
         if target is None:
-            return {"status": "error",
-                    "message": "Paragraph %d not found." % para_index}
+            return {
+                "status": "error",
+                "message": "Paragraph %d not found." % para_index,
+            }
 
         resolved_style = _resolve_style_name(ctx.doc, style)
         old_style = target.getPropertyValue("ParaStyleName")
@@ -611,6 +655,7 @@ class SetParagraphStyle(ToolBase):
 # ------------------------------------------------------------------
 # DeleteParagraph
 # ------------------------------------------------------------------
+
 
 class DeleteParagraph(ToolBase):
     """Delete a paragraph from the document."""
@@ -640,8 +685,7 @@ class DeleteParagraph(ToolBase):
     def execute(self, ctx, **kwargs):
         para_index = _resolve_para_index(ctx, kwargs)
         if para_index is None:
-            return {"status": "error",
-                    "message": "Provide locator or paragraph_index."}
+            return {"status": "error", "message": "Provide locator or paragraph_index."}
 
         doc_text = ctx.doc.getText()
         enum = doc_text.createEnumeration()
@@ -655,8 +699,10 @@ class DeleteParagraph(ToolBase):
             idx += 1
 
         if target is None:
-            return {"status": "error",
-                    "message": "Paragraph %d not found." % para_index}
+            return {
+                "status": "error",
+                "message": "Paragraph %d not found." % para_index,
+            }
 
         cursor = doc_text.createTextCursorByRange(target)
         cursor.gotoStartOfParagraph(False)
@@ -675,6 +721,7 @@ class DeleteParagraph(ToolBase):
 # ------------------------------------------------------------------
 # DuplicateParagraph
 # ------------------------------------------------------------------
+
 
 class DuplicateParagraph(ToolBase):
     """Duplicate a paragraph (with its style) after itself."""
@@ -702,8 +749,7 @@ class DuplicateParagraph(ToolBase):
             "count": {
                 "type": "integer",
                 "description": (
-                    "Number of consecutive paragraphs to duplicate "
-                    "(default: 1)."
+                    "Number of consecutive paragraphs to duplicate (default: 1)."
                 ),
             },
         },
@@ -716,8 +762,7 @@ class DuplicateParagraph(ToolBase):
 
         para_index = _resolve_para_index(ctx, kwargs)
         if para_index is None:
-            return {"status": "error",
-                    "message": "Provide locator or paragraph_index."}
+            return {"status": "error", "message": "Provide locator or paragraph_index."}
 
         count = kwargs.get("count", 1)
         if count < 1:
@@ -736,8 +781,10 @@ class DuplicateParagraph(ToolBase):
             idx += 1
 
         if not elements:
-            return {"status": "error",
-                    "message": "Paragraph %d not found." % para_index}
+            return {
+                "status": "error",
+                "message": "Paragraph %d not found." % para_index,
+            }
 
         last = elements[-1]
         cursor = doc_text.createTextCursorByRange(last)
@@ -755,8 +802,7 @@ class DuplicateParagraph(ToolBase):
 
         return {
             "status": "ok",
-            "message": "Duplicated %d paragraph(s) at %d."
-                       % (count, para_index),
+            "message": "Duplicated %d paragraph(s) at %d." % (count, para_index),
             "duplicated_count": count,
         }
 
@@ -764,6 +810,7 @@ class DuplicateParagraph(ToolBase):
 # ------------------------------------------------------------------
 # CloneHeadingBlock
 # ------------------------------------------------------------------
+
 
 class CloneHeadingBlock(ToolBase):
     """Clone an entire heading block (heading + all sub-headings + body)."""
@@ -799,22 +846,24 @@ class CloneHeadingBlock(ToolBase):
 
         para_index = _resolve_para_index(ctx, kwargs)
         if para_index is None:
-            return {"status": "error",
-                    "message": "Provide locator or paragraph_index."}
+            return {"status": "error", "message": "Provide locator or paragraph_index."}
 
         # Use writer_tree service to find the heading node and block size
         tree_svc = ctx.services.get("writer_tree")
         if tree_svc is None:
-            return {"status": "error",
-                    "message": "writer_nav module not loaded; "
-                               "cannot resolve heading block."}
+            return {
+                "status": "error",
+                "message": "writer_nav module not loaded; "
+                "cannot resolve heading block.",
+            }
 
         tree = tree_svc.build_heading_tree(ctx.doc)
         node = tree_svc._find_node_by_para_index(tree, para_index)
         if node is None:
-            return {"status": "error",
-                    "message": "No heading found at paragraph %d."
-                               % para_index}
+            return {
+                "status": "error",
+                "message": "No heading found at paragraph %d." % para_index,
+            }
 
         # Total paragraphs in the block: heading + body + all children
         total = 1 + tree_svc._count_all_children(node)
@@ -833,8 +882,10 @@ class CloneHeadingBlock(ToolBase):
             idx += 1
 
         if not elements:
-            return {"status": "error",
-                    "message": "Could not collect heading block paragraphs."}
+            return {
+                "status": "error",
+                "message": "Could not collect heading block paragraphs.",
+            }
 
         # Insert duplicates after the last element of the block
         last = elements[-1]
@@ -854,7 +905,7 @@ class CloneHeadingBlock(ToolBase):
         return {
             "status": "ok",
             "message": "Cloned heading block '%s' (%d paragraphs)."
-                       % (node.get("text", ""), total),
+            % (node.get("text", ""), total),
             "heading_text": node.get("text", ""),
             "block_size": total,
         }
@@ -864,6 +915,7 @@ class CloneHeadingBlock(ToolBase):
 # InsertParagraphsBatch
 # ------------------------------------------------------------------
 
+
 class InsertParagraphsBatch(ToolBase):
     """Insert multiple paragraphs in one call."""
 
@@ -871,7 +923,7 @@ class InsertParagraphsBatch(ToolBase):
     intent = "edit"
     description = (
         "Insert multiple paragraphs in a single operation. "
-        "Each item in paragraphs is {\"text\": \"...\", \"style\": \"...\"}. "
+        'Each item in paragraphs is {"text": "...", "style": "..."}. '
         "Style is optional."
     )
     parameters = {
@@ -921,14 +973,15 @@ class InsertParagraphsBatch(ToolBase):
         position = kwargs.get("position", "after")
         para_index = _resolve_para_index(ctx, kwargs)
         if para_index is None:
-            return {"status": "error",
-                    "message": "Provide locator or paragraph_index."}
+            return {"status": "error", "message": "Provide locator or paragraph_index."}
 
         doc_svc = ctx.services.document
         target, _ = doc_svc.find_paragraph_element(ctx.doc, para_index)
         if target is None:
-            return {"status": "error",
-                    "message": "Paragraph %d not found." % para_index}
+            return {
+                "status": "error",
+                "message": "Paragraph %d not found." % para_index,
+            }
 
         doc_text = ctx.doc.getText()
         cursor = doc_text.createTextCursorByRange(target)
@@ -941,8 +994,7 @@ class InsertParagraphsBatch(ToolBase):
                 if sty:
                     sty = _resolve_style_name(ctx.doc, sty)
                 doc_text.insertString(cursor, txt, False)
-                doc_text.insertControlCharacter(
-                    cursor, PARAGRAPH_BREAK, False)
+                doc_text.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
                 if sty:
                     cursor.gotoPreviousParagraph(False)
                     cursor.gotoStartOfParagraph(False)
@@ -956,8 +1008,7 @@ class InsertParagraphsBatch(ToolBase):
                 sty = item.get("style")
                 if sty:
                     sty = _resolve_style_name(ctx.doc, sty)
-                doc_text.insertControlCharacter(
-                    cursor, PARAGRAPH_BREAK, False)
+                doc_text.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
                 doc_text.insertString(cursor, txt, False)
                 if sty:
                     cursor.gotoStartOfParagraph(False)
@@ -965,14 +1016,13 @@ class InsertParagraphsBatch(ToolBase):
                     cursor.setPropertyValue("ParaStyleName", sty)
                     cursor.gotoEndOfParagraph(False)
         else:
-            return {"status": "error",
-                    "message": "Invalid position: %s" % position}
+            return {"status": "error", "message": "Invalid position: %s" % position}
 
         n = len(paragraphs)
         return {
             "status": "ok",
             "message": "Inserted %d paragraph(s) %s paragraph %d."
-                       % (n, position, para_index),
+            % (n, position, para_index),
             "count": n,
         }
 
@@ -980,6 +1030,7 @@ class InsertParagraphsBatch(ToolBase):
 # ------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------
+
 
 def _resolve_para_index(ctx, kwargs):
     """Resolve locator or paragraph_index from tool kwargs.
@@ -1013,8 +1064,9 @@ def _resolve_style_name(doc, style_name):
     return style_name
 
 
-def _preserving_search_replace(model, uno_ctx, new_text, search_string,
-                               all_matches=False, case_sensitive=True):
+def _preserving_search_replace(
+    model, uno_ctx, new_text, search_string, all_matches=False, case_sensitive=True
+):
     """Find *search_string* and replace with *new_text* using format-preserving
     character-by-character replacement. Returns the number of replacements.
     """

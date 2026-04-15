@@ -14,7 +14,7 @@ import logging
 from plugin.framework.tool_base import ToolBase
 from plugin.modules.calc.address_utils import parse_range_string, index_to_column
 
-log = logging.getLogger("nelson.calc")
+log = logging.getLogger("libremcp.calc")
 
 
 def _resolve_sheet(doc, sheet_name=None):

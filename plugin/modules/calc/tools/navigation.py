@@ -10,7 +10,7 @@ import logging
 from plugin.framework.tool_base import ToolBase
 from plugin.modules.calc.address_utils import index_to_column
 
-log = logging.getLogger("nelson.calc")
+log = logging.getLogger("libremcp.calc")
 
 
 def _range_address_str(ra):

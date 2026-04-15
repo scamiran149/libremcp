@@ -1,17 +1,17 @@
 #!/bin/bash
-# Clear all Nelson log files in every known location.
-# Filenames: nelson_debug.log, nelson_agent.log (see core/logging.py).
+# Clear all LibreMCP log files in every known location.
+# Filenames: libremcp_debug.log, libremcp_agent.log (see core/logging.py).
 
 LO="${HOME}/.config/libreoffice"
 rm -f \
-  "${HOME}/nelson_debug.log" \
-  "${HOME}/nelson_agent.log" \
-  "${LO}/4/user/nelson_debug.log" \
-  "${LO}/4/user/nelson_agent.log" \
-  "${LO}/4/user/config/nelson_debug.log" \
-  "${LO}/4/user/config/nelson_agent.log" \
-  "${LO}/24/user/nelson_debug.log" \
-  "${LO}/24/user/nelson_agent.log" \
-  "${LO}/24/user/config/nelson_debug.log" \
-  "${LO}/24/user/config/nelson_agent.log"
+  "${HOME}/libremcp_debug.log" \
+  "${HOME}/libremcp_agent.log" \
+  "${LO}/4/user/libremcp_debug.log" \
+  "${LO}/4/user/libremcp_agent.log" \
+  "${LO}/4/user/config/libremcp_debug.log" \
+  "${LO}/4/user/config/libremcp_agent.log" \
+  "${LO}/24/user/libremcp_debug.log" \
+  "${LO}/24/user/libremcp_agent.log" \
+  "${LO}/24/user/config/libremcp_debug.log" \
+  "${LO}/24/user/config/libremcp_agent.log"
 echo "Logs deleted."

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from plugin.framework.service_base import ServiceBase
 
-_log = logging.getLogger("nelson.services")
+_log = logging.getLogger("libremcp.services")
 
 
 class ServiceRegistry:
@@ -77,8 +77,11 @@ class ServiceRegistry:
                 try:
                     shutdown()
                 except Exception:
-                    _log.debug("Error shutting down service %s",
-                               getattr(svc, "name", svc), exc_info=True)
+                    _log.debug(
+                        "Error shutting down service %s",
+                        getattr(svc, "name", svc),
+                        exc_info=True,
+                    )
 
     @property
     def service_names(self) -> List[str]:

@@ -9,7 +9,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.common")
+log = logging.getLogger("libremcp.common")
 
 
 class DocumentHealthCheck(ToolBase):

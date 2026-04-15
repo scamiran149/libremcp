@@ -17,7 +17,7 @@ import re
 
 from plugin.modules.calc.address_utils import parse_address
 
-logger = logging.getLogger("nelson.calc")
+logger = logging.getLogger("libremcp.calc")
 
 
 # ── Helper ─────────────────────────────────────────────────────────────

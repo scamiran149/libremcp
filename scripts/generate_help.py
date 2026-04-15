@@ -67,9 +67,12 @@ def _discover_tools(module_path, module_name):
         try:
             mod = importlib.import_module(fqn)
             for attr_name, obj in inspect.getmembers(mod, inspect.isclass):
-                if (hasattr(obj, "name") and hasattr(obj, "execute")
-                        and getattr(obj, "name", None)
-                        and obj.__module__ == fqn):
+                if (
+                    hasattr(obj, "name")
+                    and hasattr(obj, "execute")
+                    and getattr(obj, "name", None)
+                    and obj.__module__ == fqn
+                ):
                     try:
                         tools.append(obj())
                     except Exception:
@@ -122,11 +125,11 @@ def _tool_to_markdown(tool):
             enum = pschema.get("enum")
             enum_str = ""
             if enum:
-                enum_str = " — values: %s" % ", ".join(
-                    "`%s`" % e for e in enum)
-            lines.append("- `%s`%s — *%s*%s%s" % (
-                pname, req, ptype, enum_str,
-                " — %s" % pdesc if pdesc else ""))
+                enum_str = " — values: %s" % ", ".join("`%s`" % e for e in enum)
+            lines.append(
+                "- `%s`%s — *%s*%s%s"
+                % (pname, req, ptype, enum_str, " — %s" % pdesc if pdesc else "")
+            )
         lines.append("")
 
     return "\n".join(lines)
@@ -157,8 +160,11 @@ def _generate_module_help(module, tools):
     # Config info
     config = module.get("config", {})
     if config:
-        config_keys = [k for k, v in config.items()
-                       if isinstance(v, dict) and v.get("widget") != "button"]
+        config_keys = [
+            k
+            for k, v in config.items()
+            if isinstance(v, dict) and v.get("widget") != "button"
+        ]
         if config_keys:
             lines.append("## Configuration")
             lines.append("")
@@ -203,7 +209,7 @@ def _discover_howtos():
 def _generate_index(modules_with_tools, howtos=None):
     """Generate the index.md."""
     lines = []
-    lines.append("# Nelson MCP — Help Index")
+    lines.append("# LibreMCP — Help Index")
     lines.append("")
 
     # How-To Guides
@@ -221,8 +227,10 @@ def _generate_index(modules_with_tools, howtos=None):
         name = mod["name"]
         title = mod.get("title", name)
         tool_count = len(tools)
-        lines.append("- [%s](%s.md) — %s (%d tools)" % (
-            title, name.replace(".", "_"), title, tool_count))
+        lines.append(
+            "- [%s](%s.md) — %s (%d tools)"
+            % (title, name.replace(".", "_"), title, tool_count)
+        )
 
     lines.append("")
     lines.append("## Quick Reference")
@@ -250,7 +258,7 @@ HTML_TEMPLATE = """\
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title} — Nelson MCP</title>
+<title>{title} — LibreMCP</title>
 <style>
 body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
        margin: 0; padding: 0; color: #222; line-height: 1.5; display: flex; }}
@@ -276,8 +284,8 @@ a:hover {{ text-decoration: underline; }}
 </head>
 <body>
 <nav>
-<div class="nav-title">Nelson MCP</div>
-<a href="https://github.com/quazardous/nelson-mcp" target="_blank">GitHub</a>
+<div class="nav-title">LibreMCP</div>
+<a href="https://github.com/scamiran149/libremcp" target="_blank">GitHub</a>
 <a href="index.html">Index</a>
 {nav_links}</nav>
 <main>
@@ -304,14 +312,12 @@ def _convert_to_html(help_dir, modules_with_tools, howtos=None):
     if howtos:
         nav_parts.append('<div class="nav-section">How-To</div>')
         for h in howtos:
-            nav_parts.append('<a href="howto_%s.html">%s</a>' % (
-                h["slug"], h["title"]))
+            nav_parts.append('<a href="howto_%s.html">%s</a>' % (h["slug"], h["title"]))
     nav_parts.append('<div class="nav-section">Modules</div>')
     for mod, _ in modules_with_tools:
         name = mod["name"]
         title = mod.get("title", name)
-        nav_parts.append('<a href="%s.html">%s</a>' % (
-            name.replace(".", "_"), title))
+        nav_parts.append('<a href="%s.html">%s</a>' % (name.replace(".", "_"), title))
     nav_links = "\n".join(nav_parts)
 
     md_ext = ["tables", "fenced_code", "toc"]
@@ -338,15 +344,18 @@ def _convert_to_html(help_dir, modules_with_tools, howtos=None):
         # Fix links: .md → .html, howto cross-refs get howto_ prefix
         body = re.sub(
             r'href="([^"]*?)\.md"',
-            lambda m: 'href="%s.html"' % (
-                "howto_" + m.group(1) if not m.group(1).startswith("howto_")
+            lambda m: 'href="%s.html"'
+            % (
+                "howto_" + m.group(1)
+                if not m.group(1).startswith("howto_")
                 and any(h["slug"] == m.group(1) for h in (howtos or []))
-                else m.group(1)),
-            body)
+                else m.group(1)
+            ),
+            body,
+        )
         body = body.replace(".md)", ".html)")
 
-        html = HTML_TEMPLATE.format(
-            title=title, nav_links=nav_links, body=body)
+        html = HTML_TEMPLATE.format(title=title, nav_links=nav_links, body=body)
 
         out_path = os.path.join(html_dir, fn[:-3] + ".html")
         with open(out_path, "w", encoding="utf-8") as f:
@@ -358,11 +367,12 @@ def _convert_to_html(help_dir, modules_with_tools, howtos=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate help documentation from modules and tools")
-    parser.add_argument("--html", action="store_true",
-                        help="Also convert to HTML format")
-    parser.add_argument("--xhp", action="store_true",
-                        help="Also convert to XHP format")
+        description="Generate help documentation from modules and tools"
+    )
+    parser.add_argument(
+        "--html", action="store_true", help="Also convert to HTML format"
+    )
+    parser.add_argument("--xhp", action="store_true", help="Also convert to XHP format")
     args = parser.parse_args()
 
     os.makedirs(HELP_DIR, exist_ok=True)
@@ -409,8 +419,10 @@ def main():
         f.write(index_content)
 
     total_tools = sum(len(t) for _, t in modules_with_tools)
-    print("Generated %d help pages (%d tools) in %s" % (
-        len(modules_with_tools) + 1 + len(howtos), total_tools, HELP_DIR))
+    print(
+        "Generated %d help pages (%d tools) in %s"
+        % (len(modules_with_tools) + 1 + len(howtos), total_tools, HELP_DIR)
+    )
 
     # Convert to HTML (static pages for Help menu)
     if args.html:
@@ -423,6 +435,7 @@ def main():
         if os.path.isfile(md2xhp_path):
             sys.path.insert(0, os.path.dirname(md2xhp_path))
             from md2xhp import convert_dir
+
             xhp_dir = os.path.join(HELP_DIR, "xhp")
             print("Converting to XHP...")
             convert_dir(HELP_DIR, xhp_dir)

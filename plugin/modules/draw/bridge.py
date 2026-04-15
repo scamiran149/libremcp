@@ -7,7 +7,7 @@
 
 import logging
 
-log = logging.getLogger("nelson.draw")
+log = logging.getLogger("libremcp.draw")
 
 
 def get_draw_page(ctx, page_index=None, sheet_name=None):

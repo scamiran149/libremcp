@@ -6,11 +6,11 @@
 services:
   dev:
     build: .
-    container_name: nelson-dev
+    container_name: libremcp-dev
     user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
-      - ../../:/nelson-mcp
-    working_dir: /nelson-mcp
+      - ../../:/libremcp
+    working_dir: /libremcp
     environment:
       - HOME=/tmp
     command: ["sleep", "infinity"]

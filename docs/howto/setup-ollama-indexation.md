@@ -4,7 +4,7 @@ This guide explains how to use Ollama (a local LLM) to automatically tag and des
 
 ## Overview
 
-Nelson MCP indexes images in 3 passes:
+LibreMCP indexes images in 3 passes:
 
 1. **Pass 1 — CLIP** (requires Forge): generates a literal description of each image
 2. **Pass 2 — Folder Universe** (requires Ollama): analyzes folder context to understand the theme (e.g. "safari trip", "family reunion")
@@ -14,14 +14,14 @@ After indexation, you can search images by theme, activity, location, or content
 
 ## Prerequisites
 
-- Nelson MCP installed in LibreOffice
+- LibreMCP installed in LibreOffice
 - At least one image folder configured (see [Image Gallery Setup](setup-image-gallery.md))
 - Forge running for Pass 1 (see [Forge Setup](setup-forge-images.md))
 - ~4 GB RAM for Ollama with a 3B model
 
 ## Step 1 — Install Ollama
 
-Open **Tools > Options > Nelson MCP > AI Ollama**.
+Open **Tools > Options > LibreMCP > AI Ollama**.
 
 Click **Detect / Install Ollama**.
 
@@ -32,7 +32,7 @@ The installer also pulls the default model (`llama3.2:latest`, 3B parameters —
 
 ## Step 2 — Start Ollama
 
-From the menu: **Tools > Nelson MCP > AI > Start Ollama**
+From the menu: **Tools > LibreMCP > AI > Start Ollama**
 
 Or start it manually in a terminal:
 
@@ -44,7 +44,7 @@ Ollama runs on port 11434 by default.
 
 ## Step 3 — Configure
 
-In **Options > Nelson MCP > AI Ollama**, verify:
+In **Options > LibreMCP > AI Ollama**, verify:
 
 - An instance exists (e.g. "Local") pointing to `http://127.0.0.1:11434`
 - **Model**: `llama3.2:latest` (recommended for indexation — fast and capable)
@@ -61,7 +61,7 @@ In **Options > Nelson MCP > AI Ollama**, verify:
 
 ## Step 4 — Enable AI Indexing on Your Folder
 
-In **Options > Nelson MCP > Image Folders**, select your folder instance and enable:
+In **Options > LibreMCP > Image Folders**, select your folder instance and enable:
 
 - **AI Auto-Index**: checked
 - **Writable**: checked (required for saving metadata)
@@ -72,7 +72,7 @@ In **Options > Nelson MCP > Image Folders**, select your folder instance and ena
 
 Make sure Forge is running, then from the menu:
 
-**Tools > Nelson MCP > AI Images > Start Indexer**
+**Tools > LibreMCP > AI Images > Start Indexer**
 
 This scans all images without a description and sends them to Forge's CLIP model. Each image gets a literal caption like "a brown horse standing in a green field, mountains in background".
 
@@ -95,7 +95,7 @@ Or use the `gallery_list` tool to browse by folder with keyword metadata.
 
 ## Index Language
 
-By default, tags are generated in the same language as the folder context files. You can force a language in **Options > Nelson MCP > AI Images > Index Language** (e.g. "french", "english").
+By default, tags are generated in the same language as the folder context files. You can force a language in **Options > LibreMCP > AI Images > Index Language** (e.g. "french", "english").
 
 ## Troubleshooting
 
@@ -103,4 +103,4 @@ By default, tags are generated in the same language as the folder context files.
 - **Pass 2/3 stuck**: Check that Ollama is running (`http://127.0.0.1:11434` reachable)
 - **Poor tag quality**: Try a larger model (8B) or add context files in your image folders
 - **Re-index**: Use the **Reset DB** button in Image Folders options to start fresh
-- **Stop Ollama**: Menu **Tools > Nelson MCP > AI > Stop Ollama** (frees RAM)
+- **Stop Ollama**: Menu **Tools > LibreMCP > AI > Stop Ollama** (frees RAM)

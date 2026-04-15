@@ -21,7 +21,7 @@ import logging
 import queue
 import threading
 
-log = logging.getLogger("nelson.framework.main_thread")
+log = logging.getLogger("libremcp.framework.main_thread")
 
 
 class _WorkItem:
@@ -54,10 +54,12 @@ def _get_async_callback():
             return _async_callback_service
         try:
             import uno
+
             ctx = uno.getComponentContext()
             smgr = ctx.ServiceManager
             _async_callback_service = smgr.createInstanceWithContext(
-                "com.sun.star.awt.AsyncCallback", ctx)
+                "com.sun.star.awt.AsyncCallback", ctx
+            )
             if _async_callback_service is None:
                 raise RuntimeError("createInstance returned None")
             _callback_instance = _make_callback_instance()
@@ -65,7 +67,9 @@ def _get_async_callback():
         except Exception as exc:
             log.warning(
                 "AsyncCallback unavailable (%s) — UNO calls will run "
-                "in the HTTP thread (legacy behaviour)", exc)
+                "in the HTTP thread (legacy behaviour)",
+                exc,
+            )
             _async_callback_service = None
         _initialized = True
         return _async_callback_service
@@ -107,8 +111,8 @@ def _poke_vcl():
         return
     try:
         import uno
-        _async_callback_service.addCallback(
-            _callback_instance, uno.Any("void", None))
+
+        _async_callback_service.addCallback(_callback_instance, uno.Any("void", None))
     except Exception:
         try:
             _async_callback_service.addCallback(_callback_instance, None)
@@ -141,7 +145,8 @@ def execute_on_main_thread(fn, *args, timeout=30.0, **kwargs):
     if not item.event.wait(timeout):
         raise TimeoutError(
             "Main-thread execution of %s timed out after %ss"
-            % (getattr(fn, "__name__", str(fn)), timeout))
+            % (getattr(fn, "__name__", str(fn)), timeout)
+        )
 
     if item.exception is not None:
         raise item.exception

@@ -1,12 +1,12 @@
 #!/bin/bash
-# Nelson MCP - Install missing Python dependencies for LibreOffice
+# LibreMCP - Install missing Python dependencies for LibreOffice
 # On Linux/Mac, sqlite3 is normally available — this is a safety net.
 
 set -e
 
 LIB_DIR="$1"
 
-echo "=== Nelson MCP — Install Dependencies ==="
+echo "=== LibreMCP — Install Dependencies ==="
 echo ""
 
 if [ -z "$LIB_DIR" ]; then

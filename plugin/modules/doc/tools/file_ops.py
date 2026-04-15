@@ -14,7 +14,7 @@ from com.sun.star.beans import PropertyValue
 from plugin.framework.tool_base import ToolBase
 from plugin.framework.uno_context import get_ctx
 
-log = logging.getLogger("nelson.common")
+log = logging.getLogger("libremcp.common")
 
 _PDF_FILTERS = {
     "writer": "writer_pdf_Export",

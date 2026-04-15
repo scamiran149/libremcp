@@ -30,8 +30,9 @@ sys.path.insert(0, PROJECT_ROOT)
 try:
     import yaml
 except ImportError:
-    print("ERROR: PyYAML is required. Install with: pip install pyyaml",
-          file=sys.stderr)
+    print(
+        "ERROR: PyYAML is required. Install with: pip install pyyaml", file=sys.stderr
+    )
     sys.exit(1)
 
 
@@ -110,7 +111,7 @@ def _json_to_python(text):
             escape = False
             i += 1
             continue
-        if ch == '\\' and in_string:
+        if ch == "\\" and in_string:
             result.append(ch)
             escape = True
             i += 1
@@ -126,10 +127,12 @@ def _json_to_python(text):
             continue
         # Outside string: replace JSON keywords
         for jval, pyval in (("true", "True"), ("false", "False"), ("null", "None")):
-            if text[i:i+len(jval)] == jval:
+            if text[i : i + len(jval)] == jval:
                 # Check it's a whole word (not part of a larger identifier)
-                before_ok = (i == 0 or not text[i-1].isalnum())
-                after_ok = (i + len(jval) >= len(text) or not text[i+len(jval)].isalnum())
+                before_ok = i == 0 or not text[i - 1].isalnum()
+                after_ok = (
+                    i + len(jval) >= len(text) or not text[i + len(jval)].isalnum()
+                )
                 if before_ok and after_ok:
                     result.append(pyval)
                     i += len(jval)
@@ -161,7 +164,9 @@ def generate_manifest_py(modules, output_path):
             "config": m.get("config", {}),
             "scripts": m.get("scripts", {}),
             "actions": list(m.get("actions", {}).keys()),
-            "action_icons": {k: v["icon"] for k, v in m.get("actions", {}).items() if v.get("icon")},
+            "action_icons": {
+                k: v["icon"] for k, v in m.get("actions", {}).items() if v.get("icon")
+            },
         }
         # json.dumps then convert true/false/null to Python True/False/None
         json_text = json.dumps(entry, indent=8)
@@ -210,9 +215,12 @@ import xml.etree.ElementTree as ET
 
 # Layout constants — single source of truth in plugin/_layout.py
 from plugin._layout import (
-    PAGE_WIDTH as _PAGE_WIDTH, PAGE_HEIGHT as _PAGE_HEIGHT,
-    SCROLLBAR_WIDTH as _SCROLLBAR_WIDTH, CONTENT_WIDTH as _CONTENT_WIDTH,
+    PAGE_WIDTH as _PAGE_WIDTH,
+    PAGE_HEIGHT as _PAGE_HEIGHT,
+    SCROLLBAR_WIDTH as _SCROLLBAR_WIDTH,
+    CONTENT_WIDTH as _CONTENT_WIDTH,
 )
+
 _MARGIN = 6
 _LABEL_WIDTH = 100
 _FIELD_X = 110
@@ -460,8 +468,8 @@ def _add_helper(board, field_name, helper_text, y):
 
 
 # Style IDs for dlg:styles block
-_STYLE_BOLD = "0"       # font-weight 150 = bold (for titles)
-_STYLE_SEMIBOLD = "1"   # font-weight 110 = semibold (for separator labels)
+_STYLE_BOLD = "0"  # font-weight 150 = bold (for titles)
+_STYLE_SEMIBOLD = "1"  # font-weight 110 = semibold (for separator labels)
 
 
 def _add_styles(window):
@@ -470,44 +478,60 @@ def _add_styles(window):
     Must be called before the bulletinboard, as LO expects styles first.
     """
     styles = ET.SubElement(window, _dlg("styles"))
-    ET.SubElement(styles, _dlg("style"), {
-        _dlg("style-id"): _STYLE_BOLD,
-        _dlg("font-weight"): "150",
-    })
-    ET.SubElement(styles, _dlg("style"), {
-        _dlg("style-id"): _STYLE_SEMIBOLD,
-        _dlg("font-weight"): "110",
-    })
+    ET.SubElement(
+        styles,
+        _dlg("style"),
+        {
+            _dlg("style-id"): _STYLE_BOLD,
+            _dlg("font-weight"): "150",
+        },
+    )
+    ET.SubElement(
+        styles,
+        _dlg("style"),
+        {
+            _dlg("style-id"): _STYLE_SEMIBOLD,
+            _dlg("font-weight"): "110",
+        },
+    )
 
 
 def _add_title(board, title_id, text, y):
     """Add a bold title at the top of a config page. Returns new y."""
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): title_id,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(_MARGIN),
-        _dlg("top"): str(y),
-        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
-        _dlg("height"): "8",
-        _dlg("value"): text,
-        _dlg("style-id"): _STYLE_BOLD,
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): title_id,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(_MARGIN),
+            _dlg("top"): str(y),
+            _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
+            _dlg("height"): "8",
+            _dlg("value"): text,
+            _dlg("style-id"): _STYLE_BOLD,
+        },
+    )
     return y + 8 + _ROW_GAP
 
 
 def _add_page_helper(board, helper_id, text, y):
     """Add a helper text below a title or separator. Returns new y."""
     h = _helper_height(text)
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): helper_id,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(_MARGIN),
-        _dlg("top"): str(y),
-        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
-        _dlg("height"): str(h),
-        _dlg("value"): text,
-        _dlg("multiline"): "true",
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): helper_id,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(_MARGIN),
+            _dlg("top"): str(y),
+            _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
+            _dlg("height"): str(h),
+            _dlg("value"): text,
+            _dlg("multiline"): "true",
+        },
+    )
     return y + h + _ROW_GAP
 
 
@@ -563,61 +587,81 @@ def _add_separator(board, sep_id, y, label=None):
 def _add_inline_list_detail(board, field_name, schema, y):
     """Add list_detail controls inline on the main page. Returns new y."""
     section_label = schema.get("label", field_name.replace("_", " ").title())
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): "lbl_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(_MARGIN),
-        _dlg("top"): str(y),
-        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): section_label,
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): "lbl_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(_MARGIN),
+            _dlg("top"): str(y),
+            _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): section_label,
+        },
+    )
     y += _ROW_HEIGHT + _ROW_GAP
 
     # Listbox
     list_y = y
-    ET.SubElement(board, _dlg("menulist"), {
-        _dlg("id"): "lst_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(_MARGIN),
-        _dlg("top"): str(list_y),
-        _dlg("width"): str(_LD_LIST_WIDTH),
-        _dlg("height"): str(_LD_INLINE_LIST_HEIGHT),
-    })
+    ET.SubElement(
+        board,
+        _dlg("menulist"),
+        {
+            _dlg("id"): "lst_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(_MARGIN),
+            _dlg("top"): str(list_y),
+            _dlg("width"): str(_LD_LIST_WIDTH),
+            _dlg("height"): str(_LD_INLINE_LIST_HEIGHT),
+        },
+    )
 
     # Add button
     btn_x = _MARGIN + _LD_LIST_WIDTH + _LD_BTN_GAP
-    ET.SubElement(board, _dlg("button"), {
-        _dlg("id"): "add_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(btn_x),
-        _dlg("top"): str(list_y),
-        _dlg("width"): str(_LD_BTN_WIDTH),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): "Add",
-    })
+    ET.SubElement(
+        board,
+        _dlg("button"),
+        {
+            _dlg("id"): "add_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(btn_x),
+            _dlg("top"): str(list_y),
+            _dlg("width"): str(_LD_BTN_WIDTH),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): "Add",
+        },
+    )
 
     # Remove button
-    ET.SubElement(board, _dlg("button"), {
-        _dlg("id"): "del_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(btn_x),
-        _dlg("top"): str(list_y + _ROW_HEIGHT + _ROW_GAP),
-        _dlg("width"): str(_LD_BTN_WIDTH),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): "Remove",
-    })
+    ET.SubElement(
+        board,
+        _dlg("button"),
+        {
+            _dlg("id"): "del_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(btn_x),
+            _dlg("top"): str(list_y + _ROW_HEIGHT + _ROW_GAP),
+            _dlg("width"): str(_LD_BTN_WIDTH),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): "Remove",
+        },
+    )
 
     # Apply button
-    ET.SubElement(board, _dlg("button"), {
-        _dlg("id"): "apply_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(btn_x),
-        _dlg("top"): str(list_y + (_ROW_HEIGHT + _ROW_GAP) * 2),
-        _dlg("width"): str(_LD_BTN_WIDTH),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): "Apply",
-    })
+    ET.SubElement(
+        board,
+        _dlg("button"),
+        {
+            _dlg("id"): "apply_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(btn_x),
+            _dlg("top"): str(list_y + (_ROW_HEIGHT + _ROW_GAP) * 2),
+            _dlg("width"): str(_LD_BTN_WIDTH),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): "Apply",
+        },
+    )
 
     y = list_y + _LD_INLINE_LIST_HEIGHT + _ROW_GAP
 
@@ -637,8 +681,9 @@ def _add_inline_list_detail(board, field_name, schema, y):
     return y
 
 
-def generate_xdl(module_name, config_fields, title=None,
-                  page_helper=None, inline_children=None):
+def generate_xdl(
+    module_name, config_fields, title=None, page_helper=None, inline_children=None
+):
     """Generate an XDL dialog page for a module's config fields.
 
     Args:
@@ -651,17 +696,20 @@ def generate_xdl(module_name, config_fields, title=None,
             labeled separator. Children with config_disposition: tab are
             rendered as switchable tabs instead of stacked sections.
     """
-    page_id = "Nelson_%s" % module_name.replace(".", "_")
+    page_id = "LibreMCP_%s" % module_name.replace(".", "_")
 
-    window = ET.Element(_dlg("window"), {
-        _dlg("id"): page_id,
-        _dlg("left"): "0",
-        _dlg("top"): "0",
-        _dlg("width"): str(_PAGE_WIDTH),
-        _dlg("height"): str(_PAGE_HEIGHT),
-        _dlg("closeable"): "true",
-        _dlg("withtitlebar"): "false",
-    })
+    window = ET.Element(
+        _dlg("window"),
+        {
+            _dlg("id"): page_id,
+            _dlg("left"): "0",
+            _dlg("top"): "0",
+            _dlg("width"): str(_PAGE_WIDTH),
+            _dlg("height"): str(_PAGE_HEIGHT),
+            _dlg("closeable"): "true",
+            _dlg("withtitlebar"): "false",
+        },
+    )
     # Force namespace declarations on root
     window.set("xmlns:script", _SCRIPT_NS)
 
@@ -671,28 +719,44 @@ def generate_xdl(module_name, config_fields, title=None,
     board = ET.SubElement(window, _dlg("bulletinboard"))
 
     # Hidden control to identify the module
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): "__module__",
-        _dlg("tab-index"): "0",
-        _dlg("left"): "0", _dlg("top"): "0",
-        _dlg("width"): "0", _dlg("height"): "0",
-        _dlg("value"): module_name,
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): "__module__",
+            _dlg("tab-index"): "0",
+            _dlg("left"): "0",
+            _dlg("top"): "0",
+            _dlg("width"): "0",
+            _dlg("height"): "0",
+            _dlg("value"): module_name,
+        },
+    )
 
     # Hidden control listing inline module names (comma-separated)
     # Only include children that have visible config fields
     if inline_children:
         inline_names = ",".join(
-            child_m["name"] for child_m, child_cfg in inline_children
-            if any(not s.get("internal") and s.get("widget", "text") != "list_detail"
-                   for s in child_cfg.values()))
-        ET.SubElement(board, _dlg("text"), {
-            _dlg("id"): "__inline_modules__",
-            _dlg("tab-index"): "0",
-            _dlg("left"): "0", _dlg("top"): "0",
-            _dlg("width"): "0", _dlg("height"): "0",
-            _dlg("value"): inline_names,
-        })
+            child_m["name"]
+            for child_m, child_cfg in inline_children
+            if any(
+                not s.get("internal") and s.get("widget", "text") != "list_detail"
+                for s in child_cfg.values()
+            )
+        )
+        ET.SubElement(
+            board,
+            _dlg("text"),
+            {
+                _dlg("id"): "__inline_modules__",
+                _dlg("tab-index"): "0",
+                _dlg("left"): "0",
+                _dlg("top"): "0",
+                _dlg("width"): "0",
+                _dlg("height"): "0",
+                _dlg("value"): inline_names,
+            },
+        )
 
     y = _MARGIN
 
@@ -740,7 +804,8 @@ def generate_xdl(module_name, config_fields, title=None,
         tabbed_children = []
         for child_m, child_config in inline_children:
             visible_fields = [
-                (fn, s) for fn, s in child_config.items()
+                (fn, s)
+                for fn, s in child_config.items()
                 if not s.get("internal") and s.get("widget", "text") != "list_detail"
             ]
             if not visible_fields:
@@ -757,13 +822,11 @@ def generate_xdl(module_name, config_fields, title=None,
 
             sep_counter[0] += 1
             sep_label = child_m.get("title", _pretty_name(child_name))
-            y = _add_separator(
-                board, "sep_%d" % sep_counter[0], y, label=sep_label)
+            y = _add_separator(board, "sep_%d" % sep_counter[0], y, label=sep_label)
 
             child_helper = child_m.get("helper")
             if child_helper:
-                y = _add_page_helper(
-                    board, "phlp_%s" % child_safe, child_helper, y)
+                y = _add_page_helper(board, "phlp_%s" % child_safe, child_helper, y)
 
             for field_name, schema in child_config.items():
                 if schema.get("internal"):
@@ -781,24 +844,32 @@ def generate_xdl(module_name, config_fields, title=None,
             y = _add_separator(board, "sep_%d" % sep_counter[0], y)
 
             # Tab selector: label + dropdown
-            ET.SubElement(board, _dlg("text"), {
-                _dlg("id"): "lbl___tab_selector__",
-                _dlg("left"): str(_MARGIN),
-                _dlg("top"): str(y + 2),
-                _dlg("width"): str(_LABEL_WIDTH),
-                _dlg("height"): str(_ROW_HEIGHT),
-                _dlg("value"): "Provider settings",
-            })
-            ET.SubElement(board, _dlg("menulist"), {
-                _dlg("id"): "__tab_selector__",
-                _dlg("tab-index"): "0",
-                _dlg("left"): str(_FIELD_X),
-                _dlg("top"): str(y),
-                _dlg("width"): str(_FIELD_WIDTH),
-                _dlg("height"): str(_ROW_HEIGHT),
-                _dlg("spin"): "true",
-                _dlg("dropdown"): "true",
-            })
+            ET.SubElement(
+                board,
+                _dlg("text"),
+                {
+                    _dlg("id"): "lbl___tab_selector__",
+                    _dlg("left"): str(_MARGIN),
+                    _dlg("top"): str(y + 2),
+                    _dlg("width"): str(_LABEL_WIDTH),
+                    _dlg("height"): str(_ROW_HEIGHT),
+                    _dlg("value"): "Provider settings",
+                },
+            )
+            ET.SubElement(
+                board,
+                _dlg("menulist"),
+                {
+                    _dlg("id"): "__tab_selector__",
+                    _dlg("tab-index"): "0",
+                    _dlg("left"): str(_FIELD_X),
+                    _dlg("top"): str(y),
+                    _dlg("width"): str(_FIELD_WIDTH),
+                    _dlg("height"): str(_ROW_HEIGHT),
+                    _dlg("spin"): "true",
+                    _dlg("dropdown"): "true",
+                },
+            )
             y += 18  # selector + gap
 
             # Compute content area start and tallest tab height
@@ -817,8 +888,7 @@ def generate_xdl(module_name, config_fields, title=None,
                 child_helper = child_m.get("helper")
                 if child_helper:
                     helper_id = "phlp_%s" % child_safe
-                    cy = _add_page_helper(
-                        board, helper_id, child_helper, cy)
+                    cy = _add_page_helper(board, helper_id, child_helper, cy)
                     tab_ctrl_ids.append(helper_id)
 
                 for fn, schema in child_config.items():
@@ -867,29 +937,43 @@ def generate_xdl(module_name, config_fields, title=None,
 
             # Hidden control with tab data for runtime handler
             tab_data = json.dumps({"tabs": tab_labels, "controls": tab_controls})
-            ET.SubElement(board, _dlg("text"), {
-                _dlg("id"): "__tabs__",
-                _dlg("tab-index"): "0",
-                _dlg("left"): "0", _dlg("top"): "0",
-                _dlg("width"): "0", _dlg("height"): "0",
-                _dlg("value"): tab_data,
-            })
+            ET.SubElement(
+                board,
+                _dlg("text"),
+                {
+                    _dlg("id"): "__tabs__",
+                    _dlg("tab-index"): "0",
+                    _dlg("left"): "0",
+                    _dlg("top"): "0",
+                    _dlg("width"): "0",
+                    _dlg("height"): "0",
+                    _dlg("value"): tab_data,
+                },
+            )
 
     # If content exceeds page height, store final y for runtime scrollbar.
     # This is a last-resort fallback — scroll in Options pages is a hack
     # (repositioning controls, no mouse wheel, no native scroll).
     # Prefer config_disposition: tab to split content into tabs.
     if y > _PAGE_HEIGHT:
-        print("  WARNING: %s page overflows (%d > %d dialog units). "
-              "Consider using config_disposition: tab or splitting config."
-              % (module_name, y, _PAGE_HEIGHT))
-        ET.SubElement(board, _dlg("text"), {
-            _dlg("id"): "__content_height__",
-            _dlg("tab-index"): "0",
-            _dlg("left"): "0", _dlg("top"): "0",
-            _dlg("width"): "0", _dlg("height"): "0",
-            _dlg("value"): str(y),
-        })
+        print(
+            "  WARNING: %s page overflows (%d > %d dialog units). "
+            "Consider using config_disposition: tab or splitting config."
+            % (module_name, y, _PAGE_HEIGHT)
+        )
+        ET.SubElement(
+            board,
+            _dlg("text"),
+            {
+                _dlg("id"): "__content_height__",
+                _dlg("tab-index"): "0",
+                _dlg("left"): "0",
+                _dlg("top"): "0",
+                _dlg("width"): "0",
+                _dlg("height"): "0",
+                _dlg("value"): str(y),
+            },
+        )
 
     return _xdl_to_string(window)
 
@@ -901,17 +985,20 @@ def generate_list_detail_xdl(module_name, field_name, schema):
     then detail fields below the listbox.
     """
     safe_mod = module_name.replace(".", "_")
-    page_id = "Nelson_%s__%s" % (safe_mod, field_name)
+    page_id = "LibreMCP_%s__%s" % (safe_mod, field_name)
 
-    window = ET.Element(_dlg("window"), {
-        _dlg("id"): page_id,
-        _dlg("left"): "0",
-        _dlg("top"): "0",
-        _dlg("width"): str(_PAGE_WIDTH),
-        _dlg("height"): str(_PAGE_HEIGHT),
-        _dlg("closeable"): "true",
-        _dlg("withtitlebar"): "false",
-    })
+    window = ET.Element(
+        _dlg("window"),
+        {
+            _dlg("id"): page_id,
+            _dlg("left"): "0",
+            _dlg("top"): "0",
+            _dlg("width"): str(_PAGE_WIDTH),
+            _dlg("height"): str(_PAGE_HEIGHT),
+            _dlg("closeable"): "true",
+            _dlg("withtitlebar"): "false",
+        },
+    )
     window.set("xmlns:script", _SCRIPT_NS)
 
     _add_styles(window)
@@ -919,82 +1006,114 @@ def generate_list_detail_xdl(module_name, field_name, schema):
     board = ET.SubElement(window, _dlg("bulletinboard"))
 
     # Hidden __module__ control
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): "__module__",
-        _dlg("tab-index"): "0",
-        _dlg("left"): "0", _dlg("top"): "0",
-        _dlg("width"): "0", _dlg("height"): "0",
-        _dlg("value"): module_name,
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): "__module__",
+            _dlg("tab-index"): "0",
+            _dlg("left"): "0",
+            _dlg("top"): "0",
+            _dlg("width"): "0",
+            _dlg("height"): "0",
+            _dlg("value"): module_name,
+        },
+    )
 
     # Hidden __list_detail__ control (identifies the field)
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): "__list_detail__",
-        _dlg("tab-index"): "0",
-        _dlg("left"): "0", _dlg("top"): "0",
-        _dlg("width"): "0", _dlg("height"): "0",
-        _dlg("value"): field_name,
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): "__list_detail__",
+            _dlg("tab-index"): "0",
+            _dlg("left"): "0",
+            _dlg("top"): "0",
+            _dlg("width"): "0",
+            _dlg("height"): "0",
+            _dlg("value"): field_name,
+        },
+    )
 
     y = _MARGIN
 
     # Section label
     section_label = schema.get("label", field_name.replace("_", " ").title())
-    ET.SubElement(board, _dlg("text"), {
-        _dlg("id"): "lbl_section",
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(_MARGIN),
-        _dlg("top"): str(y),
-        _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): section_label,
-    })
+    ET.SubElement(
+        board,
+        _dlg("text"),
+        {
+            _dlg("id"): "lbl_section",
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(_MARGIN),
+            _dlg("top"): str(y),
+            _dlg("width"): str(_CONTENT_WIDTH - _MARGIN * 2),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): section_label,
+        },
+    )
     y += _ROW_HEIGHT + _ROW_GAP
 
     # Listbox (no dropdown = full list)
     list_y = y
-    ET.SubElement(board, _dlg("menulist"), {
-        _dlg("id"): "lst_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(_MARGIN),
-        _dlg("top"): str(list_y),
-        _dlg("width"): str(_LD_LIST_WIDTH),
-        _dlg("height"): str(_LD_LIST_HEIGHT),
-    })
+    ET.SubElement(
+        board,
+        _dlg("menulist"),
+        {
+            _dlg("id"): "lst_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(_MARGIN),
+            _dlg("top"): str(list_y),
+            _dlg("width"): str(_LD_LIST_WIDTH),
+            _dlg("height"): str(_LD_LIST_HEIGHT),
+        },
+    )
 
     # Add button
     btn_x = _MARGIN + _LD_LIST_WIDTH + _LD_BTN_GAP
-    ET.SubElement(board, _dlg("button"), {
-        _dlg("id"): "add_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(btn_x),
-        _dlg("top"): str(list_y),
-        _dlg("width"): str(_LD_BTN_WIDTH),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): "Add",
-    })
+    ET.SubElement(
+        board,
+        _dlg("button"),
+        {
+            _dlg("id"): "add_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(btn_x),
+            _dlg("top"): str(list_y),
+            _dlg("width"): str(_LD_BTN_WIDTH),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): "Add",
+        },
+    )
 
     # Remove button
-    ET.SubElement(board, _dlg("button"), {
-        _dlg("id"): "del_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(btn_x),
-        _dlg("top"): str(list_y + _ROW_HEIGHT + _ROW_GAP),
-        _dlg("width"): str(_LD_BTN_WIDTH),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): "Remove",
-    })
+    ET.SubElement(
+        board,
+        _dlg("button"),
+        {
+            _dlg("id"): "del_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(btn_x),
+            _dlg("top"): str(list_y + _ROW_HEIGHT + _ROW_GAP),
+            _dlg("width"): str(_LD_BTN_WIDTH),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): "Remove",
+        },
+    )
 
     # Apply button
-    ET.SubElement(board, _dlg("button"), {
-        _dlg("id"): "apply_%s" % field_name,
-        _dlg("tab-index"): "0",
-        _dlg("left"): str(btn_x),
-        _dlg("top"): str(list_y + (_ROW_HEIGHT + _ROW_GAP) * 2),
-        _dlg("width"): str(_LD_BTN_WIDTH),
-        _dlg("height"): str(_ROW_HEIGHT),
-        _dlg("value"): "Apply",
-    })
+    ET.SubElement(
+        board,
+        _dlg("button"),
+        {
+            _dlg("id"): "apply_%s" % field_name,
+            _dlg("tab-index"): "0",
+            _dlg("left"): str(btn_x),
+            _dlg("top"): str(list_y + (_ROW_HEIGHT + _ROW_GAP) * 2),
+            _dlg("width"): str(_LD_BTN_WIDTH),
+            _dlg("height"): str(_ROW_HEIGHT),
+            _dlg("value"): "Apply",
+        },
+    )
 
     y = list_y + _LD_LIST_HEIGHT + _ROW_GAP
 
@@ -1008,13 +1127,19 @@ def generate_list_detail_xdl(module_name, field_name, schema):
     # If content exceeds page height, store final y for runtime scrollbar
     # (scrollbar space is always reserved in PAGE_WIDTH via CONTENT_WIDTH)
     if y > _PAGE_HEIGHT:
-        ET.SubElement(board, _dlg("text"), {
-            _dlg("id"): "__content_height__",
-            _dlg("tab-index"): "0",
-            _dlg("left"): "0", _dlg("top"): "0",
-            _dlg("width"): "0", _dlg("height"): "0",
-            _dlg("value"): str(y),
-        })
+        ET.SubElement(
+            board,
+            _dlg("text"),
+            {
+                _dlg("id"): "__content_height__",
+                _dlg("tab-index"): "0",
+                _dlg("left"): "0",
+                _dlg("top"): "0",
+                _dlg("width"): "0",
+                _dlg("height"): "0",
+                _dlg("value"): str(y),
+            },
+        )
 
     return _xdl_to_string(window)
 
@@ -1031,7 +1156,7 @@ def generate_xdl_files(modules, output_dir):
     # config_inline: true  -> inlined into dotted parent (tunnel.bore -> tunnel)
     # config_inline: "foo" -> inlined into module "foo"
     by_name = {m["name"]: m for m in modules}
-    inline_map = {}   # target_name -> list of (child_manifest, child_config)
+    inline_map = {}  # target_name -> list of (child_manifest, child_config)
     inline_set = set()  # names of modules that are inlined
 
     # First pass: collect all inline targets
@@ -1081,10 +1206,15 @@ def generate_xdl_files(modules, output_dir):
         # Main page (regular fields, skips list_detail)
         xdl_path = os.path.join(output_dir, "%s.xdl" % safe)
         with open(xdl_path, "w") as f:
-            f.write(generate_xdl(name, config,
-                                 title=title,
-                                 page_helper=page_helper,
-                                 inline_children=children))
+            f.write(
+                generate_xdl(
+                    name,
+                    config,
+                    title=title,
+                    page_helper=page_helper,
+                    inline_children=children,
+                )
+            )
         generated_paths.add(xdl_path)
         count += 1
 
@@ -1131,7 +1261,7 @@ _CONTEXT_MAP = {
 # Default context: all document types
 _DEFAULT_CONTEXT = ",".join(sorted(_CONTEXT_MAP.values()))
 
-_PROTOCOL = "org.extension.nelson"
+_PROTOCOL = "org.extension.libremcp"
 
 
 def _resolve_context(context_list):
@@ -1153,18 +1283,29 @@ def _resolve_context(context_list):
     return ",".join(sorted(resolved))
 
 
-def _menu_node(parent, node_name, title=None, url=None, context=None,
-               target="_self", has_icon=False):
+def _menu_node(
+    parent,
+    node_name,
+    title=None,
+    url=None,
+    context=None,
+    target="_self",
+    has_icon=False,
+):
     """Create a menu <node> element for Addons.xcu.
 
     Args:
         has_icon: If True, emit an empty ImageIdentifier so LO reserves
                   space for a runtime icon (set via XImageManager API).
     """
-    node = ET.SubElement(parent, "node", {
-        _oor("name"): node_name,
-        _oor("op"): "replace",
-    })
+    node = ET.SubElement(
+        parent,
+        "node",
+        {
+            _oor("name"): node_name,
+            _oor("op"): "replace",
+        },
+    )
     if url:
         url_prop = ET.SubElement(node, "prop", {_oor("name"): "URL"})
         ET.SubElement(url_prop, "value").text = url
@@ -1174,28 +1315,41 @@ def _menu_node(parent, node_name, title=None, url=None, context=None,
         val.set("xml:lang", "en-US")
         val.text = title
     if context:
-        ctx_prop = ET.SubElement(node, "prop", {
-            _oor("name"): "Context",
-            _oor("type"): "xs:string",
-        })
+        ctx_prop = ET.SubElement(
+            node,
+            "prop",
+            {
+                _oor("name"): "Context",
+                _oor("type"): "xs:string",
+            },
+        )
         ET.SubElement(ctx_prop, "value").text = context
     if url and url != "private:separator":
-        tgt_prop = ET.SubElement(node, "prop", {
-            _oor("name"): "Target",
-            _oor("type"): "xs:string",
-        })
+        tgt_prop = ET.SubElement(
+            node,
+            "prop",
+            {
+                _oor("name"): "Target",
+                _oor("type"): "xs:string",
+            },
+        )
         ET.SubElement(tgt_prop, "value").text = target
     if has_icon:
-        img_prop = ET.SubElement(node, "prop", {
-            _oor("name"): "ImageIdentifier",
-            _oor("type"): "xs:string",
-        })
+        img_prop = ET.SubElement(
+            node,
+            "prop",
+            {
+                _oor("name"): "ImageIdentifier",
+                _oor("type"): "xs:string",
+            },
+        )
         ET.SubElement(img_prop, "value")
     return node
 
 
-def _build_menu_entries(submenu_el, entries, actions, module_name, counter,
-                        icon_entries=None):
+def _build_menu_entries(
+    submenu_el, entries, actions, module_name, counter, icon_entries=None
+):
     """Recursively build menu entries under a <node oor:name="Submenu">.
 
     Args:
@@ -1208,7 +1362,6 @@ def _build_menu_entries(submenu_el, entries, actions, module_name, counter,
                       icon_prefix) tuples for the Images section.
     """
     for entry in entries:
-
         counter[0] += 1
         node_id = "M%d" % counter[0]
 
@@ -1224,8 +1377,14 @@ def _build_menu_entries(submenu_el, entries, actions, module_name, counter,
             context = _resolve_context(entry.get("context"))
             icon_prefix = action_def.get("icon")
             has_icon = bool(icon_prefix)
-            _menu_node(submenu_el, node_id, title=title, url=url,
-                       context=context, has_icon=has_icon)
+            _menu_node(
+                submenu_el,
+                node_id,
+                title=title,
+                url=url,
+                context=context,
+                has_icon=has_icon,
+            )
             if has_icon and icon_entries is not None:
                 icon_entries.append((url, module_name, icon_prefix))
         elif entry.get("title") and entry.get("submenu"):
@@ -1233,13 +1392,18 @@ def _build_menu_entries(submenu_el, entries, actions, module_name, counter,
             title = entry["title"]
             url = "%s:NoOp" % _PROTOCOL
             context = _resolve_context(entry.get("context"))
-            node = _menu_node(submenu_el, node_id, title=title, url=url,
-                              context=context)
-            child_submenu = ET.SubElement(node, "node",
-                                         {_oor("name"): "Submenu"})
-            _build_menu_entries(child_submenu, entry["submenu"], actions,
-                                module_name, counter,
-                                icon_entries=icon_entries)
+            node = _menu_node(
+                submenu_el, node_id, title=title, url=url, context=context
+            )
+            child_submenu = ET.SubElement(node, "node", {_oor("name"): "Submenu"})
+            _build_menu_entries(
+                child_submenu,
+                entry["submenu"],
+                actions,
+                module_name,
+                counter,
+                icon_entries=icon_entries,
+            )
         else:
             continue
 
@@ -1252,41 +1416,59 @@ def generate_addons_xcu(modules, framework_manifest, output_path):
         framework_manifest: Framework-level manifest (plugin.yaml), or None.
         output_path: Path for the generated Addons.xcu.
     """
-    root = ET.Element(_oor("component-data"), {
-        _oor("name"): "Addons",
-        _oor("package"): "org.openoffice.Office",
-    })
+    root = ET.Element(
+        _oor("component-data"),
+        {
+            _oor("name"): "Addons",
+            _oor("package"): "org.openoffice.Office",
+        },
+    )
     root.set("xmlns:xs", _XS_NS)
 
     addon_ui = ET.SubElement(root, "node", {_oor("name"): "AddonUI"})
-    menubar = ET.SubElement(addon_ui, "node",
-                            {_oor("name"): "OfficeMenuBar"})
-    top_menu = ET.SubElement(menubar, "node", {
-        _oor("name"): "org.extension.nelson.menubar",
-        _oor("op"): "replace",
-    })
+    menubar = ET.SubElement(addon_ui, "node", {_oor("name"): "OfficeMenuBar"})
+    top_menu = ET.SubElement(
+        menubar,
+        "node",
+        {
+            _oor("name"): "org.extension.libremcp.menubar",
+            _oor("op"): "replace",
+        },
+    )
 
     # Top-level menu title
-    title_prop = ET.SubElement(top_menu, "prop", {
-        _oor("name"): "Title",
-        _oor("type"): "xs:string",
-    })
+    title_prop = ET.SubElement(
+        top_menu,
+        "prop",
+        {
+            _oor("name"): "Title",
+            _oor("type"): "xs:string",
+        },
+    )
     val = ET.SubElement(title_prop, "value")
     val.set("xml:lang", "en-US")
-    val.text = "Nelson"
+    val.text = "LibreMCP"
 
     # Empty ImageIdentifier — reserves space for runtime XImageManager icons
-    img_prop = ET.SubElement(top_menu, "prop", {
-        _oor("name"): "ImageIdentifier",
-        _oor("type"): "xs:string",
-    })
+    img_prop = ET.SubElement(
+        top_menu,
+        "prop",
+        {
+            _oor("name"): "ImageIdentifier",
+            _oor("type"): "xs:string",
+        },
+    )
     ET.SubElement(img_prop, "value")
 
     # Context: all doc types
-    ctx_prop = ET.SubElement(top_menu, "prop", {
-        _oor("name"): "Context",
-        _oor("type"): "xs:string",
-    })
+    ctx_prop = ET.SubElement(
+        top_menu,
+        "prop",
+        {
+            _oor("name"): "Context",
+            _oor("type"): "xs:string",
+        },
+    )
     ET.SubElement(ctx_prop, "value").text = _DEFAULT_CONTEXT
 
     submenu = ET.SubElement(top_menu, "node", {_oor("name"): "Submenu"})
@@ -1296,8 +1478,7 @@ def generate_addons_xcu(modules, framework_manifest, output_path):
     icon_entries = []  # (command_url, module_name, icon_prefix)
     # Module entries — grouped by menu_group, separator between groups.
     # Within each group, topo-sort order is preserved.
-    menu_modules = [m for m in modules
-                    if m.get("menus") and m["name"] != "main"]
+    menu_modules = [m for m in modules if m.get("menus") and m["name"] != "main"]
     # Stable sort by group name (preserves topo-sort within groups)
     menu_modules.sort(key=lambda m: m.get("menu_group", "zzz_default"))
     for m in menu_modules:
@@ -1311,8 +1492,9 @@ def generate_addons_xcu(modules, framework_manifest, output_path):
             counter[0] += 1
             _menu_node(submenu, "M%d" % counter[0], url="private:separator")
 
-        _build_menu_entries(submenu, menus, actions, mod_name, counter,
-                            icon_entries=icon_entries)
+        _build_menu_entries(
+            submenu, menus, actions, mod_name, counter, icon_entries=icon_entries
+        )
         prev_group = group
 
     # Framework entries (appended last)
@@ -1320,28 +1502,41 @@ def generate_addons_xcu(modules, framework_manifest, output_path):
         fw_menus = framework_manifest.get("menus", [])
         fw_actions = framework_manifest.get("actions", {})
         if fw_menus:
-            _build_menu_entries(submenu, fw_menus, fw_actions, "main", counter,
-                                icon_entries=icon_entries)
+            _build_menu_entries(
+                submenu,
+                fw_menus,
+                fw_actions,
+                "main",
+                counter,
+                icon_entries=icon_entries,
+            )
 
     # Images section — static default icons for menu commands
     if icon_entries:
-        images_node = ET.SubElement(addon_ui, "node",
-                                    {_oor("name"): "Images"})
+        images_node = ET.SubElement(addon_ui, "node", {_oor("name"): "Images"})
         for cmd_url, mod_name, icon_prefix in icon_entries:
             # Unique node name from command URL
             safe_name = cmd_url.replace(":", ".") + ".img"
-            img_node = ET.SubElement(images_node, "node", {
-                _oor("name"): safe_name,
-                _oor("op"): "replace",
-            })
+            img_node = ET.SubElement(
+                images_node,
+                "node",
+                {
+                    _oor("name"): safe_name,
+                    _oor("op"): "replace",
+                },
+            )
             url_prop = ET.SubElement(img_node, "prop", {_oor("name"): "URL"})
             ET.SubElement(url_prop, "value").text = cmd_url
-            udi_node = ET.SubElement(img_node, "node",
-                                     {_oor("name"): "UserDefinedImages"})
-            small_prop = ET.SubElement(udi_node, "prop",
-                                       {_oor("name"): "ImageSmallURL"})
+            udi_node = ET.SubElement(
+                img_node, "node", {_oor("name"): "UserDefinedImages"}
+            )
+            small_prop = ET.SubElement(
+                udi_node, "prop", {_oor("name"): "ImageSmallURL"}
+            )
             icon_path = "%%origin%%/plugin/modules/%s/icons/%s_16.png" % (
-                mod_name, icon_prefix)
+                mod_name,
+                icon_prefix,
+            )
             ET.SubElement(small_prop, "value").text = icon_path
 
     ET.indent(root, space="  ")
@@ -1352,7 +1547,6 @@ def generate_addons_xcu(modules, framework_manifest, output_path):
         f.write(body)
         f.write("\n")
     print("  Generated %s" % output_path)
-
 
 
 # ── Accelerators.xcu Generation ─────────────────────────────────────
@@ -1371,16 +1565,18 @@ def generate_accelerators_xcu(modules, output_path):
             key: Q_MOD1
             context: [writer, calc]
     """
-    root = ET.Element(_oor("component-data"), {
-        _oor("name"): "Accelerators",
-        _oor("package"): "org.openoffice.Office",
-    })
+    root = ET.Element(
+        _oor("component-data"),
+        {
+            _oor("name"): "Accelerators",
+            _oor("package"): "org.openoffice.Office",
+        },
+    )
     root.set("xmlns:xs", _XS_NS)
     root.set("xmlns:install", "http://openoffice.org/2004/installation")
     root.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
 
-    primary_keys = ET.SubElement(root, "node",
-                                 {_oor("name"): "PrimaryKeys"})
+    primary_keys = ET.SubElement(root, "node", {_oor("name"): "PrimaryKeys"})
 
     # Collect shortcuts per context
     # context_shortcuts: { lo_service_name: [(key, command_url)] }
@@ -1409,17 +1605,18 @@ def generate_accelerators_xcu(modules, output_path):
 
     # Build XML
     for lo_svc, shortcuts in sorted(context_shortcuts.items()):
-        modules_node = ET.SubElement(primary_keys, "node",
-                                     {_oor("name"): "Modules"})
-        svc_node = ET.SubElement(modules_node, "node",
-                                 {_oor("name"): lo_svc})
+        modules_node = ET.SubElement(primary_keys, "node", {_oor("name"): "Modules"})
+        svc_node = ET.SubElement(modules_node, "node", {_oor("name"): lo_svc})
         for key, url in shortcuts:
-            key_node = ET.SubElement(svc_node, "node", {
-                _oor("name"): key,
-                _oor("op"): "replace",
-            })
-            cmd_prop = ET.SubElement(key_node, "prop",
-                                     {_oor("name"): "Command"})
+            key_node = ET.SubElement(
+                svc_node,
+                "node",
+                {
+                    _oor("name"): key,
+                    _oor("op"): "replace",
+                },
+            )
+            cmd_prop = ET.SubElement(key_node, "prop", {_oor("name"): "Command"})
             cmd_val = ET.SubElement(cmd_prop, "value")
             cmd_val.set("xml:lang", "en-US")
             cmd_val.text = url
@@ -1454,27 +1651,30 @@ def generate_options_dialog_xcu(modules):
     Structure produced::
 
         Nodes
-        ├── Nelson (Node)
+        ├── LibreMCP (Node)
         │   └── Leaves: [Main], Core, Http, Mcp, Chatbot ...
-        ├── Nelson Tunnel (Node)    ← only if tunnel has sub-modules
+        ├── LibreMCP Tunnel (Node)    ← only if tunnel has sub-modules
         │   └── Leaves: Main, Ngrok, Bore, Cloudflare
         └── ...
     """
-    handler_service = "org.extension.nelson.OptionsHandler"
+    handler_service = "org.extension.libremcp.OptionsHandler"
 
-    root = ET.Element(_oor("component-data"), {
-        _oor("name"): "OptionsDialog",
-        _oor("package"): "org.openoffice.Office",
-    })
+    root = ET.Element(
+        _oor("component-data"),
+        {
+            _oor("name"): "OptionsDialog",
+            _oor("package"): "org.openoffice.Office",
+        },
+    )
     root.set("xmlns:xs", _XS_NS)
 
     nodes_el = ET.SubElement(root, "node", {_oor("name"): "Nodes"})
 
     # Classify modules
-    top_level = []       # modules without dots (in order)
-    children = {}        # parent_name -> [child_modules] (in order)
+    top_level = []  # modules without dots (in order)
+    children = {}  # parent_name -> [child_modules] (in order)
     has_children = set()
-    inline_set = set()       # modules inlined into another page
+    inline_set = set()  # modules inlined into another page
     inline_target_set = set()  # modules that receive inline children
 
     for m in modules:
@@ -1497,9 +1697,9 @@ def generate_options_dialog_xcu(modules):
         else:
             top_level.append(m)
 
-    # ── Main Node: "Nelson" ─────────────────────────────────────
-    lw_node_name = "Nelson"
-    lw_node = _add_node(nodes_el, lw_node_name, "Nelson")
+    # ── Main Node: "LibreMCP" ─────────────────────────────────────
+    lw_node_name = "LibreMCP"
+    lw_node = _add_node(nodes_el, lw_node_name, "LibreMCP")
     lw_leaves = ET.SubElement(lw_node, "node", {_oor("name"): "Leaves"})
 
     # GroupId matches parent Node oor:name → appears first group.
@@ -1509,13 +1709,20 @@ def generate_options_dialog_xcu(modules):
     # Framework-level "Main" leaf (first if it has config or inline children)
     for m in top_level:
         if m["name"] == "main" and (m.get("config") or "main" in inline_target_set):
-            _add_leaf(lw_leaves, "Nelson_main", "Main",
-                      "main", "main", handler_service,
-                      group_id=lw_node_name, group_index=group_idx)
+            _add_leaf(
+                lw_leaves,
+                "LibreMCP_main",
+                "Main",
+                "main",
+                "main",
+                handler_service,
+                group_id=lw_node_name,
+                group_index=group_idx,
+            )
             group_idx += 1
             break
 
-    # Simple modules (no sub-modules) as leaves under Nelson
+    # Simple modules (no sub-modules) as leaves under LibreMCP
     for m in top_level:
         name = m["name"]
         if name == "main" or name in has_children or name in inline_set:
@@ -1524,9 +1731,16 @@ def generate_options_dialog_xcu(modules):
         if not config and name not in inline_target_set:
             continue
         safe = name.replace(".", "_")
-        _add_leaf(lw_leaves, "Nelson_%s" % safe, _pretty_name(name),
-                  name, safe, handler_service,
-                  group_id=lw_node_name, group_index=group_idx)
+        _add_leaf(
+            lw_leaves,
+            "LibreMCP_%s" % safe,
+            _pretty_name(name),
+            name,
+            safe,
+            handler_service,
+            group_id=lw_node_name,
+            group_index=group_idx,
+        )
         group_idx += 1
 
         # Extra leaves for non-inline list_detail fields
@@ -1538,13 +1752,21 @@ def generate_options_dialog_xcu(modules):
             ld_safe = "%s__%s" % (safe, field_name)
             ld_label = "%s: %s" % (
                 _pretty_name(name),
-                schema.get("page_label") or schema.get("label", field_name))
-            _add_leaf(lw_leaves, "Nelson_%s" % ld_safe, ld_label,
-                      name, ld_safe, handler_service,
-                      group_id=lw_node_name, group_index=group_idx)
+                schema.get("page_label") or schema.get("label", field_name),
+            )
+            _add_leaf(
+                lw_leaves,
+                "LibreMCP_%s" % ld_safe,
+                ld_label,
+                name,
+                ld_safe,
+                handler_service,
+                group_id=lw_node_name,
+                group_index=group_idx,
+            )
             group_idx += 1
 
-    # ── Sub-module groups as leaves under Nelson ────────────────
+    # ── Sub-module groups as leaves under LibreMCP ────────────────
     # LO doesn't reliably show multiple top-level Nodes from one extension.
     # Instead, add parent + children as leaves with a group separator label.
     for m in top_level:
@@ -1558,10 +1780,16 @@ def generate_options_dialog_xcu(modules):
         # Skip if the parent itself is inlined elsewhere (e.g. writer -> doc)
         if (config or name in inline_target_set) and name not in inline_set:
             safe = name.replace(".", "_")
-            _add_leaf(lw_leaves, "Nelson_%s" % safe,
-                      _pretty_name(name),
-                      name, safe, handler_service,
-                      group_id=lw_node_name, group_index=group_idx)
+            _add_leaf(
+                lw_leaves,
+                "LibreMCP_%s" % safe,
+                _pretty_name(name),
+                name,
+                safe,
+                handler_service,
+                group_id=lw_node_name,
+                group_index=group_idx,
+            )
             group_idx += 1
 
         # Sub-module leaves (labeled "Tunnel: Ngrok" etc.)
@@ -1575,12 +1803,17 @@ def generate_options_dialog_xcu(modules):
                 continue
             child_safe = child_name.replace(".", "_")
             # Label: "Tunnel: Ngrok"
-            child_label = "%s: %s" % (_pretty_name(name),
-                                      _pretty_name(child_name))
-            _add_leaf(lw_leaves, "Nelson_%s" % child_safe,
-                      child_label,
-                      child_name, child_safe, handler_service,
-                      group_id=lw_node_name, group_index=group_idx)
+            child_label = "%s: %s" % (_pretty_name(name), _pretty_name(child_name))
+            _add_leaf(
+                lw_leaves,
+                "LibreMCP_%s" % child_safe,
+                child_label,
+                child_name,
+                child_safe,
+                handler_service,
+                group_id=lw_node_name,
+                group_index=group_idx,
+            )
             group_idx += 1
 
             # list_detail leaves for sub-modules (non-inline only)
@@ -1592,10 +1825,18 @@ def generate_options_dialog_xcu(modules):
                 ld_safe = "%s__%s" % (child_safe, field_name)
                 ld_label = "%s: %s" % (
                     child_label,
-                    schema.get("page_label") or schema.get("label", field_name))
-                _add_leaf(lw_leaves, "Nelson_%s" % ld_safe, ld_label,
-                          child_name, ld_safe, handler_service,
-                          group_id=lw_node_name, group_index=group_idx)
+                    schema.get("page_label") or schema.get("label", field_name),
+                )
+                _add_leaf(
+                    lw_leaves,
+                    "LibreMCP_%s" % ld_safe,
+                    ld_label,
+                    child_name,
+                    ld_safe,
+                    handler_service,
+                    group_id=lw_node_name,
+                    group_index=group_idx,
+                )
                 group_idx += 1
 
     ET.indent(root, space="  ")
@@ -1604,10 +1845,14 @@ def generate_options_dialog_xcu(modules):
 
 def _add_node(parent, node_name, label):
     """Add a Node element to the OptionsDialog Nodes set."""
-    node = ET.SubElement(parent, "node", {
-        _oor("name"): node_name,
-        _oor("op"): "fuse",
-    })
+    node = ET.SubElement(
+        parent,
+        "node",
+        {
+            _oor("name"): node_name,
+            _oor("op"): "fuse",
+        },
+    )
     label_prop = ET.SubElement(node, "prop", {_oor("name"): "Label"})
     ET.SubElement(label_prop, "value").text = label
     all_mod_prop = ET.SubElement(node, "prop", {_oor("name"): "AllModules"})
@@ -1615,16 +1860,28 @@ def _add_node(parent, node_name, label):
     return node
 
 
-def _add_leaf(parent, node_name, label, module_name, safe_name,
-              handler_service, group_id=None, group_index=None):
+def _add_leaf(
+    parent,
+    node_name,
+    label,
+    module_name,
+    safe_name,
+    handler_service,
+    group_id=None,
+    group_index=None,
+):
     """Add a leaf node to the OptionsDialog XCU tree."""
-    leaf = ET.SubElement(parent, "node", {
-        _oor("name"): node_name,
-        _oor("op"): "fuse",
-    })
+    leaf = ET.SubElement(
+        parent,
+        "node",
+        {
+            _oor("name"): node_name,
+            _oor("op"): "fuse",
+        },
+    )
 
     id_prop = ET.SubElement(leaf, "prop", {_oor("name"): "Id"})
-    ET.SubElement(id_prop, "value").text = "org.extension.nelson"
+    ET.SubElement(id_prop, "value").text = "org.extension.libremcp"
 
     lbl_prop = ET.SubElement(leaf, "prop", {_oor("name"): "Label"})
     ET.SubElement(lbl_prop, "value").text = label
@@ -1650,18 +1907,16 @@ def generate_manifest_xml(modules, output_path):
 
     # Static entries (always present)
     entries = [
-        ('application/vnd.sun.star.uno-typelibrary;type=RDB', 'XPromptFunction.rdb'),
-        ('application/vnd.sun.star.uno-component;type=Python', 'plugin/main.py'),
-        ('application/vnd.sun.star.uno-component;type=Python', 'plugin/prompt_function.py'),
-        ('application/vnd.sun.star.uno-component;type=Python', 'plugin/options_handler.py'),
-        ('application/vnd.sun.star.configuration-data', 'Addons.xcu'),
-        ('application/vnd.sun.star.configuration-data', 'Accelerators.xcu'),
-        ('application/vnd.sun.star.configuration-data', 'Jobs.xcu'),
-        ('application/vnd.sun.star.configuration-data', 'ProtocolHandler.xcu'),
-        ('application/vnd.sun.star.configuration-data', 'OptionsDialog.xcu'),
-        ('application/vnd.sun.star.configuration-data', 'registry/org/openoffice/Office/UI/Sidebar.xcu'),
-        ('application/vnd.sun.star.uno-component;type=Python', 'plugin/modules/panel/panel_factory.py'),
-        ('application/vnd.sun.star.configuration-data', 'registry/org/openoffice/Office/UI/Factories.xcu'),
+        ("application/vnd.sun.star.uno-component;type=Python", "plugin/main.py"),
+        (
+            "application/vnd.sun.star.uno-component;type=Python",
+            "plugin/options_handler.py",
+        ),
+        ("application/vnd.sun.star.configuration-data", "Addons.xcu"),
+        ("application/vnd.sun.star.configuration-data", "Accelerators.xcu"),
+        ("application/vnd.sun.star.configuration-data", "Jobs.xcu"),
+        ("application/vnd.sun.star.configuration-data", "ProtocolHandler.xcu"),
+        ("application/vnd.sun.star.configuration-data", "OptionsDialog.xcu"),
     ]
 
     # Dynamic XCS/XCU entries for modules with config
@@ -1670,11 +1925,11 @@ def generate_manifest_xml(modules, output_path):
             continue
         safe = m["name"].replace(".", "_")
         entries.append(
-            ('application/vnd.sun.star.configuration-schema',
-             'registry/%s.xcs' % safe))
+            ("application/vnd.sun.star.configuration-schema", "registry/%s.xcs" % safe)
+        )
         entries.append(
-            ('application/vnd.sun.star.configuration-data',
-             'registry/%s.xcu' % safe))
+            ("application/vnd.sun.star.configuration-data", "registry/%s.xcu" % safe)
+        )
 
     # Build XML tree
     def _mf(tag):
@@ -1683,10 +1938,14 @@ def generate_manifest_xml(modules, output_path):
     ET.register_namespace("manifest", MANIFEST_NS)
     root = ET.Element(_mf("manifest"))
     for media_type, full_path in entries:
-        ET.SubElement(root, _mf("file-entry"), {
-            _mf("media-type"): media_type,
-            _mf("full-path"): full_path,
-        })
+        ET.SubElement(
+            root,
+            _mf("file-entry"),
+            {
+                _mf("media-type"): media_type,
+                _mf("full-path"): full_path,
+            },
+        )
 
     ET.indent(root, space="\t")
     body = ET.tostring(root, encoding="unicode")
@@ -1742,23 +2001,25 @@ def _synthesize_script_buttons(modules):
                 "widget": "button",
                 "label": script_def.get("label", script_name),
                 "helper": script_def.get("description", ""),
-                "action": "plugin.framework.deps:run__%s__%s" % (
-                    mod_safe, safe_name),
+                "action": "plugin.framework.deps:run__%s__%s" % (mod_safe, safe_name),
             }
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate _manifest.py and XCS/XCU from module.yaml files")
+        description="Generate _manifest.py and XCS/XCU from module.yaml files"
+    )
     parser.add_argument(
-        "--modules", nargs="*", default=None,
-        help="Only process these modules (default: all)")
+        "--modules",
+        nargs="*",
+        default=None,
+        help="Only process these modules (default: all)",
+    )
     args = parser.parse_args()
 
     modules_dir = os.path.join(PROJECT_ROOT, "plugin", "modules")
     if not os.path.isdir(modules_dir):
-        print("ERROR: plugin/modules/ not found at %s" % modules_dir,
-              file=sys.stderr)
+        print("ERROR: plugin/modules/ not found at %s" % modules_dir, file=sys.stderr)
         return 1
 
     # Load framework-level plugin.yaml (if present)
@@ -1792,8 +2053,7 @@ def main():
 
     # 1. Addons.xcu (menus) — run first to collect conditional menus
     addons_xcu_path = os.path.join(build_dir, "Addons.xcu")
-    generate_addons_xcu(
-        sorted_modules, framework_manifest, addons_xcu_path)
+    generate_addons_xcu(sorted_modules, framework_manifest, addons_xcu_path)
 
     # 2. _manifest.py
     manifest_path = os.path.join(PROJECT_ROOT, "plugin", "_manifest.py")
@@ -1818,7 +2078,9 @@ def main():
     generate_accelerators_xcu(sorted_modules, accel_xcu_path)
 
     # 7. META-INF/manifest.xml
-    manifest_xml_path = os.path.join(PROJECT_ROOT, "extension", "META-INF", "manifest.xml")
+    manifest_xml_path = os.path.join(
+        PROJECT_ROOT, "extension", "META-INF", "manifest.xml"
+    )
     generate_manifest_xml(sorted_modules, manifest_xml_path)
 
     # 8. Patch version
@@ -1852,18 +2114,21 @@ def _validate_scripts(modules, modules_dir):
                 if not os.path.isfile(ps1):
                     errors.append(
                         "%s: script '%s' declared but %s.ps1 not found"
-                        % (name, script_name, script_name))
+                        % (name, script_name, script_name)
+                    )
             elif platform in ("linux", "darwin"):
                 if not os.path.isfile(sh):
                     errors.append(
                         "%s: script '%s' declared but %s.sh not found"
-                        % (name, script_name, script_name))
+                        % (name, script_name, script_name)
+                    )
             else:
                 # No platform filter — expect at least one
                 if not os.path.isfile(ps1) and not os.path.isfile(sh):
                     errors.append(
                         "%s: script '%s' declared but no .ps1 or .sh found"
-                        % (name, script_name))
+                        % (name, script_name)
+                    )
 
         # Check script files are declared in YAML
         if os.path.isdir(mod_scripts_dir):
@@ -1873,8 +2138,8 @@ def _validate_scripts(modules, modules_dir):
                 base = fn.rsplit(".", 1)[0]
                 if base not in scripts:
                     warnings.append(
-                        "%s: script file '%s' not declared in module.yaml"
-                        % (name, fn))
+                        "%s: script file '%s' not declared in module.yaml" % (name, fn)
+                    )
 
     for w in warnings:
         print("  WARNING: %s" % w)

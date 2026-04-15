@@ -1,5 +1,5 @@
 #!/bin/bash
-# Clean / repair the LibreOffice extension cache for nelson.
+# Clean / repair the LibreOffice extension cache for LibreMCP.
 #
 # Adapted from mcp-libre/scripts/clean-cache.sh.
 #
@@ -13,9 +13,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-EXTENSION_ID="org.extension.nelson"
-EXTENSION_OXT="nelson.oxt"
-BUNDLE_NAME="nelson"
+EXTENSION_ID="org.extension.libremcp"
+EXTENSION_OXT="libremcp.oxt"
+BUNDLE_NAME="libremcp"
 
 # Parse args
 NUKE=false

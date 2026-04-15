@@ -25,7 +25,7 @@ for arg in "$@"; do
 done
 
 LOG_FILE="$HOME/soffice-debug.log"
-PLUGIN_LOG="$HOME/nelson.log"
+PLUGIN_LOG="$HOME/libremcp.log"
 
 if $FULL; then
     export SAL_LOG="+INFO+WARN+ERROR"
@@ -71,10 +71,10 @@ if [ -z "$SOFFICE" ]; then
     exit 1
 fi
 
-if [ -n "$NELSON_SET_CONFIG" ]; then
-    echo "Config overrides: $NELSON_SET_CONFIG"
+if [ -n "$LIBREMCP_SET_CONFIG" ]; then
+    echo "Config overrides: $LIBREMCP_SET_CONFIG"
 fi
 
 echo "Launching LibreOffice ($SOFFICE)..."
-NELSON_SET_CONFIG="${NELSON_SET_CONFIG:-}" $SOFFICE $LO_ARGS --writer 2>"$LOG_FILE" &
+LIBREMCP_SET_CONFIG="${LIBREMCP_SET_CONFIG:-}" $SOFFICE $LO_ARGS --writer 2>"$LOG_FILE" &
 echo "LibreOffice launched. Tail log: tail -f $LOG_FILE"

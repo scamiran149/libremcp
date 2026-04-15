@@ -14,7 +14,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.doc")
+log = logging.getLogger("libremcp.doc")
 
 
 class ListHyperlinks(ToolBase):

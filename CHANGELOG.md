@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.0] — 2026-04-14
+
+### Changed
+
+- **Renamed project** from Nelson MCP to LibreMCP
+- Forked from quazardous/nelson-mcp and stripped to core MCP document tools
+- Removed: AI image generation, image/document galleries, tunnels, =PROMPT(), sidebar launchers
+- ~115 document tools remaining: Writer, Calc, Draw/Impress, navigation, search, batch
+
+### Migrated
+
+- All Nelson branding replaced with LibreMCP
+- Extension ID changed from org.extension.nelson to org.extension.libremcp
+- Config registry paths changed from org.nelson.* to org.libremcp.*
+- Environment variables changed from NELSON_* to LIBREMCP_*
+- Log file changed from nelson.log to libremcp.log
+
 ## [0.8.2] — 2026-04-08
 
 ### Fixed
@@ -17,8 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Scripts framework** — scripts are now declared in `module.yaml` with tags (`install`, `auto`, `once`, `button`, `visible`, `pause`). Centralized launch via `plugin/framework/deps.py` and `plugin/framework/terminal.py`. Build validates declared scripts vs files
 - **`sqlite3_ctypes`** — pure-Python DB-API 2.0 wrapper using `ctypes.CDLL` to load `sqlite3.dll` directly. No `.pyd` needed — works on all Windows machines regardless of LO's custom `python312.dll`. Bundled `sqlite3.dll` v3.51.3 from sqlite.org (FTS5 included)
 - **Build ID** — each `.oxt` is stamped with a `timestamp-hash` for traceability (visible in first log line)
-- **BUILD_TAG** — `plugin/version.py` supports patch release suffixes (e.g. `nelson-0.8.1-2.oxt`)
-- **SQLite3 status check** — Options > Nelson MCP shows `[OK] sqlite3 3.51.3` or `[FAIL]`
+- **BUILD_TAG** — `plugin/version.py` supports patch release suffixes (e.g. `libremcp-0.8.1-2.oxt`)
+- **SQLite3 status check** — Options > LibreMCP shows `[OK] sqlite3 3.51.3` or `[FAIL]`
 - **`NELSON_LOG_LEVEL`** — env var overrides configured log level
 - **`NELSON_SQLITE3_DLL`** — env var overrides sqlite3 DLL path
 - **Dynamic gallery sync** — adding/removing image or document folders in Options takes effect immediately (no restart needed)
@@ -27,7 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **Log level deferred** — configured log level is applied after bootstrap completes, so all boot messages are visible
 - **`make deploy`** uses `build-force` (no stale docker cache)
-- **Versioned `.oxt`** — build output is `nelson-0.8.1.oxt` (was `nelson.oxt`)
+- **Versioned `.oxt`** — build output is `libremcp-0.8.1.oxt` (was `libremcp.oxt`)
 
 ### Fixed
 
@@ -49,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 - **HTML help system** — `generate_help.py --html` converts module docs to static HTML pages with sidebar navigation. Bundled in .oxt at `help/`, opened from Help menu entry via default browser
 - **How-To guides** — 4 guides in `docs/howto/`: Connect ChatGPT via Tailscale, Generate images with Forge, Index photos with Ollama, Set up an image gallery
-- **Help menu entry** — "Help" action in Nelson menu opens HTML help index in browser
+- **Help menu entry** — "Help" action in LibreMCP menu opens HTML help index in browser
 
 ### Changed
 
@@ -64,7 +81,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Tool reference page** — `/api/tools` HTML endpoint with searchable tool documentation, auto-generated from schemas. "Tool Reference" button in Options opens it
 - **Undo support** — all MCP mutations wrapped in `UndoContext`, Ctrl+Z reverts entire tool operation. Each action has a unique `_action_id` visible in undo history and MCP results
 - **MCP bridge** — `dev/mcp-bridge/server.py` stdio-to-HTTP proxy with auto re-initialize on 409, `-Xutf8` for Windows UTF-8
-- **Dev Docker build** — persistent `nelson-dev` container with `docker exec`, Make targets with file dependencies (skip vendor/manifest/icons if unchanged). `make build` from PowerShell works
+- **Dev Docker build** — persistent `libremcp-dev` container with `docker exec`, Make targets with file dependencies (skip vendor/manifest/icons if unchanged). `make build` from PowerShell works
 - **md2xhp converter** — `tools/md2xhp/md2xhp.py` converts Markdown subset to LibreOffice XHP help format (headings, lists, code, notes, inline formatting)
 - **PageMap** (idxV2, disabled) — sparse paragraph↔page cache with interpolation, kept as commented code for future unified index
 
@@ -165,12 +182,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Document IDs** — every document gets a persistent `NelsonDocId` (UUID stored in UserDefinedProperties). Survives save, save-as, and close+reopen. Returned by `create_document`, `open_document`, `list_open_documents`, and `get_document_info`
+- **Document IDs** — every document gets a persistent `LibreMCPDocId` (UUID stored in UserDefinedProperties). Survives save, save-as, and close+reopen. Returned by `create_document`, `open_document`, `list_open_documents`, and `get_document_info`
 - **`_document` meta-parameter** — all tools accept an optional `_document` parameter to target a specific document instead of the active one. Supports `id:<doc_id>`, `path:<file_path>`, `title:<frame_title>`, or bare 32-char hex doc_id
 - **Multi-document awareness** — `get_document_info` now includes `_other_open_documents` hint listing other open docs with their `doc_id`, title, and type
 - **`save_document` first-save support** — accepts an optional `path` parameter to save unsaved documents for the first time (no more "Use File > Save As" error)
 - **`create_document` with `path`** — optional `path` parameter to create and save a document in a single call (recommended to avoid ambiguity with multiple unsaved docs)
-- **`read_log` tool (mcp-dev)** — new tool in the dev MCP proxy to read Nelson and LibreOffice logs with level/pattern filtering, so agents can diagnose friction without filesystem access
+- **`read_log` tool (mcp-dev)** — new tool in the dev MCP proxy to read LibreMCP and LibreOffice logs with level/pattern filtering, so agents can diagnose friction without filesystem access
 
 ### Changed
 
@@ -188,7 +205,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **Document metadata extraction** — reads title, description, subject, keywords, creator, page count, word count, character count, paragraph count, image count, table count from ODF (`meta.xml` + `document-statistic`) and OOXML (`docProps/core.xml` + `app.xml`) via pure stdlib `zipfile` — no LibreOffice needed
 - **Document metadata writing** — `docs_gallery_update` writes title, description, subject, keywords into ODF and OOXML files via zip rewriting (atomic temp-file swap); supports creating `docProps/core.xml` when absent
 - **Document type filter** — `docs_gallery_list` and `docs_gallery_search` accept `doc_type` filter (writer, calc, impress, draw, other)
-- **Document index** — SQLite+FTS5 database per folder (`~/.config/nelson/documents_<hash>.db`) with incremental mtime-based scanning, same pattern as image gallery
+- **Document index** — SQLite+FTS5 database per folder (`~/.config/libremcp/documents_<hash>.db`) with incremental mtime-based scanning, same pattern as image gallery
 
 ## [0.4.0] — 2026-03-13
 
@@ -214,7 +231,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **`list_images_writer` viewport jump** — wrapped image enumeration in a single lock cycle with save/restore after unlock
 - **`_build_page_map` (fulltext search)** — added cursor restore after unlock
 - **`get_page_objects` viewport jump** — added cursor save/restore around view cursor page resolution
-- **Options handler early logging** — ensures nelson logger has a handler when `options_handler.py` loads before `main.py`
+- **Options handler early logging** — ensures libremcp logger has a handler when `options_handler.py` loads before `main.py`
 
 ## [0.3.3] — 2026-03-10
 
@@ -323,7 +340,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
-- **Sidebar panel factory** with Actions and Jobs panels in the Nelson deck
+- **Sidebar panel factory** with Actions and Jobs panels in the LibreMCP deck
 - **Job manager** — framework-level background task runner with `get_job` / `list_jobs` tools
 - **AI image generation/editing tools** — `generate_image` and `edit_image` submit background jobs, with gallery auto-save and configurable filename templates
 - **Launcher modules** — Claude Code, Gemini CLI, and OpenCode launchers with install scripts and prompt templates

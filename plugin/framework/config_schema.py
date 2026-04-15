@@ -62,12 +62,15 @@ def _to_xml_string(root):
 def generate_xcs(module_name, config_fields):
     """Generate XCS (schema) XML for a module's config fields."""
     safe = module_name.replace(".", "_")
-    package = f"org.nelson.{safe}"
+    package = f"org.libremcp.{safe}"
 
-    root = ET.Element(_qn("oor", "component-schema"), {
-        _qn("oor", "name"): safe,
-        _qn("oor", "package"): package,
-    })
+    root = ET.Element(
+        _qn("oor", "component-schema"),
+        {
+            _qn("oor", "name"): safe,
+            _qn("oor", "package"): package,
+        },
+    )
     # Force xmlns:xs declaration (used in oor:type attribute values)
     root.set("xmlns:xs", _NS["xs"])
 
@@ -80,10 +83,14 @@ def generate_xcs(module_name, config_fields):
         xcs_type = _XCS_TYPE_MAP.get(schema.get("type", "string"), "xs:string")
         desc_text = schema.get("description", "") or schema.get("label", "")
 
-        prop = ET.SubElement(grp, "prop", {
-            _qn("oor", "name"): field_name,
-            _qn("oor", "type"): xcs_type,
-        })
+        prop = ET.SubElement(
+            grp,
+            "prop",
+            {
+                _qn("oor", "name"): field_name,
+                _qn("oor", "type"): xcs_type,
+            },
+        )
         info = ET.SubElement(prop, "info")
         desc = ET.SubElement(info, "desc")
         desc.text = desc_text
@@ -94,12 +101,15 @@ def generate_xcs(module_name, config_fields):
 def generate_xcu(module_name, config_fields):
     """Generate XCU (defaults) XML for a module's config fields."""
     safe = module_name.replace(".", "_")
-    package = f"org.nelson.{safe}"
+    package = f"org.libremcp.{safe}"
 
-    root = ET.Element(_qn("oor", "component-data"), {
-        _qn("oor", "name"): safe,
-        _qn("oor", "package"): package,
-    })
+    root = ET.Element(
+        _qn("oor", "component-data"),
+        {
+            _qn("oor", "name"): safe,
+            _qn("oor", "package"): package,
+        },
+    )
 
     node = ET.SubElement(root, "node", {_qn("oor", "name"): safe})
 

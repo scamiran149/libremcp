@@ -1,4 +1,4 @@
-# Nelson MCP - Install missing Python dependencies for LibreOffice
+# LibreMCP - Install missing Python dependencies for LibreOffice
 # Downloads pysqlite3 wheel from PyPI (LO's Python on Windows lacks sqlite3)
 
 param(
@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Nelson MCP - Install Dependencies ===" -ForegroundColor Cyan
+Write-Host "=== LibreMCP - Install Dependencies ===" -ForegroundColor Cyan
 Write-Host ""
 
 # --- Resolve target lib directory ---

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Parse nelson_debug.log and compute T1/T2 timing for tool-calling rounds.
+Parse libremcp_debug.log and compute T1/T2 timing for tool-calling rounds.
 
 T1 = time from "Tool loop round N: sending" to stream end
      (one round's API time: connection + model streaming).
@@ -9,9 +9,9 @@ T2 = time from stream end to "Tool loop round N+1: sending"
      (our work: drain, execute tools, start next worker).
 
 Usage:
-  python scripts/analyze_tool_call_timing.py [path/to/nelson_debug.log]
-  If no path given, tries ~/.config/libreoffice/4/user/nelson_debug.log
-  and ~/nelson_debug.log.
+  python scripts/analyze_tool_call_timing.py [path/to/libremcp_debug.log]
+  If no path given, tries ~/.config/libreoffice/4/user/libremcp_debug.log
+  and ~/libremcp_debug.log.
 """
 
 import re
@@ -40,11 +40,23 @@ def parse_timestamp(s):
 def find_log_path():
     """Default log locations (extension writes to user config, sometimes under config/)."""
     candidates = [
-        Path.home() / ".config" / "libreoffice" / "4" / "user" / "config" / "nelson_debug.log",
-        Path.home() / ".config" / "libreoffice" / "4" / "user" / "nelson_debug.log",
-        Path.home() / ".config" / "libreoffice" / "24" / "user" / "config" / "nelson_debug.log",
-        Path.home() / ".config" / "libreoffice" / "24" / "user" / "nelson_debug.log",
-        Path.home() / "nelson_debug.log",
+        Path.home()
+        / ".config"
+        / "libreoffice"
+        / "4"
+        / "user"
+        / "config"
+        / "libremcp_debug.log",
+        Path.home() / ".config" / "libreoffice" / "4" / "user" / "libremcp_debug.log",
+        Path.home()
+        / ".config"
+        / "libreoffice"
+        / "24"
+        / "user"
+        / "config"
+        / "libremcp_debug.log",
+        Path.home() / ".config" / "libreoffice" / "24" / "user" / "libremcp_debug.log",
+        Path.home() / "libremcp_debug.log",
     ]
     for p in candidates:
         if p.exists():
@@ -56,7 +68,10 @@ def analyze(log_path):
     path = Path(log_path)
     if not path.exists():
         print("Log file not found: %s" % path, file=sys.stderr)
-        print("Reproduce the delay (Calc Chat, 2+ tool rounds), then run this script.", file=sys.stderr)
+        print(
+            "Reproduce the delay (Calc Chat, 2+ tool rounds), then run this script.",
+            file=sys.stderr,
+        )
         return 1
 
     events = []  # (timestamp, 'send', round_index) or (timestamp, 'done', None)
@@ -74,7 +89,10 @@ def analyze(log_path):
                 r = re.search(r"Tool loop round (\d+)", rest)
                 if r:
                     events.append((t, "send", int(r.group(1))))
-            if "streaming_loop: [DONE] received" in rest or "stream_request_with_tools: stream ended" in rest:
+            if (
+                "streaming_loop: [DONE] received" in rest
+                or "stream_request_with_tools: stream ended" in rest
+            ):
                 events.append((t, "done", None))
             if "[Chat] Tool call:" in rest:
                 events.append((t, "done", None))
@@ -83,8 +101,13 @@ def analyze(log_path):
 
     sends = [(t, r) for t, typ, r in events if typ == "send"]
     if not sends:
-        print("No 'Tool loop round N: sending ... to API' lines found in %s" % path, file=sys.stderr)
-        print("Reproduce with Calc Chat (tool-calling), then run again.", file=sys.stderr)
+        print(
+            "No 'Tool loop round N: sending ... to API' lines found in %s" % path,
+            file=sys.stderr,
+        )
+        print(
+            "Reproduce with Calc Chat (tool-calling), then run again.", file=sys.stderr
+        )
         return 1
 
     print("Tool-calling timing analysis: %s" % path)
@@ -97,11 +120,16 @@ def analyze(log_path):
         while j < len(done_times) and done_times[j] < send_t:
             j += 1
         if j >= len(done_times):
-            print("Round %d: send at %.3f -> no stream end found after it" % (r, send_t))
+            print(
+                "Round %d: send at %.3f -> no stream end found after it" % (r, send_t)
+            )
             break
         done_t = done_times[j]
         t1 = done_t - send_t
-        print("Round %d: send at %.3f -> stream end at %.3f  =>  T1 = %.2f s (API/stream)" % (r, send_t, done_t, t1))
+        print(
+            "Round %d: send at %.3f -> stream end at %.3f  =>  T1 = %.2f s (API/stream)"
+            % (r, send_t, done_t, t1)
+        )
         j += 1
         if i + 1 < len(sends):
             next_send_t = sends[i + 1][0]
@@ -109,10 +137,15 @@ def analyze(log_path):
             note = ""
             if t2 < 0 or t2 > 60:
                 note = "  (likely different session - ignore)"
-            print("        stream end -> next round send at %.3f  =>  T2 = %.2f s (our code)%s" % (next_send_t, t2, note))
+            print(
+                "        stream end -> next round send at %.3f  =>  T2 = %.2f s (our code)%s"
+                % (next_send_t, t2, note)
+            )
         print()
 
-    print("Interpretation: If T1 is large (e.g. 5-25s), delay is model/network. T2 should be <1s; if negative or huge, events are from different sessions.")
+    print(
+        "Interpretation: If T1 is large (e.g. 5-25s), delay is model/network. T2 should be <1s; if negative or huge, events are from different sessions."
+    )
     return 0
 
 

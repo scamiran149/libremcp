@@ -2,19 +2,19 @@
 
 ## Where we are
 
-Nelson MCP v0.7 exposes 148 tools via MCP to cloud AI agents (Claude, ChatGPT, Gemini). It works well with large models that can handle many tools, but smaller local models (7B–14B) get confused by the tool count and protocol complexity. Custom endpoints help (static filtered subsets), but don't solve the underlying problem: small models need guidance, not just fewer options.
+LibreMCP v0.7 exposes ~115 tools via MCP to cloud AI agents (Claude, ChatGPT, Gemini). It works well with large models that can handle many tools, but smaller local models (7B–14B) get confused by the tool count and protocol complexity. Custom endpoints help (static filtered subsets), but don't solve the underlying problem: small models need guidance, not just fewer options.
 
 ## Where we're going
 
 **The mission: make small local models (7B–14B) as productive as GPT-4 or Claude on document tasks.**
 
-A 70B cloud model can browse 148 tools and figure out the right sequence. A 7B local model can't — it needs to be guided step by step, with fewer choices at each point and clear suggestions for what to do next. Nelson should bridge that gap: not by dumbing down the tools, but by being smarter about how it presents them.
+A 70B cloud model can browse 115 tools and figure out the right sequence. A 7B local model can't — it needs to be guided step by step, with fewer choices at each point and clear suggestions for what to do next. LibreMCP should bridge that gap: not by dumbing down the tools, but by being smarter about how it presents them.
 
 ---
 
 ## v0.8 — Make small models productive
 
-The core problem: a 7B model can't reliably pick from 25 tools, compose locators, and chain multi-step workflows. Nelson should do that work for it.
+The core problem: a 7B model can't reliably pick from 25 tools, compose locators, and chain multi-step workflows. LibreMCP should do that work for it.
 
 ### Simple REST API (`/api/do`)
 
@@ -30,7 +30,7 @@ POST /api/do
 }
 ```
 
-Nelson resolves "Introduction" internally (heading lookup → bookmark → paragraph index → `insert_at_paragraph`). The model never sees paragraph indices, bookmarks, or locators. ~15 structured actions instead of 148 low-level tools.
+LibreMCP resolves "Introduction" internally (heading lookup → bookmark → paragraph index → `insert_at_paragraph`). The model never sees paragraph indices, bookmarks, or locators. ~15 structured actions instead of 115 low-level tools.
 
 ### Tool broker (progressive disclosure)
 
@@ -51,14 +51,12 @@ Bring back the two-tier tool delivery, adapted for MCP:
 
 ### Pre-trained baseline rules
 
-Nelson ships with a `rules.json` generated from reference sessions — not hand-written heuristics. During development, we run scripted scenarios (open document, navigate, edit, save; create spreadsheet, fill data, chart; etc.) against the tool suite, collect the traces, and mine them with PrefixSpan + Markov analysis.
+LibreMCP ships with a `rules.json` generated from reference sessions — not hand-written heuristics. During development, we run scripted scenarios (open document, navigate, edit, save; create spreadsheet, fill data, chart; etc.) against the tool suite, collect the traces, and mine them with PrefixSpan + Markov analysis.
 
-The result: on first install, Nelson already knows the common workflows and suggests relevant `_next` actions. No user training needed, no "cold start" problem.
+The result: on first install, LibreMCP already knows the common workflows and suggests relevant `_next` actions. No user training needed, no "cold start" problem.
 
-```
 Dev time: scripted scenarios → traces → PrefixSpan/Markov → rules.json → shipped in .oxt
 Runtime:  rules.json loaded at boot → _next suggestions from day one
-```
 
 The baseline covers generic patterns (Writer editing, Calc data entry, document lifecycle). As the user works, their own traces accumulate and refine the suggestions over time (see v0.9).
 
@@ -70,17 +68,17 @@ Each endpoint gets its own rule partition. The "writer-edit" endpoint learns Wri
 
 ```
 rules.json:
-  _default:       generic patterns (148 tools, broad)
+  _default:       generic patterns (115 tools, broad)
   writer-edit:    Writer editing patterns (25 tools, focused)
   calc:           spreadsheet patterns (13 tools, focused)
   my-custom:      user's custom endpoint (10 tools, very precise)
 ```
 
-Smaller tool sets = faster convergence = better suggestions. This is why custom endpoints + learned rules work so well together: the user constrains the tool set, Nelson learns the optimal paths within it.
+Smaller tool sets = faster convergence = better suggestions. This is why custom endpoints + learned rules work so well together: the user constrains the tool set, LibreMCP learns the optimal paths within it.
 
 ### Session trace collection
 
-Nelson logs every tool call to a local SQLite database:
+LibreMCP logs every tool call to a local SQLite database:
 
 ```sql
 session_traces (session_id, seq, tool_name, doc_type, success, prev_tool, endpoint, ts)
@@ -199,13 +197,13 @@ Both MCP and `/api/do` return `_next` after every action, powered by the learned
 }
 ```
 
-Large cloud models can ignore `_next`. Small local models follow it like breadcrumbs — at each step, Nelson tells them exactly what makes sense next. A 7B model doesn't need to understand 148 tools if Nelson says "you just read a heading, here are the 3 things you can do now."
+Large cloud models can ignore `_next`. Small local models follow it like breadcrumbs — at each step, LibreMCP tells them exactly what makes sense next. A 7B model doesn't need to understand 115 tools if LibreMCP says "you just read a heading, here are the 3 things you can do now."
 
 The effect: a small model guided by `_next` behaves like a much larger model that figured out the workflow on its own.
 
 ### System prompt enrichment
 
-Nelson injects the most reliable workflow patterns into the MCP `instructions` field at initialize time, tailored to the active document type and endpoint. Instead of a generic "here are tools", the agent starts with: "to edit a section, do X→Y→Z. To insert an image, do A→B." Learned from real sessions, not hardcoded.
+LibreMCP injects the most reliable workflow patterns into the MCP `instructions` field at initialize time, tailored to the active document type and endpoint. Instead of a generic "here are tools", the agent starts with: "to edit a section, do X→Y→Z. To insert an image, do A→B." Learned from real sessions, not hardcoded.
 
 ---
 
@@ -222,7 +220,7 @@ Nelson injects the most reliable workflow patterns into the MCP `instructions` f
 
 - **LibreOffice Extensions site** — publish on the official marketplace
 - **Linux packages** — .deb/.rpm for distro repos
-- **One-click installer** — bundled LibreOffice + Nelson for non-technical users
+- **One-click installer** — bundled LibreOffice + LibreMCP for non-technical users
 
 ### Protocol
 

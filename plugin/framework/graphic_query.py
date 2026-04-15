@@ -11,7 +11,7 @@ Calc/Draw/Impress iterate DrawPage shapes filtering GraphicObjectShape.
 
 import logging
 
-log = logging.getLogger("nelson.graphic_query")
+log = logging.getLogger("libremcp.graphic_query")
 
 _GRAPHIC_SERVICE = "com.sun.star.drawing.GraphicObjectShape"
 

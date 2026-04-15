@@ -18,15 +18,21 @@ import threading
 import time
 import uuid
 
-log = logging.getLogger("nelson.jobs")
+log = logging.getLogger("libremcp.jobs")
 
 
 class Job:
     """A single background job."""
 
     __slots__ = (
-        "job_id", "status", "kind", "params",
-        "result", "error", "created_at", "finished_at",
+        "job_id",
+        "status",
+        "kind",
+        "params",
+        "result",
+        "error",
+        "created_at",
+        "finished_at",
     )
 
     def __init__(self, kind="", params=None):
@@ -64,7 +70,7 @@ class JobManager:
     """
 
     def __init__(self, max_jobs=50):
-        self._jobs = {}          # job_id -> Job
+        self._jobs = {}  # job_id -> Job
         self._lock = threading.Lock()
         self._max_jobs = max_jobs
 
@@ -86,8 +92,10 @@ class JobManager:
             self._jobs[job.job_id] = job
 
         t = threading.Thread(
-            target=self._run, args=(job, fn, kwargs),
-            daemon=True, name="nelson-job-%s" % job.job_id,
+            target=self._run,
+            args=(job, fn, kwargs),
+            daemon=True,
+            name="libremcp-job-%s" % job.job_id,
         )
         t.start()
         log.info("Job %s submitted: kind=%s", job.job_id, kind)
@@ -167,7 +175,8 @@ class JobManager:
             if self._queue_thread is None or not self._queue_thread.is_alive():
                 self._queue_thread = threading.Thread(
                     target=self._drain_queue,
-                    daemon=True, name="nelson-job-queue",
+                    daemon=True,
+                    name="libremcp-job-queue",
                 )
                 self._queue_thread.start()
         log.info("Job %s enqueued: kind=%s", job.job_id, kind)

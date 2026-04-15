@@ -1,10 +1,10 @@
 # Connect ChatGPT to LibreOffice via Tailscale
 
-This guide explains how to expose your Nelson MCP server to the internet using Tailscale Funnel, so that ChatGPT (or any remote MCP client) can control your LibreOffice documents.
+This guide explains how to expose your LibreMCP server to the internet using Tailscale Funnel, so that ChatGPT (or any remote MCP client) can control your LibreOffice documents.
 
 ## Prerequisites
 
-- Nelson MCP installed in LibreOffice
+- LibreMCP installed in LibreOffice
 - A Tailscale account (free tier works)
 
 ## Step 1 — Install Tailscale
@@ -23,9 +23,9 @@ Enable Funnel (allows public HTTPS access to your machine):
 tailscale funnel on
 ```
 
-## Step 2 — Configure Nelson MCP
+## Step 2 — Configure LibreMCP
 
-Open **Tools > Options > Nelson MCP**.
+Open **Tools > Options > LibreMCP**.
 
 ### HTTP Server
 
@@ -53,9 +53,9 @@ Go to the **MCP** page:
 
 ## Step 3 — Start the tunnel
 
-From the menu: **Tools > Nelson MCP > Tunnel > Start Tunnel**
+From the menu: **Tools > LibreMCP > Tunnel > Start Tunnel**
 
-The status bar will show the tunnel URL once connected. You can also check it via **Tools > Nelson MCP > Tunnel > Tunnel Status**.
+The status bar will show the tunnel URL once connected. You can also check it via **Tools > LibreMCP > Tunnel > Tunnel Status**.
 
 The URL looks like: `https://your-machine.tail1234.ts.net`
 
@@ -78,7 +78,7 @@ If it returns document names, the connection is working.
 
 ## Custom Endpoints
 
-If you want to expose only a subset of tools (recommended for ChatGPT which has a limited tool window), create a custom endpoint in **Options > Nelson MCP > MCP**:
+If you want to expose only a subset of tools (recommended for ChatGPT which has a limited tool window), create a custom endpoint in **Options > LibreMCP > MCP**:
 
 1. Click **Add** in Custom Endpoints
 2. Give it a name (e.g. "chatgpt")

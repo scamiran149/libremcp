@@ -32,7 +32,6 @@ ALWAYS_INCLUDE_EXTENSION = [
     "extension/META-INF/",
     "extension/Jobs.xcu",
     "extension/ProtocolHandler.xcu",
-    "extension/XPromptFunction.rdb",
     "extension/registration/",
     "extension/registry/",
     "extension/dialogs/",
@@ -45,13 +44,13 @@ ALWAYS_INCLUDE_PLUGIN = [
     "plugin/main.py",
     "plugin/options_handler.py",
     "plugin/version.py",
-    "plugin/prompt_function.py",
     "plugin/_manifest.py",
     "plugin/_layout.py",
     "plugin/plugin.yaml",
     "plugin/framework/",
     "plugin/lib/",
 ]
+
 
 # Auto-discover all top-level module directories
 def _discover_modules(base_dir):
@@ -60,10 +59,11 @@ def _discover_modules(base_dir):
     if not os.path.isdir(modules_dir):
         return []
     return sorted(
-        d for d in os.listdir(modules_dir)
-        if os.path.isdir(os.path.join(modules_dir, d))
-        and not d.startswith(("_", "."))
+        d
+        for d in os.listdir(modules_dir)
+        if os.path.isdir(os.path.join(modules_dir, d)) and not d.startswith(("_", "."))
     )
+
 
 EXCLUDE_PATTERNS = (
     ".git",
@@ -122,11 +122,11 @@ def remap_path(f):
     """Convert a project-relative path to its .oxt archive path."""
     f = f.replace(os.sep, "/")
     if f.startswith("extension/"):
-        return f[len("extension/"):]
+        return f[len("extension/") :]
     if f.startswith("build/generated/"):
-        return f[len("build/generated/"):]
+        return f[len("build/generated/") :]
     if f.startswith("build/help/html/"):
-        return "help/" + f[len("build/help/html/"):]
+        return "help/" + f[len("build/help/html/") :]
     return f
 
 
@@ -147,8 +147,10 @@ def assemble_bundle(base_dir, modules):
         if os.path.isdir(mod_path):
             include.append(mod_dir)
         else:
-            print("  WARNING: module '%s' not found at %s" % (mod, mod_dir),
-                  file=sys.stderr)
+            print(
+                "  WARNING: module '%s' not found at %s" % (mod, mod_dir),
+                file=sys.stderr,
+            )
 
     include.extend(GENERATED_INCLUDES)
     files = collect_files(base_dir, include)
@@ -180,8 +182,10 @@ def assemble_bundle(base_dir, modules):
         os.makedirs(dst_dir, exist_ok=True)
         shutil.copy2(sqlite3_src, os.path.join(dst_dir, "sqlite3.dll"))
         count += 1
-        print("Bundled sqlite3.dll (%.1f MB) into plugin/lib/sqlite3/"
-              % (os.path.getsize(sqlite3_src) / 1024 / 1024))
+        print(
+            "Bundled sqlite3.dll (%.1f MB) into plugin/lib/sqlite3/"
+            % (os.path.getsize(sqlite3_src) / 1024 / 1024)
+        )
 
     # Copy vendored pip packages into plugin/lib/ inside the bundle
     vendor_dir = os.path.join(base_dir, "vendor")
@@ -210,6 +214,7 @@ def assemble_bundle(base_dir, modules):
     # Generate build ID (timestamp + short hash of assembled files)
     import hashlib
     import datetime
+
     h = hashlib.md5()
     for root, dirs, files in os.walk(bundle_path):
         for fn in sorted(files):
@@ -223,8 +228,10 @@ def assemble_bundle(base_dir, modules):
         f.write('BUILD_ID = "%s-%s"\n' % (build_ts, build_hash))
     count += 1
 
-    print("Assembled %d files in %s (build %s-%s)" % (
-        count, BUNDLE_DIR, build_ts, build_hash))
+    print(
+        "Assembled %d files in %s (build %s-%s)"
+        % (count, BUNDLE_DIR, build_ts, build_hash)
+    )
     return count
 
 
@@ -232,8 +239,10 @@ def zip_bundle(base_dir, output):
     """Zip build/bundle/ into the .oxt."""
     bundle_path = os.path.join(base_dir, BUNDLE_DIR)
     if not os.path.isdir(bundle_path):
-        print("ERROR: %s not found. Run without --repack first." % BUNDLE_DIR,
-              file=sys.stderr)
+        print(
+            "ERROR: %s not found. Run without --repack first." % BUNDLE_DIR,
+            file=sys.stderr,
+        )
         return 1
 
     output_path = os.path.join(base_dir, output)
@@ -275,19 +284,28 @@ def _is_up_to_date(project_root, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build Nelson MCP .oxt extension")
+    parser = argparse.ArgumentParser(description="Build LibreMCP .oxt extension")
     parser.add_argument(
-        "--modules", nargs="+", default=None,
-        help="Modules to include (default: auto-discover all)")
+        "--modules",
+        nargs="+",
+        default=None,
+        help="Modules to include (default: auto-discover all)",
+    )
     parser.add_argument(
-        "--output", default="build/nelson.oxt",
-        help="Output file (default: build/nelson.oxt)")
+        "--output",
+        default="build/libremcp.oxt",
+        help="Output file (default: build/libremcp.oxt)",
+    )
     parser.add_argument(
-        "--repack", action="store_true",
-        help="Only re-zip build/bundle/ (skip assembly)")
+        "--repack",
+        action="store_true",
+        help="Only re-zip build/bundle/ (skip assembly)",
+    )
     parser.add_argument(
-        "--check", action="store_true",
-        help="Skip build if .oxt is newer than all sources")
+        "--check",
+        action="store_true",
+        help="Skip build if .oxt is newer than all sources",
+    )
     args = parser.parse_args()
 
     if args.check and os.path.isfile(args.output):

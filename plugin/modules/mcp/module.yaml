@@ -1,69 +1,74 @@
 name: mcp
 title: MCP protocol endpoint
-requires: [document, config, events, http_routes]
+provides_services: [http_routes]
+requires: [document, config, events]
+
+actions:
+  toggle_server:
+    title: "Toggle MCP Server"
+    icon: running
+  server_status:
+    title: "Server Status"
+    icon: stopped
+
+menus:
+  - title: "MCP Server"
+    context: [writer, calc, draw]
+    submenu:
+      - action: toggle_server
+      - action: server_status
+
+config_inline: mcp
 
 config:
   enabled:
     type: boolean
     default: true
     widget: checkbox
-    label: Enable MCP Protocol
+    label: Enable MCP Server
     public: true
-  preset:
+
+  port:
+    type: int
+    default: 9876
+    min: 1024
+    max: 65535
+    widget: number
+    label: Server Port
+    public: true
+
+  host:
     type: string
-    default: "minimal"
-    widget: select
-    label: Preset
-    helper: "Select a preset then click 'Create Endpoint' to add a pre-filled instance."
-    options:
-      - value: minimal
-        label: "Minimal (8 core tools)"
-      - value: writer-edit
-        label: "Writer Edit (25 tools)"
-      - value: writer-read
-        label: "Writer Read-only (15 tools)"
-      - value: calc
-        label: "Calc (20 tools)"
-      - value: gallery
-        label: "Image Gallery (10 tools)"
-  create_preset:
-    widget: button
-    label: Create Endpoint
-    helper: "Creates a custom endpoint from the selected preset. Reopen Options to see it."
-    action: "plugin.modules.mcp:on_create_preset"
-  tool_reference:
-    widget: button
-    label: Tool Reference
-    helper: "Opens a web page listing all available tools with descriptions and parameters."
-    action: "plugin.modules.mcp:on_tool_reference"
-  custom_endpoints:
+    default: localhost
+    widget: text
+    label: Bind Address
+    public: true
+
+  use_ssl:
+    type: boolean
+    default: false
+    widget: checkbox
+    label: Enable HTTPS
+    public: true
+
+  ssl_cert:
     type: string
-    default: "[]"
-    widget: list_detail
-    inline: true
-    label: Custom MCP Endpoints
-    helper: "Create filtered MCP endpoints that expose only selected tools. Useful for smaller LLMs."
-    name_field: name
-    item_fields:
-      name:
-        type: string
-        label: Name
-        widget: text
-        default: ""
-      path:
-        type: string
-        label: URL Path
-        widget: text
-        default: "/mcp/custom"
-        helper: "Endpoint path (e.g. /mcp/writer). Must start with /mcp/"
-      enabled:
-        type: boolean
-        label: Enabled
-        widget: checkbox
-        default: true
-      tools:
-        type: string
-        label: Tools (one per line)
-        widget: textarea
-        default: ""
-        helper: "Tool names, one per line. Lines starting with # are ignored. Use a preset to pre-fill."
+    default: ""
+    widget: file
+    label: SSL Certificate
+    file_filter: "PEM files (*.pem)|*.pem|All files (*.*)|*.*"
+
+  ssl_key:
+    type: string
+    default: ""
+    widget: file
+    label: SSL Private Key
+    file_filter: "PEM files (*.pem)|*.pem|All files (*.*)|*.*"
+
+  enable_config_api:
+    type: boolean
+    default: false
+    widget: checkbox
+    label: Enable Config API
+    helper: "Expose config read/write via HTTP."
+    public: true

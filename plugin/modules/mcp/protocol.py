@@ -17,7 +17,7 @@ import uuid
 
 from plugin.framework.main_thread import execute_on_main_thread
 
-log = logging.getLogger("nelson.mcp.protocol")
+log = logging.getLogger("libremcp.mcp.protocol")
 
 # MCP protocol version we advertise
 MCP_PROTOCOL_VERSION = "2025-11-25"
@@ -81,6 +81,7 @@ class MCPProtocolHandler:
         self.version = "unknown"
         try:
             from plugin.version import EXTENSION_VERSION
+
             self.version = EXTENSION_VERSION
         except ImportError:
             pass
@@ -98,8 +99,9 @@ class MCPProtocolHandler:
         """GET /mcp — SSE notification stream (keepalive)."""
         accept = handler.headers.get("Accept", "")
         if "text/event-stream" not in accept:
-            self._send_json(handler, 406, {
-                "error": "Not Acceptable: must Accept text/event-stream"})
+            self._send_json(
+                handler, 406, {"error": "Not Acceptable: must Accept text/event-stream"}
+            )
             return
         handler.send_response(200)
         handler.send_header("Content-Type", "text/event-stream")
@@ -120,50 +122,6 @@ class MCPProtocolHandler:
         self._send_cors_headers(handler)
         handler.end_headers()
 
-    def handle_sse_stream(self, handler):
-        """GET /sse — legacy SSE transport (keepalive only)."""
-        try:
-            handler.send_response(200)
-            handler.send_header("Content-Type", "text/event-stream")
-            handler.send_header("Cache-Control", "no-cache")
-            handler.send_header("Connection", "keep-alive")
-            handler.send_header("X-Accel-Buffering", "no")
-            self._send_cors_headers(handler)
-            handler.end_headers()
-            log.info("[SSE] GET stream opened")
-            while True:
-                handler.wfile.write(b": keepalive\n\n")
-                handler.wfile.flush()
-                time.sleep(15)
-        except (BrokenPipeError, ConnectionResetError, OSError):
-            log.info("[SSE] GET stream disconnected")
-
-    def handle_sse_post(self, handler):
-        """POST /sse or /messages — streamable HTTP (same as /mcp)."""
-        body = self._read_body(handler)
-        if body is None:
-            return
-        msg = body
-        method = msg.get("method", "?") if isinstance(msg, dict) else "batch"
-        req_id = msg.get("id") if isinstance(msg, dict) else None
-        log.info("[SSE] POST <<< %s (id=%s)", method, req_id)
-
-        result = self._process_jsonrpc(msg)
-        if result is None:
-            handler.send_response(202)
-            self._send_cors_headers(handler)
-            handler.end_headers()
-            return
-
-        status, response = result
-        handler.send_response(status)
-        self._send_cors_headers(handler)
-        handler.send_header("Content-Type", "application/json")
-        handler.end_headers()
-        out = json.dumps(response, ensure_ascii=False, default=str)
-        log.info("[SSE] POST >>> %s (id=%s) -> %d", method, req_id, status)
-        handler.wfile.write(out.encode("utf-8"))
-
     # ── MCP protocol handler ─────────────────────────────────────────
 
     def _handle_mcp(self, msg, handler):
@@ -174,27 +132,31 @@ class MCPProtocolHandler:
         req_id = msg.get("id") if isinstance(msg, dict) else None
         log.info("[MCP] <<< %s (id=%s)", method, req_id)
 
-        is_initialize = (isinstance(msg, dict)
-                         and msg.get("method") == "initialize")
+        is_initialize = isinstance(msg, dict) and msg.get("method") == "initialize"
 
         # Validate incoming session ID (MCP spec: reject stale sessions)
         client_session = handler.headers.get("Mcp-Session-Id")
-        if (client_session
-                and client_session != _mcp_session_id
-                and not is_initialize):
-            log.warning("[MCP] Stale session ID: client=%s server=%s",
-                        client_session, _mcp_session_id)
-            self._send_json(handler, 409, {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {
-                    "code": -32000,
-                    "message": (
-                        "Session expired (server restarted). "
-                        "Please re-initialize the MCP connection."
-                    ),
+        if client_session and client_session != _mcp_session_id and not is_initialize:
+            log.warning(
+                "[MCP] Stale session ID: client=%s server=%s",
+                client_session,
+                _mcp_session_id,
+            )
+            self._send_json(
+                handler,
+                409,
+                {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -32000,
+                        "message": (
+                            "Session expired (server restarted). "
+                            "Please re-initialize the MCP connection."
+                        ),
+                    },
                 },
-            })
+            )
             return
 
         # Batch request
@@ -211,9 +173,11 @@ class MCPProtocolHandler:
                 handler.send_header("Content-Type", "application/json")
                 handler.send_header("Mcp-Session-Id", _mcp_session_id)
                 handler.end_headers()
-                handler.wfile.write(json.dumps(
-                    responses, ensure_ascii=False, default=str
-                ).encode("utf-8"))
+                handler.wfile.write(
+                    json.dumps(responses, ensure_ascii=False, default=str).encode(
+                        "utf-8"
+                    )
+                )
             else:
                 handler.send_response(202)
                 self._send_cors_headers(handler)
@@ -258,11 +222,11 @@ class MCPProtocolHandler:
                 "prompts": {"listChanged": False},
             },
             "serverInfo": {
-                "name": "Nelson MCP",
+                "name": "LibreMCP",
                 "version": self.version,
             },
             "instructions": (
-                "Nelson MCP — AI document workspace. "
+                "LibreMCP — AI document workspace. "
                 "WORKFLOW: 1) Use tools to interact with LibreOffice documents. "
                 "2) Tools are filtered by document type (writer/calc/draw). "
                 "3) All UNO operations run on the main thread for thread safety."
@@ -291,8 +255,7 @@ class MCPProtocolHandler:
         if not tool_name:
             raise ValueError("Missing 'name' in tools/call params")
         if self.tool_filter and tool_name not in self.tool_filter:
-            raise ValueError(
-                "Tool '%s' not available on this endpoint" % tool_name)
+            raise ValueError("Tool '%s' not available on this endpoint" % tool_name)
 
         if self.event_bus:
             self.event_bus.emit("mcp:request", tool=tool_name, args=arguments)
@@ -301,17 +264,14 @@ class MCPProtocolHandler:
 
         if self.event_bus:
             snippet = str(result)[:100] if result else ""
-            self.event_bus.emit("mcp:result", tool=tool_name,
-                                result_snippet=snippet)
+            self.event_bus.emit("mcp:result", tool=tool_name, result_snippet=snippet)
 
-        is_error = (isinstance(result, dict)
-                    and result.get("status") == "error")
+        is_error = isinstance(result, dict) and result.get("status") == "error"
         return {
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(result, ensure_ascii=False,
-                                       default=str),
+                    "text": json.dumps(result, ensure_ascii=False, default=str),
                 }
             ],
             "isError": is_error,
@@ -325,8 +285,10 @@ class MCPProtocolHandler:
         Returns (http_status, response_dict) or None for notifications.
         """
         if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0":
-            return (400, _jsonrpc_error(
-                None, _INVALID_REQUEST, "Invalid JSON-RPC 2.0 request"))
+            return (
+                400,
+                _jsonrpc_error(None, _INVALID_REQUEST, "Invalid JSON-RPC 2.0 request"),
+            )
 
         method = msg.get("method", "")
         params = msg.get("params", {})
@@ -336,41 +298,68 @@ class MCPProtocolHandler:
             return None
 
         handler = {
-            "initialize":      self._mcp_initialize,
-            "ping":            self._mcp_ping,
-            "tools/list":      self._mcp_tools_list,
-            "tools/call":      self._mcp_tools_call,
-            "resources/list":  self._mcp_resources_list,
-            "prompts/list":    self._mcp_prompts_list,
+            "initialize": self._mcp_initialize,
+            "ping": self._mcp_ping,
+            "tools/list": self._mcp_tools_list,
+            "tools/call": self._mcp_tools_call,
+            "resources/list": self._mcp_resources_list,
+            "prompts/list": self._mcp_prompts_list,
         }.get(method)
 
         if handler is None:
-            return (400, _jsonrpc_error(
-                req_id, _METHOD_NOT_FOUND,
-                "Unknown method: %s" % method))
+            return (
+                400,
+                _jsonrpc_error(
+                    req_id, _METHOD_NOT_FOUND, "Unknown method: %s" % method
+                ),
+            )
 
         try:
             result = handler(params)
             return (200, _jsonrpc_ok(req_id, result))
         except BusyError as e:
             log.warning("MCP %s: busy (%s)", method, e)
-            return (429, _jsonrpc_error(
-                req_id, _SERVER_BUSY, str(e),
-                {"code": "server_busy", "retryable": True,
-                 "hint": "LibreOffice main thread is processing another "
-                         "request. Retry after a short delay."}))
+            return (
+                429,
+                _jsonrpc_error(
+                    req_id,
+                    _SERVER_BUSY,
+                    str(e),
+                    {
+                        "code": "server_busy",
+                        "retryable": True,
+                        "hint": "LibreOffice main thread is processing another "
+                        "request. Retry after a short delay.",
+                    },
+                ),
+            )
         except TimeoutError as e:
             log.error("MCP %s: timeout (%s)", method, e)
-            return (504, _jsonrpc_error(
-                req_id, _EXECUTION_TIMEOUT, str(e),
-                {"code": "execution_timeout", "retryable": True,
-                 "hint": "The tool took too long. LibreOffice may be "
-                         "blocked by a dialog or heavy operation."}))
+            return (
+                504,
+                _jsonrpc_error(
+                    req_id,
+                    _EXECUTION_TIMEOUT,
+                    str(e),
+                    {
+                        "code": "execution_timeout",
+                        "retryable": True,
+                        "hint": "The tool took too long. LibreOffice may be "
+                        "blocked by a dialog or heavy operation.",
+                    },
+                ),
+            )
         except Exception as e:
             log.error("MCP %s error: %s", method, e, exc_info=True)
-            return (500, _jsonrpc_error(
-                req_id, _INTERNAL_ERROR, str(e),
-                {"code": "internal_error", "retryable": False}))
+            return (
+                500,
+                _jsonrpc_error(
+                    req_id,
+                    _INTERNAL_ERROR,
+                    str(e),
+                    {"code": "internal_error", "retryable": False},
+                ),
+            )
 
     # ── Backpressure execution ───────────────────────────────────────
 
@@ -380,11 +369,15 @@ class MCPProtocolHandler:
         if not acquired:
             raise BusyError(
                 "LibreOffice is busy processing another tool call. "
-                "Please wait a moment and retry.")
+                "Please wait a moment and retry."
+            )
         try:
             return execute_on_main_thread(
-                self._execute_tool_on_main, tool_name, arguments,
-                timeout=_PROCESS_TIMEOUT)
+                self._execute_tool_on_main,
+                tool_name,
+                arguments,
+                timeout=_PROCESS_TIMEOUT,
+            )
         finally:
             _tool_semaphore.release()
 
@@ -433,6 +426,7 @@ class MCPProtocolHandler:
         ctx = None
         try:
             import uno
+
             ctx = uno.getComponentContext()
         except Exception:
             pass
@@ -468,9 +462,10 @@ class MCPProtocolHandler:
             doc_id = doc_svc.get_doc_id(doc)
             title = ""
             try:
-                title = (doc.getDocumentProperties().Title
-                         or doc.getCurrentController().getFrame()
-                         .getTitle())
+                title = (
+                    doc.getDocumentProperties().Title
+                    or doc.getCurrentController().getFrame().getTitle()
+                )
             except Exception:
                 pass
             result["_resolved"] = {
@@ -522,7 +517,7 @@ class MCPProtocolHandler:
         """Resolve a document URI to a UNO model.
 
         Supported formats:
-            id:<nelson_doc_id>       — by NelsonDocId property
+            id:<libremcp_doc_id>       — by LibreMCPDocId property
             path:<file_path>         — by file system path
             file:<file_url>          — by file:// URL
             title:<frame_title>      — by frame title (partial match)
@@ -557,23 +552,27 @@ class MCPProtocolHandler:
 
                 match = False
                 if scheme == "id":
-                    match = (doc_svc.get_doc_id(model) == value)
+                    match = doc_svc.get_doc_id(model) == value
                 elif scheme == "path":
                     try:
                         import uno as _uno
+
                         model_path = _uno.fileUrlToSystemPath(model.getURL())
-                        match = (model_path == value)
+                        match = model_path == value
                     except Exception:
                         pass
                 elif scheme == "file":
-                    match = (model.getURL() == value)
+                    match = model.getURL() == value
                 elif scheme == "title":
-                    match = (value.lower() in frame.getTitle().lower())
+                    match = value.lower() in frame.getTitle().lower()
 
                 if match:
                     frame.activate()
-                    log.debug("_resolve_document_uri: activated %s → %s",
-                              uri, frame.getTitle())
+                    log.debug(
+                        "_resolve_document_uri: activated %s → %s",
+                        uri,
+                        frame.getTitle(),
+                    )
                     return model
             except Exception:
                 continue
@@ -615,76 +614,6 @@ class MCPProtocolHandler:
         }
         self._send_json(handler, 200, data)
 
-    def handle_tool_reference(self, handler):
-        """GET /api/tools — HTML tool reference page."""
-        from plugin.framework.http_server import send_cors_headers
-        schemas = self.tool_registry.get_mcp_schemas()
-
-        html = ['<!DOCTYPE html><html><head>',
-                '<meta charset="utf-8">',
-                '<title>Nelson MCP — Tool Reference</title>',
-                '<style>',
-                'body{font-family:system-ui;margin:2em;max-width:900px}',
-                'h1{color:#333}h2{color:#555;border-bottom:1px solid #ddd;padding-bottom:4px}',
-                '.tool{margin:1em 0;padding:1em;background:#f8f8f8;border-radius:6px}',
-                '.tool h3{margin:0 0 .3em;font-size:1.1em}',
-                '.desc{color:#666;margin:.3em 0}',
-                '.params{margin:.5em 0 0;font-size:.9em}',
-                '.param{margin:.2em 0 .2em 1em}',
-                '.pname{font-weight:bold;color:#333}',
-                '.ptype{color:#888;font-size:.85em}',
-                '.required{color:#c44}',
-                'code{background:#eee;padding:1px 4px;border-radius:3px;font-size:.9em}',
-                '#search{width:100%;padding:8px;font-size:1em;margin:1em 0;border:1px solid #ccc;border-radius:4px}',
-                '</style></head><body>',
-                '<h1>Nelson MCP — Tool Reference</h1>',
-                '<p>%d tools available. Version %s.</p>' % (
-                    len(schemas), self.version),
-                '<input id="search" type="text" placeholder="Filter tools..." oninput="filter()">']
-
-        for s in sorted(schemas, key=lambda x: x["name"]):
-            name = s["name"]
-            desc = s.get("description", "")
-            props = s.get("inputSchema", {}).get("properties", {})
-            required = set(s.get("inputSchema", {}).get("required", []))
-
-            html.append('<div class="tool" data-name="%s">' % name)
-            html.append('<h3><code>%s</code></h3>' % name)
-            if desc:
-                html.append('<div class="desc">%s</div>' % desc)
-            if props:
-                html.append('<div class="params">')
-                for pname, pschema in props.items():
-                    if pname == "_document":
-                        continue
-                    ptype = pschema.get("type", "")
-                    pdesc = pschema.get("description", "")
-                    req = ' <span class="required">*</span>' if pname in required else ""
-                    enum = pschema.get("enum")
-                    enum_str = ""
-                    if enum:
-                        enum_str = " (%s)" % ", ".join(
-                            '<code>%s</code>' % e for e in enum)
-                    html.append(
-                        '<div class="param">'
-                        '<span class="pname">%s</span>%s '
-                        '<span class="ptype">%s</span>%s'
-                        '%s</div>' % (
-                            pname, req, ptype, enum_str,
-                            " — %s" % pdesc if pdesc else ""))
-                html.append('</div>')
-            html.append('</div>')
-
-        html.append('<script>function filter(){var q=document.getElementById("search").value.toLowerCase();document.querySelectorAll(".tool").forEach(function(t){t.style.display=t.textContent.toLowerCase().includes(q)?"":"none"})}</script>')
-        html.append('</body></html>')
-
-        body = "\n".join(html).encode("utf-8")
-        handler.send_response(200)
-        send_cors_headers(handler)
-        handler.send_header("Content-Type", "text/html; charset=utf-8")
-        handler.end_headers()
-        handler.wfile.write(body)
-
     # ── Helpers ───────────────────────────────────────────────────────
 
     def _detect_active_doc_type(self):
@@ -699,12 +628,15 @@ class MCPProtocolHandler:
 
     def _read_body(self, handler):
         from plugin.framework.http_server import read_json_body
+
         return read_json_body(handler)
 
     def _send_json(self, handler, status, data):
         from plugin.framework.http_server import send_json
+
         send_json(handler, status, data)
 
     def _send_cors_headers(self, handler):
         from plugin.framework.http_server import send_cors_headers
+
         send_cors_headers(handler)

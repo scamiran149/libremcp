@@ -13,8 +13,8 @@ app:
   env:
     # GDK_BACKEND: x11  # not needed for wayland input
     SAL_USE_VCLPLUGIN: gtk3
-    NELSON_SET_CONFIG: core.log_level=DEBUG,http.port=8767
-    NELSON_LOG_PATH: /home/david/dev/projects/quazardous/nelson-mcp/dev/lo-wbox/log/nelson.log
+    LIBREMCP_SET_CONFIG: core.log_level=DEBUG,http.port=8767
+    LIBREMCP_LOG_PATH: /home/david/dev/projects/scamiran149/libremcp/dev/lo-wbox/log/libremcp.log
     LO_PROFILE_DIR: /tmp/lo_dev_profile
     CAGE_PROFILE_DIR: /tmp/lo_dev_profile
   pre_launch:
@@ -22,14 +22,14 @@ app:
 tools:
   deploy:
     script: ./scripts/deploy.sh
-    description: Build and deploy the Nelson extension into LibreOffice
+    description: Build and deploy the LibreMCP extension into LibreOffice
     headless: true
   open_options:
     script: ./scripts/open_options.sh
     description: Open LibreOffice Options dialog (Alt+F12)
-  nelson_log:
-    script: ./scripts/tail_nelson_log.sh
-    description: Show the last N lines of the Nelson extension log
+  libremcp_log:
+    script: ./scripts/tail_libremcp_log.sh
+    description: Show the last N lines of the LibreMCP extension log
     headless: true
     schema:
       type: object

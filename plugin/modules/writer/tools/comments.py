@@ -10,7 +10,7 @@ import logging
 from plugin.framework.tool_base import ToolBase
 from plugin.modules.writer.ops import find_paragraph_for_range
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 class ListComments(ToolBase):
@@ -51,9 +51,7 @@ class ListComments(ToolBase):
 
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
 
             entry = _read_annotation(field, para_ranges, text_obj)
@@ -151,15 +149,17 @@ class AddComment(ToolBase):
                 if 0 <= para_index < len(para_ranges):
                     anchor_range = para_ranges[para_index].getStart()
                 else:
-                    return {"status": "error",
-                            "message": "Paragraph %d out of range." % para_index}
+                    return {
+                        "status": "error",
+                        "message": "Paragraph %d out of range." % para_index,
+                    }
         else:
-            return {"status": "error",
-                    "message": "Provide search_text, locator, or paragraph_index."}
+            return {
+                "status": "error",
+                "message": "Provide search_text, locator, or paragraph_index.",
+            }
 
-        annotation = doc.createInstance(
-            "com.sun.star.text.textfield.Annotation"
-        )
+        annotation = doc.createInstance("com.sun.star.text.textfield.Annotation")
         annotation.setPropertyValue("Author", author)
         annotation.setPropertyValue("Content", content)
         cursor = doc_text.createTextCursorByRange(anchor_range)
@@ -204,8 +204,7 @@ class DeleteComment(ToolBase):
         author = kwargs.get("author")
 
         if not comment_name and not author:
-            return {"status": "error",
-                    "message": "Provide comment_name or author."}
+            return {"status": "error", "message": "Provide comment_name or author."}
 
         doc = ctx.doc
         text_obj = doc.getText()
@@ -215,9 +214,7 @@ class DeleteComment(ToolBase):
         to_delete = []
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
             try:
                 name = field.getPropertyValue("Name")
@@ -226,8 +223,7 @@ class DeleteComment(ToolBase):
             except Exception:
                 continue
 
-            if comment_name and (name == comment_name
-                                 or parent == comment_name):
+            if comment_name and (name == comment_name or parent == comment_name):
                 to_delete.append(field)
             elif author and field_author == author:
                 to_delete.append(field)
@@ -287,9 +283,7 @@ class ResolveComment(ToolBase):
         target = None
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
             try:
                 name = field.getPropertyValue("Name")
@@ -306,9 +300,7 @@ class ResolveComment(ToolBase):
             }
 
         if resolution:
-            reply = doc.createInstance(
-                "com.sun.star.text.textfield.Annotation"
-            )
+            reply = doc.createInstance("com.sun.star.text.textfield.Annotation")
             reply.setPropertyValue("ParentName", comment_name)
             reply.setPropertyValue("Content", resolution)
             reply.setPropertyValue("Author", author)
@@ -368,9 +360,7 @@ class ScanTasks(ToolBase):
 
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
 
             try:
@@ -427,9 +417,7 @@ class GetWorkflowStatus(ToolBase):
 
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
             try:
                 author = field.getPropertyValue("Author")
@@ -489,9 +477,7 @@ class SetWorkflowStatus(ToolBase):
         existing = None
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
             try:
                 author = field.getPropertyValue("Author")
@@ -504,9 +490,7 @@ class SetWorkflowStatus(ToolBase):
         if existing is not None:
             existing.setPropertyValue("Content", content)
         else:
-            annotation = doc.createInstance(
-                "com.sun.star.text.textfield.Annotation"
-            )
+            annotation = doc.createInstance("com.sun.star.text.textfield.Annotation")
             annotation.setPropertyValue("Author", "MCP-WORKFLOW")
             annotation.setPropertyValue("Content", content)
             cursor = doc_text.createTextCursor()
@@ -539,9 +523,7 @@ class CheckStopConditions(ToolBase):
 
         while enum.hasMoreElements():
             field = enum.nextElement()
-            if not field.supportsService(
-                "com.sun.star.text.textfield.Annotation"
-            ):
+            if not field.supportsService("com.sun.star.text.textfield.Annotation"):
                 continue
 
             try:
@@ -561,10 +543,12 @@ class CheckStopConditions(ToolBase):
             if not resolved and content:
                 upper = content.strip().upper()
                 if upper.startswith("STOP") or upper.startswith("CANCEL"):
-                    stop_signals.append({
-                        "author": author,
-                        "content": content[:100],
-                    })
+                    stop_signals.append(
+                        {
+                            "author": author,
+                            "content": content[:100],
+                        }
+                    )
 
         should_stop = bool(stop_signals) or workflow_stop
         return {
@@ -579,6 +563,7 @@ class CheckStopConditions(ToolBase):
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _read_annotation(field, para_ranges, text_obj):
     """Extract annotation properties into a plain dict."""
@@ -602,7 +587,11 @@ def _read_annotation(field, para_ranges, text_obj):
     try:
         dt = field.getPropertyValue("DateTimeValue")
         entry["date"] = "%04d-%02d-%02d %02d:%02d" % (
-            dt.Year, dt.Month, dt.Day, dt.Hours, dt.Minutes
+            dt.Year,
+            dt.Month,
+            dt.Day,
+            dt.Hours,
+            dt.Minutes,
         )
     except Exception:
         entry["date"] = ""

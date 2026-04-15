@@ -50,7 +50,7 @@ make docker-build
 docker compose -f builder/docker-compose.yml up --build
 ```
 
-The built extension will be at `build/nelson.oxt`. This is the recommended approach for contributors who don't have the full dev stack installed.
+The built extension will be at `build/libremcp.oxt`. This is the recommended approach for contributors who don't have the full dev stack installed.
 
 To use Docker for **all** build targets (`deploy`, `install`, etc.):
 
@@ -69,9 +69,8 @@ make deploy   # now uses Docker automatically
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/quazardous/localwriter.git
-cd localwriter
-git checkout framework
+git clone https://github.com/scamiran149/libremcp.git
+cd libremcp
 
 # 2. Install dev dependencies (PyYAML, vendor libs, bash/make on Windows)
 ./install.sh              # Linux / macOS
@@ -120,24 +119,24 @@ Both do the same thing (build + unopkg remove/add), just with different levels o
 
 ## Config overrides
 
-Nelson config can be overridden at launch time via the `NELSON_SET_CONFIG` environment variable. This avoids changing persistent settings in LO's Options dialog.
+LibreMCP config can be overridden at launch time via the `LIBREMCP_SET_CONFIG` environment variable. This avoids changing persistent settings in LO's Options dialog.
 
 **Format:** `"key=value,key=value,..."` — values are auto-coerced to the type declared in the module schema (boolean, integer, string).
 
 ```bash
 # Via make (any target that starts LO)
-make deploy NELSON_SET_CONFIG="core.log_level=DEBUG"
-make lo-start NELSON_SET_CONFIG="mcp.port=9000,core.log_level=DEBUG"
+make deploy LIBREMCP_SET_CONFIG="core.log_level=DEBUG"
+make lo-start LIBREMCP_SET_CONFIG="mcp.port=9000,core.log_level=DEBUG"
 
 # Or via environment variable directly
-NELSON_SET_CONFIG="core.log_level=DEBUG" make lo-start
+LIBREMCP_SET_CONFIG="core.log_level=DEBUG" make lo-start
 ```
 
 ### Common overrides
 
 | Key | Values | Description |
 |-----|--------|-------------|
-| `core.log_level` | `DEBUG`, `INFO`, `WARN`, `ERROR` | Plugin log verbosity (default: `WARN`). Set to `DEBUG` for full diagnostics in `~/nelson.log`. |
+| `core.log_level` | `DEBUG`, `INFO`, `WARN`, `ERROR` | Plugin log verbosity (default: `WARN`). Set to `DEBUG` for full diagnostics in `~/libremcp.log`. |
 | `mcp.port` | integer | MCP server port (default: `2044`) |
 | `mcp.host` | string | MCP server bind address (default: `127.0.0.1`) |
 | `http.port` | integer | HTTP API port |
@@ -203,7 +202,7 @@ If the requested backend is not installed, LO silently falls back to the default
 1. Sidebar chat panel — all 6 controls visible, no overlap
 2. Resize sidebar — controls reflow correctly
 3. Settings panel — AI dropdowns render and respond to clicks
-4. Modal dialogs (Tools > Nelson MCP options) — layout is acceptable
+4. Modal dialogs (Tools > LibreMCP options) — layout is acceptable
 
 ## Dev MCP servers (Linux)
 
@@ -233,13 +232,13 @@ The project `.mcp.json` defines three MCP servers:
 
 | Server | Type | Purpose |
 |--------|------|---------|
-| `nelson` | HTTP `:8766` | Production Nelson extension (host LO) |
-| `nelson-dev` | HTTP `:8767` | Nelson extension inside the compositor LO |
+| `libremcp` | HTTP `:8766` | Production LibreMCP extension (host LO) |
+| `libremcp-dev` | HTTP `:8767` | LibreMCP extension inside the compositor LO |
 | `lo-dev` | stdio | Compositor automation (launch, screenshot, input, deploy) |
 
-`nelson` and `nelson-dev` are standard Nelson HTTP MCP endpoints — they expose the same document manipulation tools. The difference is which LO instance they connect to.
+`libremcp` and `libremcp-dev` are standard LibreMCP HTTP MCP endpoints — they expose the same document manipulation tools. The difference is which LO instance they connect to.
 
-`lo-dev` is the compositor control server. It manages the nested Wayland compositor and the isolated LO instance running inside it. The `nelson-dev` port (8767) must match the `nelson_port` in `dev/lo-dev-mcp/config.yaml` — `lo-dev` injects this port via `NELSON_SET_CONFIG` when launching the caged LO.
+`lo-dev` is the compositor control server. It manages the nested Wayland compositor and the isolated LO instance running inside it. The `libremcp-dev` port (8767) must match the `libremcp_port` in `dev/lo-dev-mcp/config.yaml` — `lo-dev` injects this port via `LIBREMCP_SET_CONFIG` when launching the caged LO.
 
 ### Compositor backends
 
@@ -259,7 +258,7 @@ app:
   doc_type: writer
   vcl_plugin: gtk3
   profile_dir: /tmp/lo_dev_profile
-  nelson_port: 8767
+  libremcp_port: 8767
 ```
 
 ### Autonomous dev with Claude Code
@@ -270,10 +269,10 @@ The `lo-dev` MCP gives Claude Code full control over an isolated LibreOffice ins
 
 **Workflow:**
 1. `lo-dev` > `launch` — starts a weston compositor window with LO inside
-2. `lo-dev` > `deploy` — builds Nelson `.oxt` and installs it into the caged LO
+2. `lo-dev` > `deploy` — builds LibreMCP `.oxt` and installs it into the caged LO
 3. `lo-dev` > `screenshot` — Claude sees the LO UI and can analyze it
 4. `lo-dev` > `click` / `key` / `type_text` — Claude interacts with LO (menus, dialogs, etc.)
-5. `nelson-dev` tools become available to test Nelson document manipulation on the caged instance
+5. `libremcp-dev` tools become available to test LibreMCP document manipulation on the caged instance
 6. `lo-dev` > `kill` — clean up when done
 
 Claude can iterate on code, redeploy, and visually verify the result in a loop — fully autonomous.
@@ -284,21 +283,21 @@ See `dev/README.md` for the full tool list and `mcp-test.py` CLI usage.
 
 | File | Content |
 |------|---------|
-| `~/nelson.log` | Plugin log — native/production LO (overwritten each session) |
+| `~/libremcp.log` | Plugin log — native/production LO (overwritten each session) |
 | `~/soffice-debug.log` | LO internal errors |
-| `dev/lo-dev-mcp/log/nelson.log` | Plugin log — **dev compositor** LO instance |
+| `dev/lo-dev-mcp/log/libremcp.log` | Plugin log — **dev compositor** LO instance |
 
-Symlinks exist in the project root for convenience (`./nelson.log`, `./soffice-debug.log`). Created by `scripts/check-setup.sh`.
+Symlinks exist in the project root for convenience (`./libremcp.log`, `./soffice-debug.log`). Created by `scripts/check-setup.sh`.
 
-> **Dev vs native logs:** When using the `lo-dev` MCP compositor, Nelson logs go to `dev/lo-dev-mcp/log/nelson.log` (not `~/nelson.log`). The `lo-dev` > `tail_log` tool reads from this path.
+> **Dev vs native logs:** When using the `lo-dev` MCP compositor, LibreMCP logs go to `dev/lo-dev-mcp/log/libremcp.log` (not `~/libremcp.log`). The `lo-dev` > `tail_log` tool reads from this path.
 
 **Enable verbose logging** for a session (default is `WARN`):
 
 ```bash
-make lo-start NELSON_SET_CONFIG="core.log_level=DEBUG"
+make lo-start LIBREMCP_SET_CONFIG="core.log_level=DEBUG"
 ```
 
-This logs tool discovery, frame enumeration, config reads, and all tool executions to `~/nelson.log`.
+This logs tool discovery, frame enumeration, config reads, and all tool executions to `~/libremcp.log`.
 
 ```bash
 make log          # Show plugin log
@@ -309,7 +308,7 @@ make lo-log       # Show LO error log
 **Empty log = extension not loaded.** Check:
 
 1. `make check-ext` — verify extension is registered
-2. LO sidebar: View > Sidebar > Nelson MCP panel
+2. LO sidebar: View > Sidebar > LibreMCP panel
 3. If crash on startup, try `make nuke-cache` then `make deploy`
 
 ## Cache management
@@ -330,7 +329,7 @@ make lo-log       # Show LO error log
 ```bash
 make build
 gh release create v1.x.y --target framework --title "v1.x.y" --notes "changelog"
-gh release upload v1.x.y build/nelson.oxt
+gh release upload v1.x.y build/libremcp.oxt
 ```
 
 ## Tests
@@ -356,9 +355,9 @@ make deploy
 
 ### Panel is empty / no sidebar
 
-1. Check `~/nelson.log` — if empty, extension didn't load
+1. Check `~/libremcp.log` — if empty, extension didn't load
 2. `make nuke-cache && make deploy`
-3. In LO: View > Sidebar, look for the Nelson MCP panel
+3. In LO: View > Sidebar, look for the LibreMCP panel
 
 ### LO crashes on second startup
 

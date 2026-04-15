@@ -9,7 +9,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 class SetTrackChanges(ToolBase):
@@ -79,8 +79,10 @@ class GetTrackedChanges(ToolBase):
             redline = enum.nextElement()
             entry = {}
             for prop in (
-                "RedlineType", "RedlineAuthor",
-                "RedlineComment", "RedlineIdentifier",
+                "RedlineType",
+                "RedlineAuthor",
+                "RedlineComment",
+                "RedlineIdentifier",
             ):
                 try:
                     entry[prop] = redline.getPropertyValue(prop)
@@ -89,7 +91,11 @@ class GetTrackedChanges(ToolBase):
             try:
                 dt = redline.getPropertyValue("RedlineDateTime")
                 entry["date"] = "%04d-%02d-%02d %02d:%02d" % (
-                    dt.Year, dt.Month, dt.Day, dt.Hours, dt.Minutes
+                    dt.Year,
+                    dt.Month,
+                    dt.Day,
+                    dt.Hours,
+                    dt.Minutes,
                 )
             except Exception:
                 pass
@@ -124,9 +130,7 @@ class AcceptAllChanges(ToolBase):
             "com.sun.star.frame.DispatchHelper", ctx.ctx
         )
         frame = ctx.doc.getCurrentController().getFrame()
-        dispatcher.executeDispatch(
-            frame, ".uno:AcceptAllTrackedChanges", "", 0, ()
-        )
+        dispatcher.executeDispatch(frame, ".uno:AcceptAllTrackedChanges", "", 0, ())
         return {"status": "ok", "message": "All tracked changes accepted."}
 
 
@@ -150,7 +154,5 @@ class RejectAllChanges(ToolBase):
             "com.sun.star.frame.DispatchHelper", ctx.ctx
         )
         frame = ctx.doc.getCurrentController().getFrame()
-        dispatcher.executeDispatch(
-            frame, ".uno:RejectAllTrackedChanges", "", 0, ()
-        )
+        dispatcher.executeDispatch(frame, ".uno:RejectAllTrackedChanges", "", 0, ())
         return {"status": "ok", "message": "All tracked changes rejected."}

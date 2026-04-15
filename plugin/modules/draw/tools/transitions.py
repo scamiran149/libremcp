@@ -9,7 +9,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.draw")
+log = logging.getLogger("libremcp.draw")
 
 
 def _get_slide(doc, page_index=None):

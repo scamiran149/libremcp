@@ -13,7 +13,7 @@ import uuid
 from plugin.framework.service_base import ServiceBase
 from plugin.framework.uno_context import get_ctx
 
-log = logging.getLogger("nelson.document")
+log = logging.getLogger("libremcp.document")
 
 # Yield-to-GUI counter (module-level, shared across all calls)
 _yield_counter = 0
@@ -47,10 +47,8 @@ class PageMap:
         if not self._samples:
             return 1
         # Find nearest samples below and above
-        below = [(pi, pg) for pi, pg in self._samples.items()
-                 if pi <= target_para]
-        above = [(pi, pg) for pi, pg in self._samples.items()
-                 if pi > target_para]
+        below = [(pi, pg) for pi, pg in self._samples.items() if pi <= target_para]
+        above = [(pi, pg) for pi, pg in self._samples.items() if pi > target_para]
 
         if below and above:
             pi_lo, pg_lo = max(below, key=lambda x: x[0])
@@ -64,8 +62,9 @@ class PageMap:
             if pi_lo == 0 and self._total_paras > 0:
                 # Extrapolate from origin
                 paras_per_page = max(1, pi_lo / max(1, pg_lo))
-                return max(1, round(pg_lo + (target_para - pi_lo)
-                                    / max(1, paras_per_page)))
+                return max(
+                    1, round(pg_lo + (target_para - pi_lo) / max(1, paras_per_page))
+                )
             return pg_lo
         elif above:
             pi_hi, pg_hi = min(above, key=lambda x: x[0])
@@ -76,10 +75,8 @@ class PageMap:
         """Estimate which paragraph starts a page via interpolation."""
         if not self._samples:
             return 0
-        below = [(pi, pg) for pi, pg in self._samples.items()
-                 if pg <= target_page]
-        above = [(pi, pg) for pi, pg in self._samples.items()
-                 if pg > target_page]
+        below = [(pi, pg) for pi, pg in self._samples.items() if pg <= target_page]
+        above = [(pi, pg) for pi, pg in self._samples.items() if pg > target_page]
 
         if below and above:
             pi_lo, pg_lo = max(below, key=lambda x: x[1])
@@ -178,7 +175,8 @@ class DocumentService(ServiceBase):
             elif not hasattr(comp, "supportsService"):
                 log.warning(
                     "get_active_document: getCurrentComponent() returned "
-                    "non-document: %s", type(comp).__name__
+                    "non-document: %s",
+                    type(comp).__name__,
                 )
                 return None
             else:
@@ -204,16 +202,17 @@ class DocumentService(ServiceBase):
 
     def is_impress(self, model):
         try:
-            return model.supportsService("com.sun.star.presentation.PresentationDocument")
+            return model.supportsService(
+                "com.sun.star.presentation.PresentationDocument"
+            )
         except Exception:
             return False
 
     def is_draw(self, model):
         try:
-            return (
-                model.supportsService("com.sun.star.drawing.DrawingDocument")
-                or model.supportsService("com.sun.star.presentation.PresentationDocument")
-            )
+            return model.supportsService(
+                "com.sun.star.drawing.DrawingDocument"
+            ) or model.supportsService("com.sun.star.presentation.PresentationDocument")
         except Exception:
             return False
 
@@ -244,20 +243,6 @@ class DocumentService(ServiceBase):
 
     # ── Writer helpers ────────────────────────────────────────────────
 
-    def get_full_text(self, model, max_chars=8000):
-        """Get full document text, truncated to *max_chars*."""
-        try:
-            text = model.getText()
-            cursor = text.createTextCursor()
-            cursor.gotoStart(False)
-            cursor.gotoEnd(True)
-            full = cursor.getString()
-            if len(full) > max_chars:
-                full = full[:max_chars] + "\n\n[... document truncated ...]"
-            return full
-        except Exception:
-            return ""
-
     def get_document_length(self, model):
         """Return character count of the document (cached)."""
         cache = DocumentCache.get(model)
@@ -272,49 +257,6 @@ class DocumentService(ServiceBase):
             return cache.length
         except Exception:
             return 0
-
-    def build_heading_tree(self, model):
-        """Return the heading outline as a nested list of dicts.
-
-        Each entry: {"level": int, "title": str, "children": [...]}.
-        """
-        try:
-            text = model.getText()
-            enum = text.createEnumeration()
-            headings = []
-            while enum.hasMoreElements():
-                para = enum.nextElement()
-                try:
-                    level = para.getPropertyValue("OutlineLevel")
-                except Exception:
-                    continue
-                if level > 0:
-                    headings.append({
-                        "level": level,
-                        "title": para.getString().strip(),
-                        "children": [],
-                    })
-            return self._nest_headings(headings)
-        except Exception:
-            log.exception("build_heading_tree failed")
-            return []
-
-    def _nest_headings(self, flat):
-        """Convert flat list of headings into nested tree."""
-        if not flat:
-            return []
-        root = []
-        stack = []  # (level, node)
-        for h in flat:
-            node = {"level": h["level"], "title": h["title"], "children": []}
-            while stack and stack[-1][0] >= h["level"]:
-                stack.pop()
-            if stack:
-                stack[-1][1]["children"].append(node)
-            else:
-                root.append(node)
-            stack.append((h["level"], node))
-        return root
 
     def get_paragraph_ranges(self, model):
         """Return list of paragraph UNO text range objects (cached)."""
@@ -342,10 +284,8 @@ class DocumentService(ServiceBase):
                 try:
                     para_start = para.getStart()
                     para_end = para.getEnd()
-                    cmp_start = text_obj.compareRegionStarts(
-                        match_start, para_start)
-                    cmp_end = text_obj.compareRegionStarts(
-                        match_start, para_end)
+                    cmp_start = text_obj.compareRegionStarts(match_start, para_start)
+                    cmp_end = text_obj.compareRegionStarts(match_start, para_end)
                     if cmp_start <= 0 and cmp_end >= 0:
                         return i
                 except Exception:
@@ -419,11 +359,14 @@ class DocumentService(ServiceBase):
         loc_type, sep, loc_value = locator.partition(":")
         if not sep:
             raise ValueError(
-                "Invalid locator format: '%s'. Expected 'type:value'."
-                % locator)
+                "Invalid locator format: '%s'. Expected 'type:value'." % locator
+            )
 
-        result = {"locator_type": loc_type, "locator_value": loc_value,
-                  "confidence": "exact"}
+        result = {
+            "locator_type": loc_type,
+            "locator_value": loc_value,
+            "confidence": "exact",
+        }
 
         if loc_type == "paragraph":
             result["para_index"] = int(loc_value)
@@ -442,7 +385,8 @@ class DocumentService(ServiceBase):
                 text_obj = model.getText()
                 para_ranges = self.get_paragraph_ranges(model)
                 idx = self.find_paragraph_for_range(
-                    vc.getStart(), para_ranges, text_obj)
+                    vc.getStart(), para_ranges, text_obj
+                )
                 result["para_index"] = max(0, idx)
             except Exception as e:
                 raise ValueError("Cannot resolve cursor locator: %s" % e)
@@ -451,14 +395,15 @@ class DocumentService(ServiceBase):
             r = self._resolve_regex_locator(model, loc_value)
             result.update(r)
 
-        elif loc_type in ("bookmark", "page", "section",
-                          "heading", "heading_text"):
+        elif loc_type in ("bookmark", "page", "section", "heading", "heading_text"):
             # Writer-specific: delegate to writer_tree service
             from plugin.main import get_services
+
             svc = get_services().get("writer_tree")
             if svc is None:
                 raise ValueError(
-                    "writer_nav module not loaded for locator '%s'" % loc_type)
+                    "writer_nav module not loaded for locator '%s'" % loc_type
+                )
             return svc.resolve_writer_locator(model, loc_type, loc_value)
 
         else:
@@ -469,6 +414,7 @@ class DocumentService(ServiceBase):
         if pi is not None:
             try:
                 from plugin.main import get_services
+
                 tree_svc = get_services().get("writer_tree")
                 if tree_svc:
                     heading = tree_svc.find_heading_for_paragraph(model, pi)
@@ -577,33 +523,20 @@ class DocumentService(ServiceBase):
         """Return the best default directory for saving new documents.
 
         Resolution order:
-        1. First writable document gallery folder (if documents service exists)
-        2. LibreOffice's configured "My Documents" path ($(work))
-        3. ~/Documents or ~ as last fallback
+        1. LibreOffice's configured "My Documents" path ($(work))
+        2. ~/Documents or ~ as last fallback
         """
         import os
 
-        # 1. Try document gallery
-        try:
-            from plugin.modules.documents.service import DocumentGalleryService
-            doc_gallery = self._services.get("documents")
-            if doc_gallery and doc_gallery._instances:
-                for inst in doc_gallery._instances.values():
-                    provider = inst.provider
-                    if hasattr(provider, "root_path"):
-                        p = provider.root_path
-                        if p and os.path.isdir(p):
-                            return p
-        except Exception:
-            pass
-
-        # 2. LibreOffice PathSubstitution: $(work)
+        # 1. LibreOffice PathSubstitution: $(work)
         try:
             import uno
+
             ctx = get_ctx()
             smgr = ctx.ServiceManager
             ps = smgr.createInstanceWithContext(
-                "com.sun.star.util.PathSubstitution", ctx)
+                "com.sun.star.util.PathSubstitution", ctx
+            )
             work_url = ps.substituteVariables("$(work)", True)
             work_path = uno.fileUrlToSystemPath(work_url)
             if os.path.isdir(work_path):
@@ -611,7 +544,7 @@ class DocumentService(ServiceBase):
         except Exception:
             pass
 
-        # 3. Fallback
+        # 2. Fallback
         docs = os.path.expanduser("~/Documents")
         if os.path.isdir(docs):
             return docs
@@ -626,7 +559,7 @@ class DocumentService(ServiceBase):
 
     # ── Document ID (persistent) ──────────────────────────────────
 
-    _DOC_ID_PROP = "NelsonDocId"
+    _DOC_ID_PROP = "LibreMCPDocId"
 
     def get_doc_id(self, model):
         """Return a stable, persistent document ID.
@@ -650,8 +583,7 @@ class DocumentService(ServiceBase):
                 0,  # com.sun.star.beans.PropertyAttribute.REMOVEABLE
                 doc_id,
             )
-            log.debug("Assigned doc_id %s to %s",
-                       doc_id, model.getURL() or "(unsaved)")
+            log.debug("Assigned doc_id %s to %s", doc_id, model.getURL() or "(unsaved)")
             return doc_id
         except Exception:
             log.debug("get_doc_id failed", exc_info=True)
@@ -710,18 +642,21 @@ class DocumentService(ServiceBase):
                                 model.getURL() == active_model.getURL()
                                 and frame.getTitle()
                                 == active_model.getCurrentController()
-                                    .getFrame().getTitle()
+                                .getFrame()
+                                .getTitle()
                             )
                         except Exception:
-                            is_active = (model is active_model)
+                            is_active = model is active_model
 
-                    docs.append({
-                        "doc_id": doc_id,
-                        "title": title or "(untitled)",
-                        "doc_type": doc_type,
-                        "url": url or None,
-                        "is_active": is_active,
-                    })
+                    docs.append(
+                        {
+                            "doc_id": doc_id,
+                            "title": title or "(untitled)",
+                            "doc_type": doc_type,
+                            "url": url or None,
+                            "is_active": is_active,
+                        }
+                    )
                 except Exception:
                     continue
         except Exception:
@@ -744,193 +679,6 @@ class DocumentService(ServiceBase):
 
     # ── Chat context builders ─────────────────────────────────────
 
-    def get_document_context_for_chat(self, model, max_context=8000,
-                                      include_end=True,
-                                      include_selection=True):
-        """Build a context string for the chat LLM.
-
-        Dispatches to Writer / Calc / Draw specific builders.
-        Returns a human-readable summary with selection markers.
-        """
-        if self.is_calc(model):
-            return self._calc_context_for_chat(model, max_context)
-        if self.is_draw(model):
-            return self._draw_context_for_chat(model, max_context)
-        return self._writer_context_for_chat(
-            model, max_context, include_end, include_selection)
-
-    def _writer_context_for_chat(self, model, max_context, include_end,
-                                 include_selection):
-        try:
-            text = model.getText()
-            cursor = text.createTextCursor()
-            cursor.gotoStart(False)
-            cursor.gotoEnd(True)
-            full = cursor.getString()
-            doc_len = len(full)
-        except Exception:
-            return ("Document length: 0.\n\n"
-                    "[DOCUMENT START]\n(empty)\n[END DOCUMENT]")
-
-        start_offset, end_offset = (0, 0)
-        if include_selection:
-            try:
-                from plugin.modules.writer.ops import get_selection_range
-                start_offset, end_offset = get_selection_range(model)
-            except Exception:
-                pass
-            start_offset = max(0, min(start_offset, doc_len))
-            end_offset = max(0, min(end_offset, doc_len))
-            if start_offset > end_offset:
-                start_offset, end_offset = end_offset, start_offset
-            max_span = 2000
-            if end_offset - start_offset > max_span:
-                end_offset = start_offset + max_span
-
-        if include_end and doc_len > (max_context // 2):
-            start_chars = max_context // 2
-            end_chars = max_context - start_chars
-            start_excerpt = self._inject_markers(
-                full[:start_chars], 0, start_chars,
-                start_offset, end_offset,
-                "[DOCUMENT START]\n", "\n[DOCUMENT END]")
-            end_excerpt = self._inject_markers(
-                full[-end_chars:], doc_len - end_chars, doc_len,
-                start_offset, end_offset,
-                "[DOCUMENT END]\n", "\n[END DOCUMENT]")
-            middle = ("\n\n[... middle of document omitted ...]\n\n"
-                      if doc_len > max_context else "")
-            return ("Document length: %d characters.\n\n%s%s%s"
-                    % (doc_len, start_excerpt, middle, end_excerpt))
-
-        take = min(doc_len, max_context)
-        excerpt = full[:take]
-        if doc_len > max_context:
-            excerpt += "\n\n[... document truncated ...]"
-        excerpt = self._inject_markers(
-            excerpt, 0, take, start_offset, end_offset,
-            "[DOCUMENT START]\n", "\n[END DOCUMENT]")
-        return "Document length: %d characters.\n\n%s" % (doc_len, excerpt)
-
-    def _calc_context_for_chat(self, model, max_context):
-        try:
-            from plugin.modules.calc.bridge import CalcBridge
-            from plugin.modules.calc.analyzer import SheetAnalyzer
-
-            bridge = CalcBridge(model)
-            analyzer = SheetAnalyzer(bridge)
-            summary = analyzer.get_sheet_summary()
-
-            ctx_str = "Spreadsheet: %s\n" % (
-                model.getURL() or "Untitled")
-            ctx_str += "Active Sheet: %s\n" % summary["sheet_name"]
-            ctx_str += "Used Range: %s (%d rows x %d columns)\n" % (
-                summary["used_range"],
-                summary["row_count"], summary["col_count"])
-            headers = [str(h) for h in summary.get("headers", []) if h]
-            if headers:
-                ctx_str += "Columns: %s\n" % ", ".join(headers)
-
-            controller = model.getCurrentController()
-            selection = controller.getSelection()
-            if selection and hasattr(selection, "getRangeAddress"):
-                addr = selection.getRangeAddress()
-                from plugin.modules.calc.address_utils import index_to_column
-                sel_range = "%s%d:%s%d" % (
-                    index_to_column(addr.StartColumn),
-                    addr.StartRow + 1,
-                    index_to_column(addr.EndColumn),
-                    addr.EndRow + 1)
-                ctx_str += "Current Selection: %s\n" % sel_range
-
-                cell_count = ((addr.EndRow - addr.StartRow + 1) *
-                              (addr.EndColumn - addr.StartColumn + 1))
-                if cell_count < 100:
-                    from plugin.modules.calc.inspector import CellInspector
-                    inspector = CellInspector(bridge)
-                    cells = inspector.read_range(sel_range)
-                    ctx_str += "Selection Content (CSV-like):\n"
-                    for row in cells:
-                        ctx_str += ", ".join([
-                            str(c["value"]) if c["value"] is not None
-                            else "" for c in row]) + "\n"
-
-            return ctx_str
-        except Exception as e:
-            return "Error getting Calc context: %s" % e
-
-    def _draw_context_for_chat(self, model, max_context):
-        try:
-            from plugin.modules.draw.bridge import DrawBridge
-            bridge = DrawBridge(model)
-            pages = bridge.get_pages()
-            active_page = bridge.get_active_page()
-
-            is_impress = model.supportsService(
-                "com.sun.star.presentation.PresentationDocument")
-            doc_type = "Impress Presentation" if is_impress else "Draw Document"
-            page_label = "Slide" if is_impress else "Page"
-
-            ctx_str = "%s: %s\n" % (doc_type, model.getURL() or "Untitled")
-            ctx_str += "Total %ss: %d\n" % (page_label, pages.getCount())
-
-            active_idx = -1
-            for i in range(pages.getCount()):
-                if pages.getByIndex(i) == active_page:
-                    active_idx = i
-                    break
-            ctx_str += "Active %s Index: %d\n" % (page_label, active_idx)
-
-            if active_page:
-                shapes = bridge.get_shapes(active_page)
-                ctx_str += "\nShapes on %s %d:\n" % (page_label, active_idx)
-                for i, s in enumerate(shapes):
-                    type_name = s.getShapeType().split(".")[-1]
-                    pos = s.getPosition()
-                    size = s.getSize()
-                    ctx_str += "- [%d] %s: pos(%d, %d) size(%dx%d)" % (
-                        i, type_name, pos.X, pos.Y,
-                        size.Width, size.Height)
-                    if hasattr(s, "getString"):
-                        text = s.getString()
-                        if text:
-                            ctx_str += " text: \"%s\"" % text[:200]
-                    ctx_str += "\n"
-
-                if is_impress and hasattr(active_page, "getNotesPage"):
-                    try:
-                        notes_page = active_page.getNotesPage()
-                        notes_text = ""
-                        for i in range(notes_page.getCount()):
-                            shape = notes_page.getByIndex(i)
-                            if shape.getShapeType() == (
-                                    "com.sun.star.presentation"
-                                    ".NotesShape"):
-                                notes_text += shape.getString() + "\n"
-                        if notes_text.strip():
-                            ctx_str += ("\nSpeaker Notes:\n%s\n"
-                                        % notes_text.strip())
-                    except Exception:
-                        pass
-
-            return ctx_str
-        except Exception as e:
-            return "Error getting Draw context: %s" % e
-
-    @staticmethod
-    def _inject_markers(excerpt, excerpt_start, excerpt_end,
-                        sel_start, sel_end, prefix, suffix):
-        """Inject [SELECTION_START]/[SELECTION_END] markers into excerpt."""
-        if sel_start >= excerpt_end or sel_end <= excerpt_start:
-            return prefix + excerpt + suffix
-        local_start = max(0, sel_start - excerpt_start)
-        local_end = min(len(excerpt), sel_end - excerpt_start)
-        before = excerpt[:local_start]
-        between = excerpt[local_start:local_end]
-        after = excerpt[local_end:]
-        return (prefix + before + "[SELECTION_START]" + between +
-                "[SELECTION_END]" + after + suffix)
-
     # ── GUI yield ──────────────────────────────────────────────────
 
     _yield_counter = 0
@@ -947,8 +695,7 @@ class DocumentService(ServiceBase):
             ctx = get_ctx()
             if ctx:
                 sm = ctx.getServiceManager()
-                tk = sm.createInstanceWithContext(
-                    "com.sun.star.awt.Toolkit", ctx)
+                tk = sm.createInstanceWithContext("com.sun.star.awt.Toolkit", ctx)
                 if hasattr(tk, "processEventsToIdle"):
                     tk.processEventsToIdle()
         except Exception:

@@ -6,24 +6,24 @@
 #   stdio — JSON-RPC over stdin/stdout subprocess (command required)
 
 servers:
-  nelson:
+  libremcp:
     type: http
     url: http://localhost:8766/mcp
-    description: Nelson MCP (production port)
+    description: LibreMCP (production port)
 
-  nelson-dev:
+  libremcp-dev:
     type: http
     url: http://localhost:8767/mcp
-    description: Nelson MCP (dev port, wbox compositor)
+    description: LibreMCP (dev port, wbox compositor)
 
   lo-wbox:
     type: stdio
     command: wbox-mcp
-    args: ["serve", "/home/david/dev/projects/quazardous/nelson-mcp/dev/lo-wbox/config.yaml"]
+    args: ["serve", "/home/david/dev/projects/scamiran149/libremcp/dev/lo-wbox/config.yaml"]
     description: Wbox compositor MCP (lo-wbox)
 
 # Log files accessible via the read_log tool.
 # Keys are friendly names, values are absolute paths (~ is expanded).
 log_files:
-  nelson: ~/nelson.log
+  libremcp: ~/libremcp.log
   soffice: ~/soffice-debug.log

@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-"""Nelson MCP entry point — bootstraps the module framework.
+"""LibreMCP entry point — bootstraps the module framework.
 
 Responsibilities:
 1. Resolve module load order from dependency graph (_manifest.py)
@@ -23,18 +23,20 @@ import threading
 # ── File logger (debug even when LO console is hidden) ──────────────────────
 # Inline setup (cannot import plugin.framework here — __init__.py has heavy deps).
 # Mirrors framework/logging.py setup_logging() — keep in sync.
-_log_path = os.environ.get("NELSON_LOG_PATH",
-                           os.path.join(os.path.expanduser("~"), "nelson.log"))
-_logger = logging.getLogger("nelson")
+_log_path = os.environ.get(
+    "LIBREMCP_LOG_PATH", os.path.join(os.path.expanduser("~"), "libremcp.log")
+)
+_logger = logging.getLogger("libremcp")
 _logger.handlers.clear()
 _logger.propagate = False
 _handler = logging.FileHandler(_log_path, mode="w", encoding="utf-8")
-_handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(name)s — %(message)s"))
+_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(name)s — %(message)s")
+)
 _logger.addHandler(_handler)
 _logger.setLevel(logging.DEBUG)
 
-log = logging.getLogger("nelson.main")
+log = logging.getLogger("libremcp.main")
 
 _version = "?"
 try:
@@ -56,10 +58,10 @@ try:
                 break
 except Exception:
     pass
-log.info("=== Nelson MCP %s (build %s) — main.py loaded ===", _version, _build_id)
+log.info("=== LibreMCP %s (build %s) — main.py loaded ===", _version, _build_id)
 
 # Extension identifier (matches description.xml)
-EXTENSION_ID = "org.extension.nelson"
+EXTENSION_ID = "org.extension.libremcp"
 
 # ── Singleton registries ──────────────────────────────────────────────
 
@@ -71,26 +73,8 @@ _initialized = False
 
 
 def _setup_bundled_sqlite3(base_path):
-    """Make sqlite3 importable on Windows via bundled sqlite3.dll + ctypes.
-
-    LO's Python on Windows doesn't include a working sqlite3 module.
-    We bundle sqlite3.dll (from sqlite.org) and wrap it via ctypes in
-    sqlite3_ctypes.py — pure Python, no .pyd needed.  This is always
-    used on Windows for consistent behavior across all machines.
-    """
-    if sys.platform != "win32":
-        return
-
-    try:
-        from plugin.framework import sqlite3_ctypes
-        sys.modules["sqlite3"] = sqlite3_ctypes
-        sys.modules["sqlite3.dbapi2"] = sqlite3_ctypes
-        # Verify it actually works
-        sqlite3_ctypes.connect(":memory:").close()
-        log.info("sqlite3_ctypes loaded (sqlite %s)",
-                 sqlite3_ctypes.sqlite_version)
-    except Exception as e:
-        log.warning("sqlite3 unavailable — indexing will be disabled: %s", e)
+    """Stub — sqlite3 ctypes loader removed. Not needed without indexer modules."""
+    pass
 
 
 def _ensure_extension_on_path(ctx):
@@ -98,8 +82,10 @@ def _ensure_extension_on_path(ctx):
     ext_path = None
     try:
         import uno
+
         pip = ctx.getValueByName(
-            "/singletons/com.sun.star.deployment.PackageInformationProvider")
+            "/singletons/com.sun.star.deployment.PackageInformationProvider"
+        )
         ext_url = pip.getPackageLocation(EXTENSION_ID)
         if ext_url.startswith("file://"):
             ext_path = str(uno.fileUrlToSystemPath(ext_url))
@@ -131,6 +117,7 @@ def _load_manifest():
     """
     try:
         from plugin._manifest import MODULES
+
         return MODULES
     except ImportError:
         log.warning("_manifest.py not found — using fallback discovery")
@@ -154,6 +141,7 @@ def _fallback_discover_modules():
             continue
         try:
             import yaml
+
             with open(yaml_path) as f:
                 manifest = yaml.safe_load(f)
             manifest.setdefault("name", entry)
@@ -208,13 +196,18 @@ def _import_module_class(module_manifest):
     package = "plugin.modules.%s" % name.replace(".", "_")
     try:
         import importlib
+
         mod = importlib.import_module(package)
         # Find the ModuleBase subclass
         from plugin.framework.module_base import ModuleBase
+
         for attr in dir(mod):
             obj = getattr(mod, attr)
-            if (isinstance(obj, type) and issubclass(obj, ModuleBase)
-                    and obj is not ModuleBase):
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, ModuleBase)
+                and obj is not ModuleBase
+            ):
                 return obj
     except Exception:
         log.exception("Failed to import module: %s", name)
@@ -256,6 +249,7 @@ def bootstrap(ctx=None):
             # Store fallback ctx for environments where uno module
             # is not importable (shouldn't happen in LO, but safe)
             from plugin.framework.uno_context import set_fallback_ctx
+
             set_fallback_ctx(ctx)
 
         from plugin.framework.service_registry import ServiceRegistry
@@ -269,6 +263,7 @@ def bootstrap(ctx=None):
 
         # Register the framework-level job manager
         from plugin.framework.job_manager import JobManager
+
         _services.register_instance("jobs", JobManager())
 
         # Load and sort modules
@@ -306,8 +301,9 @@ def bootstrap(ctx=None):
                 config_svc = _services.get("config")
                 if config_svc:
                     config_svc.set_manifest(manifest_dict)
-                    log.info("Config defaults loaded for %d modules",
-                             len(manifest_dict))
+                    log.info(
+                        "Config defaults loaded for %d modules", len(manifest_dict)
+                    )
                     # Log level is deferred until after bootstrap completes
                     # so all bootstrap messages are visible regardless of config
 
@@ -316,7 +312,8 @@ def bootstrap(ctx=None):
             # e.g. "tunnel.bore" -> modules/tunnel_bore/tools
             dir_name = name.replace(".", "_")
             tools_dir = os.path.join(
-                os.path.dirname(__file__), "modules", dir_name, "tools")
+                os.path.dirname(__file__), "modules", dir_name, "tools"
+            )
             if os.path.isdir(tools_dir):
                 tools_pkg = "plugin.modules.%s.tools" % dir_name
                 log.info("Discovering tools: %s", tools_pkg)
@@ -325,12 +322,15 @@ def bootstrap(ctx=None):
                 except Exception:
                     log.exception("Tool discovery failed: %s", tools_pkg)
 
-        # Wire event bus into config service
-        log.info("Wiring event bus into config service...")
-        if config_svc:
-            events_svc = _services.get("events")
-            if events_svc:
+        # Wire event bus into config and document services
+        log.info("Wiring event bus into config and document services...")
+        events_svc = _services.get("events")
+        if events_svc:
+            if config_svc:
                 config_svc.set_events(events_svc)
+            doc_svc = _services.get("document")
+            if doc_svc:
+                doc_svc.set_events(events_svc)
 
         # Initialize services that need a UNO context
         log.info("Initializing services with UNO context...")
@@ -338,14 +338,12 @@ def bootstrap(ctx=None):
             _services.initialize_all(ctx)
         log.info("Services initialized.")
 
-        log.info("── Phase 1 complete: %d modules initialized ────────",
-                 len(_modules))
+        log.info("── Phase 1 complete: %d modules initialized ────────", len(_modules))
 
         # Emit modules:initialized event
         events_svc = _services.get("events")
         if events_svc:
-            events_svc.emit("modules:initialized",
-                            modules=[m.name for m in _modules])
+            events_svc.emit("modules:initialized", modules=[m.name for m in _modules])
 
         # ── Phase 2a: start modules on VCL main thread ────────────────
         log.info("── Phase 2a: start (main thread) ────────────────────")
@@ -359,13 +357,15 @@ def bootstrap(ctx=None):
                 started_count += 1
                 log.info("Module started: %s", mod.name)
             except TimeoutError:
-                log.warning("Module start timed out (VCL not ready?): %s",
-                            mod.name)
+                log.warning("Module start timed out (VCL not ready?): %s", mod.name)
             except Exception:
                 log.exception("Failed to start module: %s", mod.name)
 
-        log.info("── Phase 2a complete: %d/%d modules started ──────────",
-                 started_count, len(_modules))
+        log.info(
+            "── Phase 2a complete: %d/%d modules started ──────────",
+            started_count,
+            len(_modules),
+        )
 
         # ── Phase 2b: start_background on Job thread ─────────────────
         log.info("── Phase 2b: start_background (job thread) ──────────")
@@ -375,34 +375,33 @@ def bootstrap(ctx=None):
                 mod.start_background(_services)
                 log.info("Module background started: %s", mod.name)
             except Exception:
-                log.exception("Failed to background-start module: %s",
-                              mod.name)
+                log.exception("Failed to background-start module: %s", mod.name)
 
-        log.info("── Phase 2b complete: %d modules background started ─",
-                 len(_modules))
+        log.info("── Phase 2b complete: %d modules background started ─", len(_modules))
 
         # Emit modules:started event
         if events_svc:
-            events_svc.emit("modules:started",
-                            modules=[m.name for m in _modules])
+            events_svc.emit("modules:started", modules=[m.name for m in _modules])
 
         # Subscribe to menu:update for dynamic menu text + icons
         if events_svc:
-            events_svc.subscribe("menu:update",
-                                 lambda **kw: notify_menu_update())
+            events_svc.subscribe("menu:update", lambda **kw: notify_menu_update())
 
         # Pre-load icons into ImageManager so first menu display has them
         threading.Thread(target=_update_menu_icons, daemon=True).start()
 
-
         _initialized = True
-        log.info("Framework bootstrap complete: %d modules, %d tools",
-                 len(_modules), len(_tools))
+        log.info(
+            "Framework bootstrap complete: %d modules, %d tools",
+            len(_modules),
+            len(_tools),
+        )
 
         # Apply configured log level now that bootstrap is done.
-        # NELSON_LOG_LEVEL env var overrides the config value.
+        # LIBREMCP_LOG_LEVEL env var overrides the config value.
         from plugin.framework.logging import set_log_level
-        env_level = os.environ.get("NELSON_LOG_LEVEL")
+
+        env_level = os.environ.get("LIBREMCP_LOG_LEVEL")
         if env_level:
             set_log_level(env_level)
             log.info("Log level set to %s (from env)", env_level)
@@ -432,7 +431,7 @@ def shutdown():
 
 # ── Dynamic menu text infrastructure ─────────────────────────────────
 
-_DISPATCH_PROTOCOL = "org.extension.nelson:"
+_DISPATCH_PROTOCOL = "org.extension.libremcp:"
 
 _status_listeners = []  # [(listener, url)]
 _status_lock = threading.Lock()
@@ -446,12 +445,13 @@ def _dispatch_command(command):
         return
 
     mod_name = command[:dot]
-    action = command[dot + 1:]
+    action = command[dot + 1 :]
 
     # Framework actions
     if mod_name == "main":
         if action == "help":
             import webbrowser
+
             ext_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             help_path = os.path.join(ext_dir, "help", "index.html")
             if os.path.isfile(help_path):
@@ -461,6 +461,7 @@ def _dispatch_command(command):
         elif action == "about":
             from plugin.framework.uno_context import get_ctx
             from plugin.framework.dialogs import about_dialog
+
             about_dialog(get_ctx())
         else:
             log.warning("Unhandled framework action: %s", action)
@@ -472,9 +473,11 @@ def _dispatch_command(command):
     best_action = None
     for mod in _modules:
         prefix = mod.name + "."
-        if command.startswith(prefix) and (best_mod is None or len(mod.name) > len(best_mod.name)):
+        if command.startswith(prefix) and (
+            best_mod is None or len(mod.name) > len(best_mod.name)
+        ):
             best_mod = mod
-            best_action = command[len(prefix):]
+            best_action = command[len(prefix) :]
     if best_mod:
         best_mod.on_action(best_action)
         return
@@ -492,9 +495,11 @@ def get_menu_text(command):
     best_action = None
     for mod in _modules:
         prefix = mod.name + "."
-        if command.startswith(prefix) and (best_mod is None or len(mod.name) > len(best_mod.name)):
+        if command.startswith(prefix) and (
+            best_mod is None or len(mod.name) > len(best_mod.name)
+        ):
             best_mod = mod
-            best_action = command[len(prefix):]
+            best_action = command[len(prefix) :]
     if best_mod:
         return best_mod.get_menu_text(best_action)
     return None
@@ -523,6 +528,7 @@ def notify_menu_update():
 def _fire_status_event(listener, url, text):
     """Send a FeatureStateEvent to one listener."""
     import uno
+
     ev = uno.createUnoStruct("com.sun.star.frame.FeatureStateEvent")
     ev.FeatureURL = url
     ev.IsEnabled = True
@@ -552,9 +558,11 @@ def _get_menu_icon(command):
     best_action = None
     for mod in _modules:
         prefix = mod.name + "."
-        if command.startswith(prefix) and (best_mod is None or len(mod.name) > len(best_mod.name)):
+        if command.startswith(prefix) and (
+            best_mod is None or len(mod.name) > len(best_mod.name)
+        ):
             best_mod = mod
-            best_action = command[len(prefix):]
+            best_action = command[len(prefix) :]
     if best_mod:
         return best_mod.get_menu_icon(best_action)
     return None
@@ -587,23 +595,26 @@ def _load_icon_graphic(module_name, icon_filename):
     try:
         import uno
         from com.sun.star.beans import PropertyValue
+
         ctx = uno.getComponentContext()
         smgr = ctx.ServiceManager
         pip = ctx.getValueByName(
-            "/singletons/com.sun.star.deployment.PackageInformationProvider")
+            "/singletons/com.sun.star.deployment.PackageInformationProvider"
+        )
         ext_url = pip.getPackageLocation(EXTENSION_ID)
         if not ext_url:
             return None
-        gp = smgr.createInstanceWithContext(
-            "com.sun.star.graphic.GraphicProvider", ctx)
+        gp = smgr.createInstanceWithContext("com.sun.star.graphic.GraphicProvider", ctx)
         pv = PropertyValue()
         pv.Name = "URL"
         pv.Value = "%s/plugin/modules/%s/icons/%s" % (
-            ext_url, module_name, icon_filename)
+            ext_url,
+            module_name,
+            icon_filename,
+        )
         return gp.queryGraphic((pv,))
     except Exception as e:
-        log.debug("Failed to load icon %s/%s: %s",
-                  module_name, icon_filename, e)
+        log.debug("Failed to load icon %s/%s: %s", module_name, icon_filename, e)
         return None
 
 
@@ -611,6 +622,7 @@ def _update_menu_icons():
     """Push current-state icons into every module's ImageManager."""
     try:
         import uno
+
         icon_cmds = _collect_icon_commands()
         if not icon_cmds:
             return
@@ -629,8 +641,7 @@ def _update_menu_icons():
             if graphic:
                 key_graphics[key] = graphic
             else:
-                log.warning("Icon graphic is None for %s/%s", mod_name,
-                            filename)
+                log.warning("Icon graphic is None for %s/%s", mod_name, filename)
 
         if not key_graphics:
             return
@@ -641,7 +652,8 @@ def _update_menu_icons():
         ok_count = 0
 
         supplier = smgr.createInstanceWithContext(
-            "com.sun.star.ui.ModuleUIConfigurationManagerSupplier", ctx)
+            "com.sun.star.ui.ModuleUIConfigurationManagerSupplier", ctx
+        )
         for mod_id in _IMAGE_MANAGER_MODULES:
             try:
                 cfg_mgr = supplier.getUIConfigurationManager(mod_id)
@@ -658,8 +670,7 @@ def _update_menu_icons():
                                 img_mgr.insertImages(0, (cmd,), (graphic,))
                             ok_count += 1
                         except Exception as e:
-                            log.debug("ImageManager %s cmd %s: %s",
-                                      mod_id, cmd, e)
+                            log.debug("ImageManager %s cmd %s: %s", mod_id, cmd, e)
             except Exception as e:
                 log.debug("ImageManager skip %s: %s", mod_id, e)
 
@@ -709,15 +720,16 @@ try:
             except Exception:
                 log.exception("MainJob.trigger FAILED")
 
-    class DispatchHandler(unohelper.Base, XDispatch, XDispatchProvider,
-                          XInitialization, XServiceInfo):
-        """Protocol handler for org.extension.nelson: URLs.
+    class DispatchHandler(
+        unohelper.Base, XDispatch, XDispatchProvider, XInitialization, XServiceInfo
+    ):
+        """Protocol handler for org.extension.libremcp: URLs.
 
         Handles menu dispatch and supports dynamic menu text via
         FeatureStateEvent / addStatusListener.
         """
 
-        IMPL_NAME = "org.extension.nelson.DispatchHandler"
+        IMPL_NAME = "org.extension.libremcp.DispatchHandler"
         SERVICE_NAMES = ("com.sun.star.frame.ProtocolHandler",)
 
         def __init__(self, ctx):
@@ -747,8 +759,10 @@ try:
             return None
 
         def queryDispatches(self, requests):
-            return [self.queryDispatch(r.FeatureURL, r.FrameName,
-                                       r.SearchFlags) for r in requests]
+            return [
+                self.queryDispatch(r.FeatureURL, r.FrameName, r.SearchFlags)
+                for r in requests
+            ]
 
         # ── XDispatch ────────────────────────────────────────────────
 
@@ -759,8 +773,7 @@ try:
                 bootstrap(self.ctx)
                 _dispatch_command(command)
                 # After action, push updated menu text
-                threading.Thread(target=notify_menu_update,
-                                 daemon=True).start()
+                threading.Thread(target=notify_menu_update, daemon=True).start()
             except Exception:
                 log.exception("DispatchHandler.dispatch FAILED")
 
@@ -779,7 +792,8 @@ try:
         def removeStatusListener(self, listener, url):
             with _status_lock:
                 _status_listeners[:] = [
-                    (l, u) for l, u in _status_listeners
+                    (l, u)
+                    for l, u in _status_listeners
                     if not (l is listener and u.Complete == url.Complete)
                 ]
 
@@ -787,7 +801,7 @@ try:
     g_ImplementationHelper = unohelper.ImplementationHelper()
     g_ImplementationHelper.addImplementation(
         MainJob,
-        "org.extension.nelson.Main",
+        "org.extension.libremcp.Main",
         ("com.sun.star.task.Job",),
     )
     g_ImplementationHelper.addImplementation(
@@ -800,6 +814,7 @@ try:
     # Module-level fallback auto-bootstrap (like mcp-libre)
     def _module_autostart():
         import time
+
         time.sleep(3)
         if not _initialized:
             log.info("Module-level auto-bootstrap (fallback)")
@@ -810,8 +825,8 @@ try:
                 log.exception("Module-level auto-bootstrap FAILED")
 
     threading.Thread(
-        target=_module_autostart, daemon=True,
-        name="nelson-autoboot").start()
+        target=_module_autostart, daemon=True, name="libremcp-autoboot"
+    ).start()
     log.info("Auto-bootstrap thread started (will fire in 3s)")
 
 except ImportError as e:

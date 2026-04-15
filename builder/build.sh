@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Nelson MCP Docker Build ==="
+echo "=== LibreMCP Docker Build ==="
 
 # Use a temp working dir (writable by any UID)
 WORK=$(mktemp -d)
@@ -29,9 +29,9 @@ magick -background none -density 256 extension/assets/icon.svg -resize 42x42 bui
 
 # Build .oxt
 echo "Building .oxt..."
-python3 scripts/build_oxt.py --output /output/nelson.oxt
+python3 scripts/build_oxt.py --output /output/libremcp.oxt
 
 # Report result
 echo ""
 echo "=== Build complete ==="
-ls -lh /output/nelson.oxt
+ls -lh /output/libremcp.oxt

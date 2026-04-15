@@ -9,11 +9,11 @@ import logging
 from abc import ABC
 from typing import Any, Optional
 
-log = logging.getLogger("nelson.module_base")
+log = logging.getLogger("libremcp.module_base")
 
 
 class ModuleBase(ABC):
-    """Base class for all Nelson MCP modules.
+    """Base class for all LibreMCP modules.
 
     Modules declare their manifest in module.yaml (config, requires,
     provides_services). This class handles the runtime behavior:
@@ -88,15 +88,3 @@ class ModuleBase(ABC):
         Return None to keep the icon declared in module.yaml.
         """
         return None
-
-    # ── Dialog helpers ───────────────────────────────────────────────
-
-    def load_dialog(self, dialog_name: str) -> Any:
-        """Load an XDL dialog from this module's dialogs/ directory."""
-        from plugin.framework.dialogs import load_module_dialog
-        return load_module_dialog(self.name, dialog_name)
-
-    def load_framework_dialog(self, dialog_name: str) -> Any:
-        """Load a reusable framework dialog template."""
-        from plugin.framework.dialogs import load_framework_dialog
-        return load_framework_dialog(dialog_name)

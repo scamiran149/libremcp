@@ -1,11 +1,11 @@
 name: main
-title: Nelson MCP global settings
+title: LibreMCP global settings
 
 actions:
   help:
     title: "Help"
   about:
-    title: "About Nelson MCP"
+    title: "About LibreMCP"
 
 menus:
   - separator: true

@@ -16,7 +16,7 @@ from plugin.modules.calc.bridge import CalcBridge
 from plugin.modules.calc.inspector import CellInspector
 from plugin.modules.calc.error_detector import ErrorDetector
 
-logger = logging.getLogger("nelson.calc")
+logger = logging.getLogger("libremcp.calc")
 
 
 class DetectErrors(ToolBase):

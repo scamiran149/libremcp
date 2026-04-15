@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — Build and deploy the Nelson extension into the dev profile.
+# deploy.sh — Build and deploy the LibreMCP extension into the dev profile.
 #
 # Only does: build .oxt + install via unopkg.
 # Does NOT manage soffice/compositor lifecycle — caller handles that
@@ -16,8 +16,8 @@ PROJECT_ROOT="$(cd "$CONFIG_DIR/../.." && pwd)"
 
 PROFILE_DIR="${LO_PROFILE_DIR:-/tmp/lo_dev_profile}"
 PROFILE_URI="file://$PROFILE_DIR"
-EXTENSION_ID="org.extension.nelson"
-OXT_FILE="$PROJECT_ROOT/build/nelson.oxt"
+EXTENSION_ID="org.extension.libremcp"
+OXT_FILE="$PROJECT_ROOT/build/libremcp.oxt"
 
 # Find unopkg
 UNOPKG=$(command -v unopkg 2>/dev/null || echo "/usr/bin/unopkg")

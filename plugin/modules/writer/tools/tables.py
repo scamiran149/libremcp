@@ -9,7 +9,7 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 class ListTables(ToolBase):
@@ -31,17 +31,22 @@ class ListTables(ToolBase):
     def execute(self, ctx, **kwargs):
         doc = ctx.doc
         if not hasattr(doc, "getTextTables"):
-            return {"status": "error", "message": "Document does not support text tables."}
+            return {
+                "status": "error",
+                "message": "Document does not support text tables.",
+            }
 
         tables_sup = doc.getTextTables()
         tables = []
         for name in tables_sup.getElementNames():
             table = tables_sup.getByName(name)
-            tables.append({
-                "name": name,
-                "rows": table.getRows().getCount(),
-                "cols": table.getColumns().getCount(),
-            })
+            tables.append(
+                {
+                    "name": name,
+                    "rows": table.getRows().getCount(),
+                    "cols": table.getColumns().getCount(),
+                }
+            )
         return {"status": "ok", "tables": tables, "count": len(tables)}
 
 
@@ -151,7 +156,8 @@ class WriteTableCell(ToolBase):
         if cell_obj is None:
             return {
                 "status": "error",
-                "message": "Cell '%s' not found in table '%s'." % (cell_ref, table_name),
+                "message": "Cell '%s' not found in table '%s'."
+                % (cell_ref, table_name),
             }
 
         try:
@@ -203,8 +209,7 @@ class CreateTable(ToolBase):
                 "type": "string",
                 "enum": ["before", "after"],
                 "description": (
-                    "Insert before or after the target paragraph "
-                    "(default: after)."
+                    "Insert before or after the target paragraph (default: after)."
                 ),
             },
         },
@@ -276,6 +281,7 @@ class CreateTable(ToolBase):
 # DeleteTable
 # ------------------------------------------------------------------
 
+
 class DeleteTable(ToolBase):
     """Delete a table from the document."""
 
@@ -315,6 +321,7 @@ class DeleteTable(ToolBase):
 # ------------------------------------------------------------------
 # SetTableProperties
 # ------------------------------------------------------------------
+
 
 class SetTableProperties(ToolBase):
     """Set table layout properties: width, alignment, equal columns."""
@@ -427,8 +434,8 @@ class SetTableProperties(ToolBase):
                 elif custom_widths:
                     return {
                         "status": "error",
-                        "message": "column_widths length (%d) != column count (%d)" % (
-                            len(custom_widths), cols),
+                        "message": "column_widths length (%d) != column count (%d)"
+                        % (len(custom_widths), cols),
                     }
             except Exception as e:
                 log.debug("set_table_properties: column adjust failed: %s", e)
@@ -462,6 +469,7 @@ class SetTableProperties(ToolBase):
 # ------------------------------------------------------------------
 # AddTableRows / AddTableColumns
 # ------------------------------------------------------------------
+
 
 class AddTableRows(ToolBase):
     """Add rows to a Writer table."""
@@ -575,6 +583,7 @@ class AddTableColumns(ToolBase):
 # DeleteTableRows / DeleteTableColumns
 # ------------------------------------------------------------------
 
+
 class DeleteTableRows(ToolBase):
     """Delete rows from a Writer table."""
 
@@ -681,6 +690,7 @@ class DeleteTableColumns(ToolBase):
 # WriteTableRow (batch write)
 # ------------------------------------------------------------------
 
+
 class WriteTableRow(ToolBase):
     """Write a full row of values to a Writer table."""
 
@@ -751,6 +761,7 @@ class WriteTableRow(ToolBase):
 # Helpers
 # ------------------------------------------------------------------
 
+
 def _col_letter(c):
     """Convert 0-based column index to Excel-style letter(s)."""
     if c < 26:
@@ -764,9 +775,14 @@ def _parse_color(color_str):
         return None
     color_str = color_str.strip().lower()
     names = {
-        "red": 0xFF0000, "green": 0x00FF00, "blue": 0x0000FF,
-        "yellow": 0xFFFF00, "white": 0xFFFFFF, "black": 0x000000,
-        "orange": 0xFF8C00, "gray": 0x808080,
+        "red": 0xFF0000,
+        "green": 0x00FF00,
+        "blue": 0x0000FF,
+        "yellow": 0xFFFF00,
+        "white": 0xFFFFFF,
+        "black": 0x000000,
+        "orange": 0xFF8C00,
+        "gray": 0x808080,
     }
     if color_str in names:
         return names[color_str]

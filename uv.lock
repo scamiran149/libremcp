@@ -55,7 +55,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nelson-mcp"
+name = "libremcp"
 source = { editable = "." }
 
 [package.optional-dependencies]

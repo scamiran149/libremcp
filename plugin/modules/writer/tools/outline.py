@@ -3,20 +3,35 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-"""Writer outline / heading navigation tools."""
+"""Writer outline / heading navigation tools.
+
+NOTE: GetDocumentOutline and GetHeadingContent are deprecated.
+Use get_document_tree and get_heading_children from writer_nav instead.
+These tools remain for backward compatibility and fall back to the core
+document service's simpler heading tree when writer_nav is not available.
+"""
 
 import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 class GetDocumentOutline(ToolBase):
-    """Return the heading tree (outline) of a Writer document."""
+    """Return the heading tree (outline) of a Writer document.
+
+    .. deprecated::
+        Use ``get_document_tree`` with ``content_strategy="heading_only"``
+        and ``depth=0`` for equivalent or richer output.
+    """
 
     name = "get_document_outline"
-    description = "Returns the document outline (headings hierarchy)."
+    description = (
+        "Returns the document outline (headings hierarchy). "
+        "Prefer get_document_tree(content_strategy='heading_only', depth=0) "
+        "for richer output with bookmarks and para indices."
+    )
     parameters = {
         "type": "object",
         "properties": {
@@ -31,8 +46,12 @@ class GetDocumentOutline(ToolBase):
     tier = "core"
 
     def execute(self, ctx, **kwargs):
-        doc_svc = ctx.services.document
-        tree = doc_svc.build_heading_tree(ctx.doc)
+        tree_svc = ctx.services.get("writer_tree")
+        if tree_svc is not None:
+            tree = tree_svc.build_heading_tree(ctx.doc)
+        else:
+            tree_svc = ctx.services.document
+            tree = tree_svc.build_heading_tree(ctx.doc)
         max_depth = kwargs.get("max_depth")
         if max_depth is not None:
             tree = [_prune_tree(node, max_depth) for node in tree]
@@ -40,13 +59,20 @@ class GetDocumentOutline(ToolBase):
 
 
 class GetHeadingContent(ToolBase):
-    """Return content under a heading identified by its path."""
+    """Return content under a heading identified by its path.
+
+    .. deprecated::
+        Use ``get_heading_children`` with ``locator="heading:N.N"`` and
+        ``content_strategy="full"`` for equivalent or richer output.
+    """
 
     name = "get_heading_content"
     intent = "navigate"
     description = (
         "Returns content under a heading identified by its path "
-        "(e.g. '1.2' for the second child of the first heading)."
+        "(e.g. '1.2' for the second child of the first heading). "
+        "Prefer get_heading_children(locator='heading:1.2', content_strategy='full') "
+        "for richer output with bookmark support."
     )
     parameters = {
         "type": "object",
@@ -67,10 +93,16 @@ class GetHeadingContent(ToolBase):
     def execute(self, ctx, **kwargs):
         heading_path = kwargs["heading_path"]
         max_paragraphs = kwargs.get("max_paragraphs", 50)
-        doc_svc = ctx.services.document
 
-        # Navigate the heading tree by path indices.
-        tree = doc_svc.build_heading_tree(ctx.doc)
+        tree_svc = ctx.services.get("writer_tree")
+        if tree_svc is not None:
+            tree = tree_svc.build_heading_tree(ctx.doc)
+            # Convert rich tree format to simple format for path walking.
+            simple_tree = _simplify_tree(tree)
+        else:
+            doc_svc = ctx.services.document
+            simple_tree = doc_svc.build_heading_tree(ctx.doc)
+
         parts = _parse_path(heading_path)
         if parts is None:
             return {
@@ -78,31 +110,25 @@ class GetHeadingContent(ToolBase):
                 "message": "Invalid heading path: %s" % heading_path,
             }
 
-        node = _walk_tree(tree, parts)
+        node = _walk_tree(simple_tree, parts)
         if node is None:
             return {
                 "status": "error",
                 "message": "Heading '%s' not found." % heading_path,
             }
 
-        # Read paragraphs under that heading.
+        doc_svc = ctx.services.document
         para_ranges = doc_svc.get_paragraph_ranges(ctx.doc)
         heading_level = node.get("level", 1)
         heading_title = node.get("title", "")
 
-        # Find the paragraph index of this heading by scanning for a
-        # matching title and level.
-        start_idx = _find_heading_para_index(
-            para_ranges, heading_title, heading_level
-        )
+        start_idx = _find_heading_para_index(para_ranges, heading_title, heading_level)
         if start_idx is None:
             return {
                 "status": "error",
                 "message": "Could not locate heading in paragraphs.",
             }
 
-        # Collect body paragraphs until the next heading of equal or
-        # higher level (or end of document).
         paragraphs = []
         for i in range(start_idx + 1, len(para_ranges)):
             if len(paragraphs) >= max_paragraphs:
@@ -130,6 +156,7 @@ class GetHeadingContent(ToolBase):
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _prune_tree(node, max_depth, current_depth=1):
     """Remove children deeper than *max_depth*."""
@@ -183,3 +210,16 @@ def _find_heading_para_index(para_ranges, title, level):
         if p_level == level and p.getString().strip() == title:
             return i
     return None
+
+
+def _simplify_tree(rich_tree):
+    """Convert rich tree from TreeService to simple {level, title, children}."""
+    result = []
+    for node in rich_tree:
+        simple = {
+            "level": node.get("level", 1),
+            "title": node.get("text", ""),
+            "children": _simplify_tree(node.get("children", [])),
+        }
+        result.append(simple)
+    return result

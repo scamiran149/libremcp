@@ -12,7 +12,7 @@ duplicating UNO details.
 
 import logging
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 def find_paragraph_for_range(anchor, para_ranges, text_obj):
@@ -28,12 +28,8 @@ def find_paragraph_for_range(anchor, para_ranges, text_obj):
         match_start = anchor.getStart()
         for i, para in enumerate(para_ranges):
             try:
-                cmp_start = text_obj.compareRegionStarts(
-                    match_start, para.getStart()
-                )
-                cmp_end = text_obj.compareRegionStarts(
-                    match_start, para.getEnd()
-                )
+                cmp_start = text_obj.compareRegionStarts(match_start, para.getStart())
+                cmp_end = text_obj.compareRegionStarts(match_start, para.getEnd())
                 if cmp_start <= 0 and cmp_end >= 0:
                     return i
             except Exception:

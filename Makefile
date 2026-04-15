@@ -1,4 +1,4 @@
-# Makefile — Nelson MCP extension build & dev tools.
+# Makefile — LibreMCP extension build & dev tools.
 #
 # Cross-platform: detects Windows vs Linux/macOS and calls .ps1 or .sh scripts.
 #
@@ -28,7 +28,7 @@
 # Info:
 #   make help                      Show this help
 
-EXTENSION_NAME = nelson
+EXTENSION_NAME = libremcp
 
 # Python minor version matching LibreOffice's bundled Python (for pysqlite3 wheel)
 LO_PYTHON_VERSION ?= 3.12
@@ -89,13 +89,13 @@ OXT_NAME = $(EXTENSION_NAME)-$(EXTENSION_VERSION)$(BUILD_TAG)
         lo-start lo-start-full lo-kill lo-restart \
         clean-cache nuke-cache nuke-cache-force unbundle \
         log log-tail lo-log test check-ext check-setup deploy \
-        set-config vendor docker-build rdb icons sqlite3
+        set-config vendor docker-build icons sqlite3
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 
 help:
 	@echo ""
-	@echo "Nelson MCP — build & dev targets"
+	@echo "LibreMCP — build & dev targets"
 	@echo "================================"
 	@echo ""
 	@echo "Build:"
@@ -152,13 +152,13 @@ DOCKER_GID ?= $(shell id -g)
 endif
 export DOCKER_UID DOCKER_GID
 
-DOCKER_EXEC  = docker exec nelson-dev
+DOCKER_EXEC  = docker exec libremcp-dev
 DOCKER_COMPOSE = docker compose -f dev/docker/docker-compose.yml
 DOCKER_CI   = docker compose -f builder/docker-compose.yml up --build
 
 # Start dev container if not running
 dev-up:
-	@docker start nelson-dev 2>NUL || $(DOCKER_COMPOSE) up -d
+	@docker start libremcp-dev 2>NUL || $(DOCKER_COMPOSE) up -d
 
 dev-build-image:
 	$(DOCKER_COMPOSE) build
@@ -169,22 +169,9 @@ dev-down:
 # Legacy Docker build (CI/release — ephemeral container)
 docker-build:
 	$(DOCKER_CI)
-	@echo "Done: build/nelson.oxt"
+	@echo "Done: build/libremcp.oxt"
 
 # ── RDB (UNO type library) ────────────────────────────────────────────────
-# Requires LibreOffice SDK (unoidl-write).
-
-LO_PROGRAM  ?= /usr/lib64/libreoffice/program
-UNOIDL_WRITE ?= /usr/lib64/libreoffice/sdk/bin/unoidl-write
-RDB_SOURCE   = idl/XPromptFunction.idl
-RDB_TARGET   = extension/XPromptFunction.rdb
-
-rdb: $(RDB_TARGET)
-
-$(RDB_TARGET): $(RDB_SOURCE)
-	$(UNOIDL_WRITE) $(LO_PROGRAM)/types.rdb $(LO_PROGRAM)/types/offapi.rdb $< $@
-	@echo "Generated $@"
-
 # ── Icons (SVG → PNG) ────────────────────────────────────────────────────
 ICON_SVG    = extension/assets/icon.svg
 ICON_DIR    = build/generated/assets
@@ -215,16 +202,9 @@ endif
 # Build: always via dev Docker container (tools + make inside container)
 # The container runs `make _build` which uses local targets with deps.
 # Use `make _build` directly if running inside the container or locally.
-build: dev-up vendor manifest rdb icons sqlite3 docs
-	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt --check
-
-build-force: dev-up vendor manifest rdb icons sqlite3
-	$(DOCKER_EXEC) python3 scripts/build_oxt.py --output build/$(EXTENSION_NAME).oxt
-
-rebuild: clean build
-
-# Internal targets (called inside container or locally)
-_build: vendor manifest rdb icons sqlite3
+build: dev-up vendor manifest icons sqlite3 docs
+build-force: dev-up vendor manifest icons sqlite3
+_build: vendor manifest icons sqlite3
 ifneq ($(BUILD_TAG),)
 	@echo ""
 	@echo "  *** WARNING: BUILD_TAG = '$(BUILD_TAG)' — reset to '' in plugin/version.py for a clean release ***"
@@ -246,9 +226,9 @@ repack-deploy: repack
 	$(MAKE) lo-kill
 	@sleep 3
 	@rm -f $(LO_CONF)/.lock $(LO_CONF)/user/.lock
-	-unopkg remove org.extension.nelson 2>/dev/null; sleep 1
+	-unopkg remove org.extension.libremcp 2>/dev/null; sleep 1
 	unopkg add build/$(EXTENSION_NAME).oxt
-	@rm -f $(HOME_DIR)/nelson.log
+	@rm -f $(HOME_DIR)/libremcp.log
 	@sleep 1
 	$(MAKE) lo-start
 	@echo "Waiting for LO to load..."
@@ -365,19 +345,19 @@ deploy:
 	powershell -c "Start-Sleep 3"
 	-powershell -c "Remove-Item '$(LO_CONF)/.lock','$(LO_CONF)/user/.lock' -ErrorAction SilentlyContinue"
 	$(MAKE) build-force
-	-unopkg remove org.extension.nelson
+	-unopkg remove org.extension.libremcp
 	powershell -c "Start-Sleep 1"
 	unopkg add build/$(EXTENSION_NAME).oxt
-	-powershell -c "Remove-Item '$(HOME_DIR)/nelson.log' -ErrorAction SilentlyContinue"
+	-powershell -c "Remove-Item '$(HOME_DIR)/libremcp.log' -ErrorAction SilentlyContinue"
 	powershell -c "Start-Sleep 1"
 	$(MAKE) lo-start
 	@echo "Deploy done. LO is starting..."
 
 log:
-	@cat $(HOME_DIR)/nelson.log 2>/dev/null || echo "No nelson.log found"
+	@cat $(HOME_DIR)/libremcp.log 2>/dev/null || echo "No libremcp.log found"
 
 log-tail:
-	@tail -f $(HOME_DIR)/nelson.log
+	@tail -f $(HOME_DIR)/libremcp.log
 
 lo-log:
 	@cat $(HOME_DIR)/soffice-debug.log 2>/dev/null || echo "No soffice-debug.log found"
@@ -391,12 +371,18 @@ check-ext:
 	@$(PYTHON) -c "from plugin._manifest import MODULES; print('Manifest OK: %d modules, %d with config' % (len(MODULES), len([m for m in MODULES if m.get('config')])))"
 
 test:
-	uv run --extra dev pytest
+	uv run --extra dev pytest tests/ --ignore=tests/legacy --ignore=tests/smoke
+
+test-smoke:
+	uv run --extra dev pytest tests/smoke/ -v
+
+test-all:
+	uv run --extra dev pytest tests/ --ignore=tests/legacy
 
 # ── POC extension ───────────────────────────────────────────────────────────
 
 set-config:
-	@echo "Usage: make deploy NELSON_SET_CONFIG=\"mcp.port=9000,mcp.host=0.0.0.0\""
+	@echo "Usage: make deploy LIBREMCP_SET_CONFIG=\"mcp.port=9000,mcp.host=0.0.0.0\""
 	@echo ""
 	@echo "Available config keys (module.key = default):"
 	@$(PYTHON) -c "from plugin._manifest import MODULES; \

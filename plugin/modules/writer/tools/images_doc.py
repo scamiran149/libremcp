@@ -17,10 +17,10 @@ import tempfile
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.images")
+log = logging.getLogger("libremcp.images")
 
 # Persistent cache directory for downloaded images.
-_IMAGE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "nelson_images")
+_IMAGE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "libremcp_images")
 
 # Default image width when none specified (mm)
 _DEFAULT_WIDTH_MM = 120
@@ -31,6 +31,7 @@ _DEFAULT_MAX_HEIGHT_MM = 160
 def _read_image_dimensions(path):
     """Read pixel dimensions from image header. Returns (w, h) or (0, 0)."""
     import struct
+
     try:
         with open(path, "rb") as f:
             header = f.read(32)
@@ -48,6 +49,7 @@ def _read_image_dimensions(path):
 def _read_jpeg_dims(path):
     """Read JPEG dimensions from SOF marker."""
     import struct
+
     try:
         with open(path, "rb") as f:
             f.read(2)
@@ -80,6 +82,7 @@ def _basename_from_url(file_url):
         name = name.rsplit(".", 1)[0] if "." in name else name
         # URL-decode
         import urllib.parse
+
         return urllib.parse.unquote(name)
     except Exception:
         return ""
@@ -131,6 +134,7 @@ def _fit_dimensions(image_path, width_mm, height_mm, max_height_mm=None):
 # ListImages — all doc types
 # ------------------------------------------------------------------
 
+
 class ListImages(ToolBase):
     """List all images/graphic objects in the document."""
 
@@ -172,8 +176,10 @@ class ListImages(ToolBase):
 
     def execute(self, ctx, **kwargs):
         from plugin.framework.graphic_query import (
-            list_images_writer, list_images_drawpage,
+            list_images_writer,
+            list_images_drawpage,
         )
+
         doc = ctx.doc
 
         if ctx.doc_type == "writer":
@@ -181,6 +187,7 @@ class ListImages(ToolBase):
             images = list_images_writer(doc, doc_svc=doc_svc)
         else:
             from plugin.modules.draw.bridge import get_draw_page
+
             page, _ = get_draw_page(
                 ctx,
                 page_index=kwargs.get("page_index"),
@@ -195,6 +202,7 @@ class ListImages(ToolBase):
 # ------------------------------------------------------------------
 # GetImageInfo — all doc types
 # ------------------------------------------------------------------
+
 
 class GetImageInfo(ToolBase):
     """Get detailed info about a specific image."""
@@ -251,22 +259,31 @@ class GetImageInfo(ToolBase):
 
         if ctx.doc_type == "writer":
             if not image_name:
-                return {"status": "error", "message": "image_name is required for Writer."}
+                return {
+                    "status": "error",
+                    "message": "image_name is required for Writer.",
+                }
             return self._writer_info(ctx, image_name)
 
         if not image_name and shape_index is None:
-            return {"status": "error", "message": "image_name or shape_index is required."}
+            return {
+                "status": "error",
+                "message": "image_name or shape_index is required.",
+            }
 
         # Calc / Draw / Impress — find shape on draw page
         from plugin.modules.draw.bridge import get_draw_page
         from plugin.framework.graphic_query import find_image_on_page, _shape_info
+
         page, _ = get_draw_page(
             ctx,
             page_index=kwargs.get("page_index"),
             sheet_name=kwargs.get("sheet_name"),
         )
         shape, idx = find_image_on_page(
-            page, image_name=image_name or None, shape_index=shape_index,
+            page,
+            image_name=image_name or None,
+            shape_index=shape_index,
         )
         if shape is None:
             return {"status": "error", "message": "Image not found."}
@@ -359,6 +376,7 @@ class GetImageInfo(ToolBase):
 # SetImageProperties — Writer-only
 # ------------------------------------------------------------------
 
+
 class SetImageProperties(ToolBase):
     """Resize, reposition, crop, or update caption/alt-text for an image."""
 
@@ -432,10 +450,15 @@ class SetImageProperties(ToolBase):
         height_mm = kwargs.get("height_mm")
         if width_mm is not None or height_mm is not None:
             from com.sun.star.awt import Size
+
             current = graphic.getPropertyValue("Size")
             new_size = Size()
-            new_size.Width = int(width_mm * 100) if width_mm is not None else current.Width
-            new_size.Height = int(height_mm * 100) if height_mm is not None else current.Height
+            new_size.Width = (
+                int(width_mm * 100) if width_mm is not None else current.Width
+            )
+            new_size.Height = (
+                int(height_mm * 100) if height_mm is not None else current.Height
+            )
             graphic.setPropertyValue("Size", new_size)
             updated.append("size")
 
@@ -452,8 +475,13 @@ class SetImageProperties(ToolBase):
         anchor_type = kwargs.get("anchor_type")
         if anchor_type is not None:
             from com.sun.star.text.TextContentAnchorType import (
-                AT_PARAGRAPH, AS_CHARACTER, AT_PAGE, AT_FRAME, AT_CHARACTER,
+                AT_PARAGRAPH,
+                AS_CHARACTER,
+                AT_PAGE,
+                AT_FRAME,
+                AT_CHARACTER,
             )
+
             anchor_map = {
                 0: AT_PARAGRAPH,
                 1: AS_CHARACTER,
@@ -485,6 +513,7 @@ class SetImageProperties(ToolBase):
 # ------------------------------------------------------------------
 # DownloadImage — all doc types
 # ------------------------------------------------------------------
+
 
 class DownloadImage(ToolBase):
     """Download an image from URL to local cache."""
@@ -524,7 +553,9 @@ class DownloadImage(ToolBase):
         force = kwargs.get("force", False)
 
         try:
-            local_path = _download_image_to_cache(url, verify_ssl=verify_ssl, force=force)
+            local_path = _download_image_to_cache(
+                url, verify_ssl=verify_ssl, force=force
+            )
             return {
                 "status": "ok",
                 "local_path": local_path,
@@ -537,6 +568,7 @@ class DownloadImage(ToolBase):
 # ------------------------------------------------------------------
 # InsertImage — all doc types
 # ------------------------------------------------------------------
+
 
 class InsertImage(ToolBase):
     """Insert an image from local path or URL into any document type."""
@@ -663,7 +695,8 @@ class InsertImage(ToolBase):
         # Preserve aspect ratio
         max_height_mm = kwargs.get("max_height_mm")
         width_mm, height_mm = _fit_dimensions(
-            image_path, width_mm, height_mm, max_height_mm)
+            image_path, width_mm, height_mm, max_height_mm
+        )
 
         file_url = uno.systemPathToFileUrl(os.path.abspath(image_path))
         width_units = int(width_mm) * 100
@@ -671,17 +704,22 @@ class InsertImage(ToolBase):
 
         doc = ctx.doc
         # Remove shared params already extracted — avoid double-passing
-        extra = {k: v for k, v in kwargs.items()
-                 if k not in ("image_path", "width_mm", "height_mm", "title", "description")}
+        extra = {
+            k: v
+            for k, v in kwargs.items()
+            if k not in ("image_path", "width_mm", "height_mm", "title", "description")
+        }
 
         if ctx.doc_type == "writer":
-            return self._insert_writer(ctx, file_url, width_units, height_units,
-                                       title, description, **extra)
+            return self._insert_writer(
+                ctx, file_url, width_units, height_units, title, description, **extra
+            )
 
         # Calc / Draw / Impress — shape on DrawPage
         try:
-            return self._insert_drawpage(ctx, file_url, width_units, height_units,
-                                         title, description, **extra)
+            return self._insert_drawpage(
+                ctx, file_url, width_units, height_units, title, description, **extra
+            )
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
@@ -693,6 +731,7 @@ class InsertImage(ToolBase):
         Pass caption=False for a standalone image without frame.
         """
         from com.sun.star.awt import Size
+
         doc = ctx.doc
         doc_text = doc.getText()
         doc_svc = ctx.services.document
@@ -706,7 +745,10 @@ class InsertImage(ToolBase):
 
         if paragraph_index is not None:
             para_ranges = doc_svc.get_paragraph_ranges(doc)
-            log.debug("INSERT_IMAGE: para_ranges len=%d", len(para_ranges) if para_ranges else 0)
+            log.debug(
+                "INSERT_IMAGE: para_ranges len=%d",
+                len(para_ranges) if para_ranges else 0,
+            )
             if para_ranges and paragraph_index < len(para_ranges):
                 target = para_ranges[paragraph_index]
             else:
@@ -726,20 +768,28 @@ class InsertImage(ToolBase):
 
         if add_caption and caption_text:
             result = self._insert_with_frame(
-                doc, doc_text, cursor, file_url, width, height,
-                title, desc, caption_text)
+                doc,
+                doc_text,
+                cursor,
+                file_url,
+                width,
+                height,
+                title,
+                desc,
+                caption_text,
+            )
         else:
             result = self._insert_standalone(
-                doc, doc_text, cursor, file_url, width, height,
-                title, desc)
+                doc, doc_text, cursor, file_url, width, height, title, desc
+            )
 
         if paragraph_index is not None:
             result["paragraph_index"] = paragraph_index
         return result
 
-    def _insert_with_frame(self, doc, doc_text, cursor,
-                           file_url, width, height,
-                           title, desc, caption_text):
+    def _insert_with_frame(
+        self, doc, doc_text, cursor, file_url, width, height, title, desc, caption_text
+    ):
         """Insert image inside a TextFrame with caption below.
 
         Follows the same pattern as mcp-libre: frame size = image size,
@@ -749,11 +799,11 @@ class InsertImage(ToolBase):
 
         frame = doc.createInstance("com.sun.star.text.TextFrame")
         frame.setPropertyValue("Size", Size(width, height))
-        frame.setPropertyValue("AnchorType", 4)   # AT_CHARACTER
-        frame.setPropertyValue("HoriOrient", 0)    # NONE
-        frame.setPropertyValue("VertOrient", 0)    # NONE
-        frame.setPropertyValue("SizeType", 2)      # FIX
-        frame.setPropertyValue("WidthType", 1)     # FIX
+        frame.setPropertyValue("AnchorType", 4)  # AT_CHARACTER
+        frame.setPropertyValue("HoriOrient", 0)  # NONE
+        frame.setPropertyValue("VertOrient", 0)  # NONE
+        frame.setPropertyValue("SizeType", 2)  # FIX
+        frame.setPropertyValue("WidthType", 1)  # FIX
 
         # Margins matching reference (top=0, left=0, right/bottom ~5mm)
         frame.setPropertyValue("TopMargin", 0)
@@ -763,15 +813,20 @@ class InsertImage(ToolBase):
 
         # Zero borders and padding
         from com.sun.star.table import BorderLine2
+
         empty_border = BorderLine2()
         for side in ("TopBorder", "BottomBorder", "LeftBorder", "RightBorder"):
             try:
                 frame.setPropertyValue(side, empty_border)
             except Exception:
                 pass
-        for dist in ("TopBorderDistance", "BottomBorderDistance",
-                     "LeftBorderDistance", "RightBorderDistance",
-                     "BorderDistance"):
+        for dist in (
+            "TopBorderDistance",
+            "BottomBorderDistance",
+            "LeftBorderDistance",
+            "RightBorderDistance",
+            "BorderDistance",
+        ):
             try:
                 frame.setPropertyValue(dist, 0)
             except Exception:
@@ -815,8 +870,9 @@ class InsertImage(ToolBase):
             "caption": caption_text,
         }
 
-    def _insert_standalone(self, doc, doc_text, cursor,
-                           file_url, width, height, title, desc):
+    def _insert_standalone(
+        self, doc, doc_text, cursor, file_url, width, height, title, desc
+    ):
         """Insert a standalone image without frame."""
         from com.sun.star.awt import Size
 
@@ -863,10 +919,12 @@ class InsertImage(ToolBase):
         elif ctx.doc_type != "calc":
             # Center on page for Draw/Impress
             try:
-                image.setPosition(Point(
-                    (page.Width - width) // 2,
-                    (page.Height - height) // 2,
-                ))
+                image.setPosition(
+                    Point(
+                        (page.Width - width) // 2,
+                        (page.Height - height) // 2,
+                    )
+                )
             except Exception:
                 pass
 
@@ -886,6 +944,7 @@ class InsertImage(ToolBase):
 # ------------------------------------------------------------------
 # DeleteImage — all doc types
 # ------------------------------------------------------------------
+
 
 class DeleteImage(ToolBase):
     """Delete an image from the document."""
@@ -940,22 +999,34 @@ class DeleteImage(ToolBase):
 
         if ctx.doc_type == "writer":
             if not image_name:
-                return {"status": "error", "message": "image_name is required for Writer."}
+                return {
+                    "status": "error",
+                    "message": "image_name is required for Writer.",
+                }
             return self._delete_writer(ctx, image_name)
 
         if not image_name and shape_index is None:
-            return {"status": "error", "message": "image_name or shape_index is required."}
+            return {
+                "status": "error",
+                "message": "image_name or shape_index is required.",
+            }
 
         # Calc / Draw / Impress
         from plugin.modules.draw.bridge import get_draw_page
         from plugin.framework.graphic_query import delete_image_drawpage
+
         page, _ = get_draw_page(
             ctx,
             page_index=kwargs.get("page_index"),
             sheet_name=kwargs.get("sheet_name"),
         )
-        if delete_image_drawpage(page, image_name=image_name or None, shape_index=shape_index):
-            return {"status": "ok", "deleted": image_name or ("shape_index:%d" % shape_index)}
+        if delete_image_drawpage(
+            page, image_name=image_name or None, shape_index=shape_index
+        ):
+            return {
+                "status": "ok",
+                "deleted": image_name or ("shape_index:%d" % shape_index),
+            }
         return {"status": "error", "message": "Image not found."}
 
     def _delete_writer(self, ctx, image_name):
@@ -982,6 +1053,7 @@ class DeleteImage(ToolBase):
 # ------------------------------------------------------------------
 # ReplaceImage — Writer-only
 # ------------------------------------------------------------------
+
 
 class ReplaceImage(ToolBase):
     """Replace an image's source file keeping position and frame."""
@@ -1038,7 +1110,9 @@ class ReplaceImage(ToolBase):
             }
 
         # Auto-download URLs
-        if new_image_path.startswith("http://") or new_image_path.startswith("https://"):
+        if new_image_path.startswith("http://") or new_image_path.startswith(
+            "https://"
+        ):
             try:
                 new_image_path = _download_image_to_cache(new_image_path)
             except Exception as e:
@@ -1061,10 +1135,15 @@ class ReplaceImage(ToolBase):
             height_mm = kwargs.get("height_mm")
             if width_mm is not None or height_mm is not None:
                 from com.sun.star.awt import Size
+
                 current = graphic.getPropertyValue("Size")
                 new_size = Size()
-                new_size.Width = int(width_mm * 100) if width_mm is not None else current.Width
-                new_size.Height = int(height_mm * 100) if height_mm is not None else current.Height
+                new_size.Width = (
+                    int(width_mm * 100) if width_mm is not None else current.Width
+                )
+                new_size.Height = (
+                    int(height_mm * 100) if height_mm is not None else current.Height
+                )
                 graphic.setPropertyValue("Size", new_size)
 
             return {
@@ -1078,6 +1157,7 @@ class ReplaceImage(ToolBase):
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _download_image_to_cache(url, verify_ssl=False, force=False):
     """Download an image URL to the local cache directory.
@@ -1118,7 +1198,7 @@ def _download_image_to_cache(url, verify_ssl=False, force=False):
         context.verify_mode = ssl.CERT_NONE
 
     request = urllib.request.Request(url)
-    request.add_header("User-Agent", "Nelson/1.0")
+    request.add_header("User-Agent", "LibreMCP/1.0")
 
     with urllib.request.urlopen(request, context=context) as response:
         data = response.read()

@@ -9,12 +9,13 @@ import logging
 
 from plugin.framework.tool_base import ToolBase
 
-log = logging.getLogger("nelson.writer")
+log = logging.getLogger("libremcp.writer")
 
 
 # ------------------------------------------------------------------
 # ListTextFrames
 # ------------------------------------------------------------------
+
 
 class ListTextFrames(ToolBase):
     """List all text frames in the document."""
@@ -32,7 +33,10 @@ class ListTextFrames(ToolBase):
     def execute(self, ctx, **kwargs):
         doc = ctx.doc
         if not hasattr(doc, "getTextFrames"):
-            return {"status": "error", "message": "Document does not support text frames."}
+            return {
+                "status": "error",
+                "message": "Document does not support text frames.",
+            }
 
         text_frames = doc.getTextFrames()
         frames = []
@@ -56,14 +60,16 @@ class ListTextFrames(ToolBase):
                 except Exception:
                     pass
 
-                frames.append({
-                    "name": name,
-                    "width_mm": size.Width / 100.0,
-                    "height_mm": size.Height / 100.0,
-                    "width_100mm": size.Width,
-                    "height_100mm": size.Height,
-                    "content_preview": content_preview,
-                })
+                frames.append(
+                    {
+                        "name": name,
+                        "width_mm": size.Width / 100.0,
+                        "height_mm": size.Height / 100.0,
+                        "width_100mm": size.Width,
+                        "height_100mm": size.Height,
+                        "content_preview": content_preview,
+                    }
+                )
             except Exception as e:
                 log.debug("list_text_frames: skip '%s': %s", name, e)
 
@@ -73,6 +79,7 @@ class ListTextFrames(ToolBase):
 # ------------------------------------------------------------------
 # GetTextFrameInfo
 # ------------------------------------------------------------------
+
 
 class GetTextFrameInfo(ToolBase):
     """Get detailed info about a text frame."""
@@ -175,6 +182,7 @@ class GetTextFrameInfo(ToolBase):
 # SetTextFrameProperties
 # ------------------------------------------------------------------
 
+
 class SetTextFrameProperties(ToolBase):
     """Resize or reposition a text frame."""
 
@@ -238,10 +246,15 @@ class SetTextFrameProperties(ToolBase):
         height_mm = kwargs.get("height_mm")
         if width_mm is not None or height_mm is not None:
             from com.sun.star.awt import Size
+
             current = frame.getPropertyValue("Size")
             new_size = Size()
-            new_size.Width = int(width_mm * 100) if width_mm is not None else current.Width
-            new_size.Height = int(height_mm * 100) if height_mm is not None else current.Height
+            new_size.Width = (
+                int(width_mm * 100) if width_mm is not None else current.Width
+            )
+            new_size.Height = (
+                int(height_mm * 100) if height_mm is not None else current.Height
+            )
             frame.setPropertyValue("Size", new_size)
             updated.append("size")
 
@@ -249,8 +262,13 @@ class SetTextFrameProperties(ToolBase):
         anchor_type = kwargs.get("anchor_type")
         if anchor_type is not None:
             from com.sun.star.text.TextContentAnchorType import (
-                AT_PARAGRAPH, AS_CHARACTER, AT_PAGE, AT_FRAME, AT_CHARACTER,
+                AT_PARAGRAPH,
+                AS_CHARACTER,
+                AT_PAGE,
+                AT_FRAME,
+                AT_CHARACTER,
             )
+
             anchor_map = {
                 0: AT_PARAGRAPH,
                 1: AS_CHARACTER,

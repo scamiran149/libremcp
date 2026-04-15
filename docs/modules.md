@@ -81,7 +81,7 @@ cfg.get("port")                      # Auto-prefixed: "my_module.port"
 cfg.set("port", 9000)                # Writes to LO registry
 ```
 
-Cross-module reads work only for `public: true` fields. Environment overrides: `NELSON_SET_CONFIG="key=val"`.
+Cross-module reads work only for `public: true` fields. Environment overrides: `LIBREMCP_SET_CONFIG="key=val"`.
 
 ## Events
 

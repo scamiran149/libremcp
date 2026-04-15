@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Clean / repair the LibreOffice extension cache for nelson.
+    Clean / repair the LibreOffice extension cache for LibreMCP.
 
 .DESCRIPTION
     Fixes common cache corruption issues: revoked flags, stale lock files,
@@ -23,9 +23,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot  = Split-Path $PSScriptRoot
-$ExtensionId  = "org.extension.nelson"
-$ExtensionOxt = "nelson.oxt"
-$BundleName   = "nelson"
+$ExtensionId  = "org.extension.libremcp"
+$ExtensionOxt = "libremcp.oxt"
+$BundleName   = "libremcp"
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
