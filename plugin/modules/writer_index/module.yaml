@@ -1,4 +1,0 @@
-name: writer.index
-title: Full-text search for Writer documents
-requires: [document, config, events, writer_tree, writer_bookmarks]
-provides_services: [writer_index]

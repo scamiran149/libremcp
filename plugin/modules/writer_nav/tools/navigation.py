@@ -10,6 +10,7 @@ from plugin.framework.tool_base import ToolBase
 
 class NavigateHeading(ToolBase):
     name = "navigate_heading"
+    tier = "core"
     intent = "navigate"
     description = (
         "Navigate from a locator to a related heading. "
@@ -29,8 +30,14 @@ class NavigateHeading(ToolBase):
             },
             "direction": {
                 "type": "string",
-                "enum": ["next", "previous", "parent", "first_child",
-                         "next_sibling", "previous_sibling"],
+                "enum": [
+                    "next",
+                    "previous",
+                    "parent",
+                    "first_child",
+                    "next_sibling",
+                    "previous_sibling",
+                ],
                 "description": "Navigation direction",
             },
         },
@@ -42,7 +49,8 @@ class NavigateHeading(ToolBase):
         prox_svc = ctx.services.writer_proximity
         try:
             result = prox_svc.navigate_heading(
-                ctx.doc, kwargs["locator"], kwargs["direction"])
+                ctx.doc, kwargs["locator"], kwargs["direction"]
+            )
             if "error" in result:
                 return {"status": "error", **result}
             return {"status": "ok", **result}
@@ -86,9 +94,11 @@ class GetSurroundings(ToolBase):
         prox_svc = ctx.services.writer_proximity
         try:
             result = prox_svc.get_surroundings(
-                ctx.doc, kwargs["locator"],
+                ctx.doc,
+                kwargs["locator"],
                 radius=kwargs.get("radius", 10),
-                include=kwargs.get("include"))
+                include=kwargs.get("include"),
+            )
             return {"status": "ok", **result}
         except ValueError as e:
             return {"status": "error", "error": str(e)}

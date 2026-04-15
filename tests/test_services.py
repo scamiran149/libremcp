@@ -6,7 +6,6 @@ from plugin.modules.core.services.config import ConfigService
 from plugin.modules.writer_nav.services.bookmarks import BookmarkService
 from plugin.modules.writer_nav.services.tree import TreeService
 from plugin.modules.writer_nav.services.proximity import ProximityService
-from plugin.modules.writer_index.services.index import IndexService
 from plugin.framework.service_registry import ServiceRegistry
 
 from stubs.writer_stubs import WriterDocStub
@@ -295,54 +294,6 @@ class TestProximityServiceCohesion:
 
         assert key1 not in prox_svc._flat_cache
         assert key2 in prox_svc._flat_cache
-
-
-class TestIndexServiceCohesion:
-    def test_cache_invalidated_on_event(self):
-        bus = EventBus()
-        doc_svc = DocumentService()
-
-        class FakeTreeSvc:
-            def enrich_search_results(self, doc, matches):
-                pass
-
-        class FakeBookmarkSvc:
-            def get_mcp_bookmark_map(self, doc):
-                return {}
-
-        idx_svc = IndexService(doc_svc, FakeTreeSvc(), FakeBookmarkSvc(), bus)
-
-        idx_svc._cache = {"key1": "data"}
-
-        bus.emit("document:cache_invalidated")
-
-        assert idx_svc._cache == {}
-
-    def test_cache_cleared_for_specific_doc(self):
-        bus = EventBus()
-        doc_svc = DocumentService()
-
-        class FakeTreeSvc:
-            def enrich_search_results(self, doc, matches):
-                pass
-
-        class FakeBookmarkSvc:
-            def get_mcp_bookmark_map(self, doc):
-                return {}
-
-        idx_svc = IndexService(doc_svc, FakeTreeSvc(), FakeBookmarkSvc(), bus)
-
-        model = WriterDocStub(url="test://doc1")
-        model2 = WriterDocStub(url="test://doc2")
-        key1 = doc_svc.doc_key(model)
-        key2 = doc_svc.doc_key(model2)
-
-        idx_svc._cache = {key1: "a", key2: "b"}
-
-        bus.emit("document:cache_invalidated", doc=model)
-
-        assert key1 not in idx_svc._cache
-        assert key2 in idx_svc._cache
 
 
 class TestServiceRegistryWiring:

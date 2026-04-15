@@ -20,24 +20,27 @@ PRESETS = {
     "writer-edit": [
         "list_open_documents",
         "get_document_info",
-        "get_document_outline",
         "open_document",
         "create_document",
         "save_document",
         "close_document",
+        "get_document_content",
         "read_paragraphs",
-        "get_heading_content",
-        "find_text",
-        "insert_at_paragraph",
-        "insert_paragraphs_batch",
+        "get_document_tree",
+        "get_heading_children",
+        "navigate_heading",
         "set_paragraph_text",
         "set_paragraph_style",
         "delete_paragraph",
-        "duplicate_paragraph",
+        "insert_paragraphs_batch",
+        "apply_document_content",
+        "search_in_document",
+        "replace_in_document",
         "insert_image",
         "insert_hyperlink",
         "create_table",
         "write_table_cell",
+        "set_style_properties",
         "execute_batch",
         "undo",
         "redo",
@@ -47,18 +50,21 @@ PRESETS = {
     "writer-read": [
         "list_open_documents",
         "get_document_info",
-        "get_document_outline",
         "get_document_content",
         "read_paragraphs",
-        "get_heading_content",
-        "find_text",
+        "get_document_tree",
+        "get_heading_children",
+        "navigate_heading",
         "search_in_document",
         "get_document_stats",
+        "list_styles",
+        "get_style_info",
         "list_images",
         "list_tables",
+        "read_table",
         "list_comments",
         "resolve_locator",
-        "get_document_tree",
+        "get_surroundings",
     ],
     "calc": [
         "list_open_documents",
@@ -71,6 +77,9 @@ PRESETS = {
         "write_table_row",
         "create_chart",
         "list_tables",
+        "list_sheets",
+        "switch_sheet",
+        "read_cell_range",
         "execute_batch",
         "undo",
         "redo",
@@ -82,7 +91,8 @@ PRESETS = {
         "create_document",
         "save_document",
         "read_paragraphs",
-        "insert_at_paragraph",
+        "apply_document_content",
+        "insert_paragraphs_batch",
         "insert_image",
     ],
 }
@@ -196,8 +206,27 @@ class MCPModule(ModuleBase):
         self._custom_routes = []
         log.info("MCP routes registered")
 
+        # Auto-register /mcp/core with only core-tier tools
+        self._register_core_endpoint(services)
+
         # Register custom filtered endpoints
         self._register_custom_endpoints(services)
+
+    def _register_core_endpoint(self, services):
+        """Auto-register /mcp/core exposing only core-tier tools."""
+        from plugin.modules.mcp.protocol import MCPProtocolHandler
+
+        core_names = set(services.tools.core_tool_names())
+        if not core_names:
+            return
+
+        handler = MCPProtocolHandler(services, tool_filter=core_names)
+        routes = self._registry
+        routes.add("POST", "/mcp/core", handler.handle_mcp_post, raw=True)
+        routes.add("GET", "/mcp/core", handler.handle_mcp_sse, raw=True)
+        routes.add("DELETE", "/mcp/core", handler.handle_mcp_delete, raw=True)
+        self._custom_routes.append("/mcp/core")
+        log.info("Core MCP endpoint: /mcp/core (%d tools)", len(core_names))
 
     def _register_custom_endpoints(self, services):
         """Register custom filtered MCP endpoints from config."""

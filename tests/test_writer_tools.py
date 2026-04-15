@@ -17,9 +17,7 @@ from plugin.framework.tool_context import ToolContext
 from plugin.modules.writer.tools.content import (
     GetDocumentContent,
     ApplyDocumentContent,
-    FindText,
     ReadParagraphs,
-    InsertAtParagraph,
     SetParagraphText,
     SetParagraphStyle,
     DeleteParagraph,
@@ -29,7 +27,6 @@ from plugin.modules.writer.tools.content import (
 )
 from plugin.modules.writer.tools.search import SearchInDocument, ReplaceInDocument
 from plugin.modules.writer.tools.stats import GetDocumentStats
-from plugin.modules.writer.tools.outline import GetDocumentOutline, GetHeadingContent
 from plugin.modules.writer.tools.styles import ListStyles, GetStyleInfo
 from plugin.modules.writer.tools.tracking import (
     SetTrackChanges,
@@ -230,59 +227,6 @@ class TestApplyDocumentContent:
 
 
 # ======================================================================
-# FindText
-# ======================================================================
-
-
-class TestFindText:
-    def test_mutation_detection(self):
-        tool = FindText()
-        assert tool.detects_mutation() is False
-
-    def test_doc_types(self):
-        tool = FindText()
-        assert tool.doc_types == ["writer"]
-
-    def test_validate_requires_search(self):
-        tool = FindText()
-        ok, err = tool.validate(search="hello")
-        assert ok is True
-
-    def test_validate_missing_search(self):
-        tool = FindText()
-        ok, err = tool.validate()
-        assert ok is False
-        assert "search" in err
-
-    def test_empty_search_returns_error(self, tool_context):
-        tool = FindText()
-        result = tool.execute(tool_context, search="")
-        assert result["status"] == "error"
-
-    def test_find_text_returns_ranges(self, tool_context):
-        tool = FindText()
-        with patch(
-            "plugin.modules.writer.tools.content.format_support.find_text_ranges",
-            return_value=[{"start": 0, "end": 10, "text": "Introduction"}],
-        ):
-            result = tool.execute(tool_context, search="Introduction")
-        assert result["status"] == "ok"
-        assert "ranges" in result
-        assert len(result["ranges"]) == 1
-
-    def test_find_text_case_sensitive(self, tool_context):
-        tool = FindText()
-        with patch(
-            "plugin.modules.writer.tools.content.format_support.find_text_ranges",
-            return_value=[],
-        ):
-            result = tool.execute(
-                tool_context, search="introduction", case_sensitive=True
-            )
-        assert result["status"] == "ok"
-
-
-# ======================================================================
 # ReadParagraphs
 # ======================================================================
 
@@ -317,64 +261,6 @@ class TestReadParagraphs:
         result = tool.execute(tool_context)
         assert result["status"] == "ok"
         assert "paragraphs" in result
-
-
-# ======================================================================
-# InsertAtParagraph
-# ======================================================================
-
-
-class TestInsertAtParagraph:
-    def test_mutation_detection(self):
-        tool = InsertAtParagraph()
-        assert tool.is_mutation is True
-
-    def test_validate_requires_text(self):
-        tool = InsertAtParagraph()
-        ok, err = tool.validate(text="hello")
-        assert ok is True
-
-    def test_validate_missing_text(self):
-        tool = InsertAtParagraph()
-        ok, err = tool.validate()
-        assert ok is False
-
-    def test_no_locator_or_index(self, tool_context):
-        tool = InsertAtParagraph()
-        result = tool.execute(tool_context, text="new text")
-        assert result["status"] == "error"
-        assert (
-            "locator" in result["message"].lower()
-            or "paragraph_index" in result["message"].lower()
-        )
-
-    def test_index_out_of_range(self, tool_context):
-        tool = InsertAtParagraph()
-        result = tool.execute(tool_context, text="new", paragraph_index=999)
-        assert result["status"] == "error"
-        assert "out of range" in result["message"].lower()
-
-    def test_insert_before(self, tool_context, writer_doc):
-        tool = InsertAtParagraph()
-        result = tool.execute(
-            tool_context, text="New paragraph", paragraph_index=1, position="before"
-        )
-        assert result["status"] == "ok"
-        assert "Inserted" in result["message"]
-
-    def test_insert_after(self, tool_context, writer_doc):
-        tool = InsertAtParagraph()
-        result = tool.execute(
-            tool_context, text="After para", paragraph_index=0, position="after"
-        )
-        assert result["status"] == "ok"
-
-    def test_insert_with_locator(self, tool_context, writer_services):
-        tool = InsertAtParagraph()
-        result = tool.execute(
-            tool_context, text="Located", locator="paragraph:0", position="before"
-        )
-        assert result["status"] == "ok"
 
 
 # ======================================================================
@@ -766,83 +652,6 @@ class TestGetDocumentStats:
         assert result["status"] == "ok"
         assert result["paragraph_count"] == 0
         assert result["heading_count"] == 0
-
-
-# ======================================================================
-# GetDocumentOutline (deprecated)
-# ======================================================================
-
-
-class TestGetDocumentOutline:
-    def test_mutation_detection(self):
-        tool = GetDocumentOutline()
-        assert tool.detects_mutation() is False
-
-    def test_doc_types(self):
-        tool = GetDocumentOutline()
-        assert tool.doc_types == ["writer"]
-
-    def test_returns_outline(self, tool_context):
-        tool = GetDocumentOutline()
-        result = tool.execute(tool_context)
-        assert result["status"] == "ok"
-        assert "outline" in result
-        assert len(result["outline"]) >= 1
-
-    def test_max_depth(self, tool_context):
-        tool = GetDocumentOutline()
-        result = tool.execute(tool_context, max_depth=1)
-        assert result["status"] == "ok"
-        for node in result["outline"]:
-            assert node["children"] == []
-
-    def test_empty_doc(self, empty_context):
-        tool = GetDocumentOutline()
-        result = tool.execute(empty_context)
-        assert result["status"] == "ok"
-        assert result["outline"] == []
-
-
-# ======================================================================
-# GetHeadingContent (deprecated)
-# ======================================================================
-
-
-class TestGetHeadingContent:
-    def test_mutation_detection(self):
-        tool = GetHeadingContent()
-        assert tool.detects_mutation() is False
-
-    def test_doc_types(self):
-        tool = GetHeadingContent()
-        assert tool.doc_types == ["writer"]
-
-    def test_validate_requires_heading_path(self):
-        tool = GetHeadingContent()
-        ok, err = tool.validate(heading_path="1")
-        assert ok is True
-
-    def test_validate_missing_heading_path(self):
-        tool = GetHeadingContent()
-        ok, err = tool.validate()
-        assert ok is False
-
-    def test_heading_content(self, tool_context):
-        tool = GetHeadingContent()
-        result = tool.execute(tool_context, heading_path="1")
-        assert result["status"] == "ok"
-        assert result["heading_title"] == "Introduction"
-        assert "paragraphs" in result
-
-    def test_heading_not_found(self, tool_context):
-        tool = GetHeadingContent()
-        result = tool.execute(tool_context, heading_path="99")
-        assert result["status"] == "error"
-
-    def test_invalid_heading_path(self, tool_context):
-        tool = GetHeadingContent()
-        result = tool.execute(tool_context, heading_path="abc")
-        assert result["status"] == "error"
 
 
 # ======================================================================

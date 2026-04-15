@@ -115,6 +115,10 @@ class ToolRegistry:
         """Return all registered tool names."""
         return list(self._tools.keys())
 
+    def core_tool_names(self):
+        """Return tool names with tier='core'."""
+        return [name for name, tool in self._tools.items() if tool.tier == "core"]
+
     def _service_available(self, service_name):
         """Check if a service has at least one registered instance."""
         svc = self._services.get(service_name)

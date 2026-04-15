@@ -79,6 +79,7 @@ Auto-discovered at build time by `generate_manifest.py`.
 - **Doc types**: `detect_doc_type()` returns `"writer"`, `"calc"`, `"impress"`, or `"draw"` (Impress and Draw are distinct). Use `doc_types = ["draw", "impress"]` for tools that work on both.
 - **Doc-type param namespacing**: Unified tools use nested objects (`"writer": {...}`, `"calc": {...}`) for doc-type-specific params. `_flatten_doc_type_params()` in `ToolRegistry` merges the matching block before `execute()`. Tool code stays flat.
 - **Draw page resolution**: Use `get_draw_page(ctx, page_index=, sheet_name=)` from `draw/bridge.py` — handles Writer (single page), Calc (per-sheet), Draw/Impress (multi-page).
+- **Tool tiers**: Every tool has `tier = "core"` or `"extended"` (default). The `/mcp/core` endpoint exposes only core tools; `/mcp` exposes everything. Assign `tier = "core"` on the tool class for tools essential to the AI read-write workflow.
 
 ## Cross-renderer testing
 

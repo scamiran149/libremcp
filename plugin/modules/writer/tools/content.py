@@ -295,63 +295,6 @@ class ApplyDocumentContent(ToolBase):
 
 
 # ------------------------------------------------------------------
-# FindText
-# ------------------------------------------------------------------
-
-
-class FindText(ToolBase):
-    """Find text in the document."""
-
-    name = "find_text"
-    description = (
-        "Finds text in the document. Returns {start, end, text} per match. "
-        "Use with apply_document_content (search= or target=range)."
-    )
-    parameters = {
-        "type": "object",
-        "properties": {
-            "search": {
-                "type": "string",
-                "description": "Text to search for.",
-            },
-            "start": {
-                "type": "integer",
-                "description": "Start offset to search from (default 0).",
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum matches to return.",
-            },
-            "case_sensitive": {
-                "type": "boolean",
-                "description": "Case-sensitive search. Default true.",
-            },
-        },
-        "required": ["search"],
-    }
-    doc_types = ["writer"]
-    tier = "core"
-
-    def execute(self, ctx, **kwargs):
-        search = kwargs.get("search")
-        if not search:
-            return {"status": "error", "message": "search parameter is required."}
-        start = kwargs.get("start", 0)
-        limit = kwargs.get("limit")
-        case_sensitive = kwargs.get("case_sensitive", True)
-
-        ranges = format_support.find_text_ranges(
-            ctx.doc,
-            ctx.ctx,
-            search,
-            start=start,
-            limit=limit,
-            case_sensitive=case_sensitive,
-        )
-        return {"status": "ok", "ranges": ranges}
-
-
-# ------------------------------------------------------------------
 # ReadParagraphs
 # ------------------------------------------------------------------
 
@@ -413,98 +356,6 @@ class ReadParagraphs(ToolBase):
             "status": "ok",
             "paragraphs": paragraphs,
             "total": len(para_ranges),
-        }
-
-
-# ------------------------------------------------------------------
-# InsertAtParagraph
-# ------------------------------------------------------------------
-
-
-class InsertAtParagraph(ToolBase):
-    """Insert text at a specific paragraph index."""
-
-    name = "insert_at_paragraph"
-    description = "Insert text at a specific paragraph index or locator."
-    parameters = {
-        "type": "object",
-        "properties": {
-            "paragraph_index": {
-                "type": "integer",
-                "description": "0-based paragraph index.",
-            },
-            "locator": {
-                "type": "string",
-                "description": (
-                    "Locator: 'paragraph:N', 'bookmark:_mcp_x', "
-                    "'heading_text:Title', etc. Overrides paragraph_index."
-                ),
-            },
-            "text": {
-                "type": "string",
-                "description": "Text to insert.",
-            },
-            "style": {
-                "type": "string",
-                "description": (
-                    "Paragraph style to apply to the inserted text "
-                    "(e.g. 'Heading 1', 'Text Body')."
-                ),
-            },
-            "position": {
-                "type": "string",
-                "enum": ["before", "after", "replace"],
-                "description": "Position relative to the target paragraph (default: 'before').",
-            },
-        },
-        "required": ["text"],
-    }
-    doc_types = ["writer"]
-    tier = "core"
-    is_mutation = True
-
-    def execute(self, ctx, **kwargs):
-        para_index = _resolve_para_index(ctx, kwargs)
-        text_to_insert = kwargs.get("text", "")
-        style = kwargs.get("style")
-        position = kwargs.get("position", "before")
-
-        if para_index is None:
-            return {"status": "error", "message": "Provide locator or paragraph_index."}
-
-        doc_svc = ctx.services.document
-        para_ranges = doc_svc.get_paragraph_ranges(ctx.doc)
-
-        if para_index < 0 or para_index >= len(para_ranges):
-            return {
-                "status": "error",
-                "message": "Paragraph index %d out of range (0..%d)."
-                % (para_index, len(para_ranges) - 1),
-            }
-
-        target_para = para_ranges[para_index]
-        text = ctx.doc.getText()
-        cursor = text.createTextCursorByRange(target_para.getStart())
-
-        if position == "after":
-            cursor.gotoRange(target_para.getEnd(), False)
-            text.insertString(cursor, "\n" + text_to_insert, False)
-        elif position == "replace":
-            cursor.gotoRange(target_para.getEnd(), True)
-            cursor.setString(text_to_insert)
-        else:  # before
-            text.insertString(cursor, text_to_insert + "\n", False)
-
-        # Apply style if requested
-        if style:
-            resolved_style = _resolve_style_name(ctx.doc, style)
-            cursor.gotoStartOfParagraph(False)
-            cursor.gotoEndOfParagraph(True)
-            cursor.setPropertyValue("ParaStyleName", resolved_style)
-
-        return {
-            "status": "ok",
-            "message": "Inserted text at paragraph %d." % para_index,
         }
 
 
@@ -590,6 +441,7 @@ class SetParagraphStyle(ToolBase):
     """Change the paragraph style of a paragraph."""
 
     name = "set_paragraph_style"
+    tier = "core"
     intent = "edit"
     description = (
         "Set the paragraph style (e.g. 'Heading 1', 'Text Body', 'List Bullet')."
@@ -661,6 +513,7 @@ class DeleteParagraph(ToolBase):
     """Delete a paragraph from the document."""
 
     name = "delete_paragraph"
+    tier = "core"
     intent = "edit"
     description = "Delete a paragraph from the document."
     parameters = {
@@ -920,6 +773,7 @@ class InsertParagraphsBatch(ToolBase):
     """Insert multiple paragraphs in one call."""
 
     name = "insert_paragraphs_batch"
+    tier = "core"
     intent = "edit"
     description = (
         "Insert multiple paragraphs in a single operation. "

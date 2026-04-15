@@ -26,11 +26,13 @@ class ListSections(ToolBase):
             sections = []
             for name in names:
                 section = supplier.getByName(name)
-                sections.append({
-                    "name": name,
-                    "is_visible": getattr(section, "IsVisible", True),
-                    "is_protected": getattr(section, "IsProtected", False),
-                })
+                sections.append(
+                    {
+                        "name": name,
+                        "is_visible": getattr(section, "IsVisible", True),
+                        "is_protected": getattr(section, "IsProtected", False),
+                    }
+                )
             return {"status": "ok", "sections": sections, "count": len(sections)}
         except Exception as e:
             return {"status": "error", "error": str(e)}
@@ -71,7 +73,10 @@ class GetPageObjects(ToolBase):
         "properties": {
             "page": {"type": "integer", "description": "Page number"},
             "locator": {"type": "string", "description": "Locator to determine page"},
-            "paragraph_index": {"type": "integer", "description": "Paragraph index to determine page"},
+            "paragraph_index": {
+                "type": "integer",
+                "description": "Paragraph index to determine page",
+            },
         },
         "required": [],
     }
@@ -125,12 +130,14 @@ class GetPageObjects(ToolBase):
                     vc.gotoRange(g.getAnchor(), False)
                     if vc.getPage() == page:
                         size = g.getPropertyValue("Size")
-                        images.append({
-                            "name": name,
-                            "width_mm": size.Width // 100,
-                            "height_mm": size.Height // 100,
-                            "title": g.getPropertyValue("Title"),
-                        })
+                        images.append(
+                            {
+                                "name": name,
+                                "width_mm": size.Width // 100,
+                                "height_mm": size.Height // 100,
+                                "title": g.getPropertyValue("Title"),
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -141,11 +148,13 @@ class GetPageObjects(ToolBase):
                     t = doc.getTextTables().getByName(name)
                     vc.gotoRange(t.getAnchor(), False)
                     if vc.getPage() == page:
-                        tables.append({
-                            "name": name,
-                            "rows": t.getRows().getCount(),
-                            "cols": t.getColumns().getCount(),
-                        })
+                        tables.append(
+                            {
+                                "name": name,
+                                "rows": t.getRows().getCount(),
+                                "cols": t.getColumns().getCount(),
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -157,11 +166,13 @@ class GetPageObjects(ToolBase):
                     vc.gotoRange(fr.getAnchor(), False)
                     if vc.getPage() == page:
                         size = fr.getPropertyValue("Size")
-                        frames.append({
-                            "name": fname,
-                            "width_mm": size.Width // 100,
-                            "height_mm": size.Height // 100,
-                        })
+                        frames.append(
+                            {
+                                "name": fname,
+                                "width_mm": size.Width // 100,
+                                "height_mm": size.Height // 100,
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -288,7 +299,10 @@ class ResolveBookmark(ToolBase):
 
         doc = ctx.doc
         if not hasattr(doc, "getBookmarks"):
-            return {"status": "error", "message": "Document does not support bookmarks."}
+            return {
+                "status": "error",
+                "message": "Document does not support bookmarks.",
+            }
 
         try:
             bookmarks = doc.getBookmarks()
@@ -302,8 +316,7 @@ class ResolveBookmark(ToolBase):
                         "to refresh bookmarks."
                     )
                     existing = [
-                        n for n in bookmarks.getElementNames()
-                        if n.startswith("_mcp_")
+                        n for n in bookmarks.getElementNames() if n.startswith("_mcp_")
                     ]
                     if existing:
                         hint += " Existing bookmarks: %s" % ", ".join(existing[:10])
@@ -316,9 +329,7 @@ class ResolveBookmark(ToolBase):
             doc_svc = ctx.services.document
             para_ranges = doc_svc.get_paragraph_ranges(doc)
             text_obj = doc.getText()
-            para_idx = doc_svc.find_paragraph_for_range(
-                anchor, para_ranges, text_obj
-            )
+            para_idx = doc_svc.find_paragraph_for_range(anchor, para_ranges, text_obj)
 
             result = {
                 "status": "ok",
@@ -347,6 +358,7 @@ class ResolveLocator(ToolBase):
     """Resolve any locator to its canonical form with metadata."""
 
     name = "resolve_locator"
+    tier = "core"
     intent = "navigate"
     description = (
         "Resolve any locator string to its current paragraph position "

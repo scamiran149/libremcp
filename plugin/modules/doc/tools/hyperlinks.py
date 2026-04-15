@@ -21,6 +21,7 @@ class ListHyperlinks(ToolBase):
     """List all hyperlinks in the document."""
 
     name = "list_hyperlinks"
+    tier = "core"
     intent = "navigate"
     description = (
         "List all hyperlinks in the document. "
@@ -65,12 +66,14 @@ class ListHyperlinks(ToolBase):
                         url = field.getPropertyValue("URL")
                         rep = field.getPropertyValue("Representation")
                         if url:
-                            links.append({
-                                "index": idx,
-                                "url": url,
-                                "text": rep or url,
-                                "type": "field",
-                            })
+                            links.append(
+                                {
+                                    "index": idx,
+                                    "url": url,
+                                    "text": rep or url,
+                                    "type": "field",
+                                }
+                            )
                             idx += 1
                 except Exception:
                     pass
@@ -93,12 +96,14 @@ class ListHyperlinks(ToolBase):
                         if url:
                             name = portion.getPropertyValue("HyperLinkName")
                             txt = portion.getString()
-                            links.append({
-                                "index": idx,
-                                "url": url,
-                                "text": txt or name or url,
-                                "type": "inline",
-                            })
+                            links.append(
+                                {
+                                    "index": idx,
+                                    "url": url,
+                                    "text": txt or name or url,
+                                    "type": "inline",
+                                }
+                            )
                             idx += 1
                     except Exception:
                         pass
@@ -113,7 +118,10 @@ class ListHyperlinks(ToolBase):
         if sheet_name:
             sheets = doc.getSheets()
             if not sheets.hasByName(sheet_name):
-                return {"status": "error", "message": "Sheet not found: %s" % sheet_name}
+                return {
+                    "status": "error",
+                    "message": "Sheet not found: %s" % sheet_name,
+                }
             sheet = sheets.getByName(sheet_name)
         else:
             sheet = doc.getCurrentController().getActiveSheet()
@@ -126,6 +134,7 @@ class ListHyperlinks(ToolBase):
             ra = cursor.getRangeAddress()
 
             from plugin.modules.calc.address_utils import index_to_column
+
             idx = 0
             for r in range(ra.StartRow, ra.EndRow + 1):
                 for c in range(ra.StartColumn, ra.EndColumn + 1):
@@ -138,12 +147,14 @@ class ListHyperlinks(ToolBase):
                                 url = field.getPropertyValue("URL")
                                 if url:
                                     cell_ref = "%s%d" % (index_to_column(c), r + 1)
-                                    links.append({
-                                        "index": idx,
-                                        "cell": cell_ref,
-                                        "url": url,
-                                        "text": cell.getString(),
-                                    })
+                                    links.append(
+                                        {
+                                            "index": idx,
+                                            "cell": cell_ref,
+                                            "url": url,
+                                            "text": cell.getString(),
+                                        }
+                                    )
                                     idx += 1
                     except Exception:
                         pass
@@ -162,6 +173,7 @@ class InsertHyperlink(ToolBase):
     """Insert a hyperlink into the document."""
 
     name = "insert_hyperlink"
+    tier = "core"
     intent = "edit"
     description = (
         "Insert a hyperlink into the document. "
@@ -396,7 +408,10 @@ class RemoveHyperlink(ToolBase):
         except Exception:
             pass
 
-        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+        return {
+            "status": "error",
+            "message": "Hyperlink index %d not found." % target_index,
+        }
 
     def _remove_calc(self, ctx, target_index, sheet_name=None):
         """Remove a hyperlink in Calc by clearing the URL field."""
@@ -404,7 +419,10 @@ class RemoveHyperlink(ToolBase):
         if sheet_name:
             sheets = doc.getSheets()
             if not sheets.hasByName(sheet_name):
-                return {"status": "error", "message": "Sheet not found: %s" % sheet_name}
+                return {
+                    "status": "error",
+                    "message": "Sheet not found: %s" % sheet_name,
+                }
             sheet = sheets.getByName(sheet_name)
         else:
             sheet = doc.getCurrentController().getActiveSheet()
@@ -416,6 +434,7 @@ class RemoveHyperlink(ToolBase):
             ra = cursor.getRangeAddress()
 
             from plugin.modules.calc.address_utils import index_to_column
+
             idx = 0
             for r in range(ra.StartRow, ra.EndRow + 1):
                 for c in range(ra.StartColumn, ra.EndColumn + 1):
@@ -446,7 +465,10 @@ class RemoveHyperlink(ToolBase):
         except Exception as e:
             log.debug("remove_hyperlink calc: %s", e)
 
-        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+        return {
+            "status": "error",
+            "message": "Hyperlink index %d not found." % target_index,
+        }
 
 
 class EditHyperlink(ToolBase):
@@ -498,8 +520,9 @@ class EditHyperlink(ToolBase):
 
         if ctx.doc_type == "writer":
             return self._edit_writer(ctx, target_index, new_url, new_text)
-        return self._edit_calc(ctx, target_index, new_url, new_text,
-                               kwargs.get("sheet_name"))
+        return self._edit_calc(
+            ctx, target_index, new_url, new_text, kwargs.get("sheet_name")
+        )
 
     def _edit_writer(self, ctx, target_index, new_url, new_text):
         """Edit a hyperlink in Writer."""
@@ -526,7 +549,8 @@ class EditHyperlink(ToolBase):
                                     "index": target_index,
                                     "type": "field",
                                     "url": new_url or url,
-                                    "text": new_text or field.getPropertyValue("Representation"),
+                                    "text": new_text
+                                    or field.getPropertyValue("Representation"),
                                 }
                             idx += 1
                 except Exception:
@@ -568,7 +592,10 @@ class EditHyperlink(ToolBase):
         except Exception:
             pass
 
-        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+        return {
+            "status": "error",
+            "message": "Hyperlink index %d not found." % target_index,
+        }
 
     def _edit_calc(self, ctx, target_index, new_url, new_text, sheet_name=None):
         """Edit a hyperlink in Calc."""
@@ -576,7 +603,10 @@ class EditHyperlink(ToolBase):
         if sheet_name:
             sheets = doc.getSheets()
             if not sheets.hasByName(sheet_name):
-                return {"status": "error", "message": "Sheet not found: %s" % sheet_name}
+                return {
+                    "status": "error",
+                    "message": "Sheet not found: %s" % sheet_name,
+                }
             sheet = sheets.getByName(sheet_name)
         else:
             sheet = doc.getCurrentController().getActiveSheet()
@@ -588,6 +618,7 @@ class EditHyperlink(ToolBase):
             ra = cursor.getRangeAddress()
 
             from plugin.modules.calc.address_utils import index_to_column
+
             idx = 0
             for r in range(ra.StartRow, ra.EndRow + 1):
                 for c in range(ra.StartColumn, ra.EndColumn + 1):
@@ -603,7 +634,9 @@ class EditHyperlink(ToolBase):
                                         if new_url is not None:
                                             field.setPropertyValue("URL", new_url)
                                         if new_text is not None:
-                                            field.setPropertyValue("Representation", new_text)
+                                            field.setPropertyValue(
+                                                "Representation", new_text
+                                            )
                                             cell.setString(new_text)
                                             # Re-insert field after text change
                                             cell_text = cell.getText()
@@ -636,4 +669,7 @@ class EditHyperlink(ToolBase):
         except Exception as e:
             log.debug("edit_hyperlink calc: %s", e)
 
-        return {"status": "error", "message": "Hyperlink index %d not found." % target_index}
+        return {
+            "status": "error",
+            "message": "Hyperlink index %d not found." % target_index,
+        }

@@ -139,6 +139,7 @@ class ListImages(ToolBase):
     """List all images/graphic objects in the document."""
 
     name = "list_images"
+    tier = "core"
     intent = "media"
     description = (
         "List all images/graphic objects in the document with name, "
@@ -574,6 +575,7 @@ class InsertImage(ToolBase):
     """Insert an image from local path or URL into any document type."""
 
     name = "insert_image"
+    tier = "core"
     intent = "media"
     description = (
         "Insert an image from local path or URL into the document. "

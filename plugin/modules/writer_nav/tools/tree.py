@@ -10,6 +10,7 @@ from plugin.framework.tool_base import ToolBase
 
 class GetDocumentTree(ToolBase):
     name = "get_document_tree"
+    tier = "core"
     intent = "navigate"
     description = (
         "Get the document heading tree with bookmarks and content previews. "
@@ -47,6 +48,7 @@ class GetDocumentTree(ToolBase):
 
 class GetHeadingChildren(ToolBase):
     name = "get_heading_children"
+    tier = "core"
     intent = "navigate"
     description = (
         "Drill into a heading's children — body paragraphs and sub-headings. "

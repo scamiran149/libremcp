@@ -65,7 +65,7 @@ def _save_to_path(doc, path):
             "status": "error",
             "code": "unsupported_extension",
             "message": "Unsupported extension: %s. Supported: %s"
-                       % (ext, ", ".join(sorted(_EXT_FILTERS))),
+            % (ext, ", ".join(sorted(_EXT_FILTERS))),
             "retryable": False,
         }
 
@@ -101,13 +101,17 @@ def _save_to_path(doc, path):
             log.info("storeToURL did not update URL; trying .uno:SaveAs")
             frame = doc.getCurrentController().getFrame()
             from plugin.framework.uno_context import get_ctx
+
             ctx = get_ctx()
             dispatcher = ctx.ServiceManager.createInstanceWithContext(
-                "com.sun.star.frame.DispatchHelper", ctx)
+                "com.sun.star.frame.DispatchHelper", ctx
+            )
             dispatcher.executeDispatch(
-                frame, ".uno:SaveAs", "", 0,
-                (pv_filter, pv_overwrite,
-                 PropertyValue("URL", 0, file_url, 0)),
+                frame,
+                ".uno:SaveAs",
+                "",
+                0,
+                (pv_filter, pv_overwrite, PropertyValue("URL", 0, file_url, 0)),
             )
     except Exception:
         log.debug("SaveAs dispatch fallback failed", exc_info=True)
@@ -116,8 +120,7 @@ def _save_to_path(doc, path):
     try:
         saved_url = doc.getURL()
         if not saved_url and os.path.isfile(path):
-            log.warning("Document saved to disk but URL not updated: %s",
-                        path)
+            log.warning("Document saved to disk but URL not updated: %s", path)
     except Exception:
         pass
 
@@ -179,8 +182,7 @@ class SaveDocument(ToolBase):
                 "hint": (
                     "Example: path='%s/report.odt'. "
                     "Supported extensions: %s."
-                    % (save_dir.replace("\\", "/"),
-                       ", ".join(sorted(_EXT_FILTERS)))
+                    % (save_dir.replace("\\", "/"), ", ".join(sorted(_EXT_FILTERS)))
                 ),
                 "default_save_dir": save_dir.replace("\\", "/"),
                 "retryable": False,
@@ -198,9 +200,7 @@ class ExportPdf(ToolBase):
     """Export the current document as PDF."""
 
     name = "export_pdf"
-    description = (
-        "Exports the current document to a PDF file at the given path."
-    )
+    description = "Exports the current document to a PDF file at the given path."
     parameters = {
         "type": "object",
         "properties": {
@@ -223,8 +223,7 @@ class ExportPdf(ToolBase):
         if not filter_name:
             return {
                 "status": "error",
-                "error": "Unsupported document type for PDF export: %s"
-                         % doc_type,
+                "error": "Unsupported document type for PDF export: %s" % doc_type,
             }
 
         # Convert local path to file:// URL.
@@ -250,6 +249,7 @@ class SaveDocumentAs(ToolBase):
     """Save the current document to a new path (File > Save As)."""
 
     name = "save_document_as"
+    tier = "core"
     intent = "media"
     description = (
         "Save the current document to a new path. "
@@ -298,6 +298,7 @@ class CreateDocument(ToolBase):
     """Create a new empty document in LibreOffice."""
 
     name = "create_document"
+    tier = "core"
     intent = "media"
     description = (
         "Create a new empty document in LibreOffice. "
@@ -323,8 +324,7 @@ class CreateDocument(ToolBase):
                 "description": (
                     "Optional file path to save the document immediately "
                     "(e.g. C:/Users/me/report.odt). "
-                    "Supported extensions: "
-                    + ", ".join(sorted(_EXT_FILTERS)) + ". "
+                    "Supported extensions: " + ", ".join(sorted(_EXT_FILTERS)) + ". "
                     "Tip: use get_recent_documents to discover valid "
                     "directory paths on this machine."
                 ),
@@ -350,9 +350,7 @@ class CreateDocument(ToolBase):
 
         try:
             desktop = _get_desktop()
-            new_doc = desktop.loadComponentFromURL(
-                factory_url, "_blank", 0, ()
-            )
+            new_doc = desktop.loadComponentFromURL(factory_url, "_blank", 0, ())
         except Exception as exc:
             log.exception("CreateDocument failed: %s", exc)
             return {"status": "error", "error": str(exc)}
@@ -391,6 +389,7 @@ class OpenDocument(ToolBase):
     """Open a document file in LibreOffice."""
 
     name = "open_document"
+    tier = "core"
     intent = "media"
     description = "Open a document file in LibreOffice."
     parameters = {
@@ -440,10 +439,9 @@ class CloseDocument(ToolBase):
     """Close the current document."""
 
     name = "close_document"
+    tier = "core"
     intent = "media"
-    description = (
-        "Close the current document. Use save_document first if needed."
-    )
+    description = "Close the current document. Use save_document first if needed."
     parameters = {
         "type": "object",
         "properties": {},
@@ -461,9 +459,7 @@ class CloseDocument(ToolBase):
         try:
             frames = desktop.getFrames()
             frame_count = frames.getCount()
-            log.debug(
-                "close_document: %d frames before close", frame_count
-            )
+            log.debug("close_document: %d frames before close", frame_count)
             for i in range(frame_count):
                 frame = frames.getByIndex(i)
                 try:
@@ -482,10 +478,11 @@ class CloseDocument(ToolBase):
                     try:
                         is_closing = (
                             model.getURL() == closing_doc.getURL()
-                            and frame_title == closing_doc.getCurrentController().getFrame().getTitle()
+                            and frame_title
+                            == closing_doc.getCurrentController().getFrame().getTitle()
                         )
                     except Exception:
-                        is_closing = (model is closing_doc)
+                        is_closing = model is closing_doc
                     if is_closing:
                         log.debug("  frame %d: closing doc (%s)", i, frame_title)
                         continue
@@ -495,21 +492,31 @@ class CloseDocument(ToolBase):
                         continue
                     is_doc = (
                         model.supportsService("com.sun.star.text.TextDocument")
-                        or model.supportsService("com.sun.star.sheet.SpreadsheetDocument")
+                        or model.supportsService(
+                            "com.sun.star.sheet.SpreadsheetDocument"
+                        )
                         or model.supportsService("com.sun.star.drawing.DrawingDocument")
-                        or model.supportsService("com.sun.star.presentation.PresentationDocument")
+                        or model.supportsService(
+                            "com.sun.star.presentation.PresentationDocument"
+                        )
                     )
                     if is_doc:
                         log.debug("  frame %d: next doc candidate (%s)", i, frame_title)
                         next_frame = frame
                         break
                     else:
-                        log.debug("  frame %d: not a supported doc (%s)", i, frame_title)
+                        log.debug(
+                            "  frame %d: not a supported doc (%s)", i, frame_title
+                        )
                 except Exception:
-                    log.debug("  frame %d: exception during inspection", i, exc_info=True)
+                    log.debug(
+                        "  frame %d: exception during inspection", i, exc_info=True
+                    )
                     continue
         except Exception:
-            log.info("Could not enumerate frames for next-doc activation", exc_info=True)
+            log.info(
+                "Could not enumerate frames for next-doc activation", exc_info=True
+            )
 
         # Close the document
         try:
@@ -531,7 +538,9 @@ class CloseDocument(ToolBase):
                     "active_document": next_title,
                 }
             except Exception:
-                log.warning("close_document: failed to activate next frame", exc_info=True)
+                log.warning(
+                    "close_document: failed to activate next frame", exc_info=True
+                )
         else:
             log.info("close_document: no next frame found")
 
@@ -542,6 +551,7 @@ class ListOpenDocuments(ToolBase):
     """List all currently open documents in LibreOffice."""
 
     name = "list_open_documents"
+    tier = "core"
     intent = "media"
     description = (
         "List all currently open documents in LibreOffice. "
@@ -559,8 +569,7 @@ class ListOpenDocuments(ToolBase):
     def execute(self, ctx, **kwargs):
         try:
             doc_svc = ctx.services.document
-            documents = doc_svc.enumerate_open_documents(
-                active_model=ctx.doc)
+            documents = doc_svc.enumerate_open_documents(active_model=ctx.doc)
             return {
                 "status": "ok",
                 "documents": documents,
@@ -575,10 +584,9 @@ class GetRecentDocuments(ToolBase):
     """Get list of recently opened documents from LibreOffice history."""
 
     name = "get_recent_documents"
+    tier = "core"
     intent = "media"
-    description = (
-        "Get list of recently opened documents from LibreOffice history."
-    )
+    description = "Get list of recently opened documents from LibreOffice history."
     parameters = {
         "type": "object",
         "properties": {
@@ -598,7 +606,8 @@ class GetRecentDocuments(ToolBase):
             uno_ctx = get_ctx()
             smgr = uno_ctx.ServiceManager
             cfg_provider = smgr.createInstanceWithContext(
-                "com.sun.star.configuration.ConfigurationProvider", uno_ctx)
+                "com.sun.star.configuration.ConfigurationProvider", uno_ctx
+            )
             arg = PropertyValue()
             arg.Name = "nodepath"
             arg.Value = (
@@ -606,7 +615,8 @@ class GetRecentDocuments(ToolBase):
                 "/org.openoffice.Office.Histories:HistoryInfo['PickList']"
             )
             cfg = cfg_provider.createInstanceWithArguments(
-                "com.sun.star.configuration.ConfigurationAccess", (arg,))
+                "com.sun.star.configuration.ConfigurationAccess", (arg,)
+            )
 
             order_list = cfg.getByName("OrderList")
             item_list = cfg.getByName("ItemList")

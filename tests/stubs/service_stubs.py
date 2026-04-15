@@ -262,13 +262,6 @@ class StubProximityService:
         return []
 
 
-class StubIndexService:
-    name = "writer_index"
-
-    def search_index(self, doc, query):
-        return []
-
-
 class StubFormatService:
     name = "format"
 
@@ -300,16 +293,6 @@ class StubToolRegistry:
         return list(self._tools.keys())
 
 
-class StubJobManager:
-    name = "jobs"
-
-    def __init__(self):
-        self._jobs = {}
-
-    def submit(self, func, **kwargs):
-        return "stub-job-id"
-
-
 class StubServiceRegistry(ServiceRegistry):
     def __init__(self, doc=None):
         super().__init__()
@@ -319,10 +302,8 @@ class StubServiceRegistry(ServiceRegistry):
         tree_svc = StubTreeService(doc_svc)
         bm_svc = StubBookmarkService()
         prox_svc = StubProximityService()
-        idx_svc = StubIndexService()
         fmt_svc = StubFormatService()
         tools_svc = StubToolRegistry()
-        jobs_svc = StubJobManager()
 
         self.register_instance("document", doc_svc)
         self.register_instance("config", config_svc)
@@ -330,10 +311,8 @@ class StubServiceRegistry(ServiceRegistry):
         self.register_instance("writer_tree", tree_svc)
         self.register_instance("writer_bookmarks", bm_svc)
         self.register_instance("writer_proximity", prox_svc)
-        self.register_instance("writer_index", idx_svc)
         self.register_instance("format", fmt_svc)
         self.register_instance("tools", tools_svc)
-        self.register_instance("jobs", jobs_svc)
 
 
 def _nest_headings(flat):

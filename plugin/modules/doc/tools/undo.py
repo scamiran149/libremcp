@@ -19,6 +19,7 @@ class Undo(ToolBase):
     """Undo the last action."""
 
     name = "undo"
+    tier = "core"
     description = (
         "Undo the last action in the document. "
         "Can undo multiple steps. Works on all document types."
@@ -60,6 +61,7 @@ class Redo(ToolBase):
     """Redo the last undone action."""
 
     name = "redo"
+    tier = "core"
     description = (
         "Redo the last undone action in the document. "
         "Can redo multiple steps. Works on all document types."

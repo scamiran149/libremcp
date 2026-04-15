@@ -7,7 +7,7 @@ install_uno_stubs()
 from stubs.writer_stubs import WriterDocStub
 from stubs.calc_stubs import CalcDocStub
 from stubs.draw_stubs import DrawDocStub
-from stubs.service_stubs import StubServiceRegistry, StubJobManager
+from stubs.service_stubs import StubServiceRegistry
 from plugin.framework.tool_context import ToolContext
 from plugin.framework.tool_registry import ToolRegistry
 
@@ -35,8 +35,6 @@ from plugin.modules.doc.tools.diagnostics import (
     DocumentHealthCheck,
     SetDocumentProtection,
 )
-from plugin.modules.core.tools.list_jobs import ListJobs
-from plugin.modules.core.tools.get_job import GetJob
 from plugin.modules.batch.tools.batch import ExecuteBatch
 
 
@@ -184,38 +182,6 @@ class _WriterDocWithSections(_DocWithModified):
 
     def getTextSections(self):
         return self._sections
-
-
-class _JobStub:
-    def __init__(self, job_id, status="completed", result=None):
-        self.job_id = job_id
-        self._status = status
-        self._result = result
-
-    def to_dict(self):
-        return {"job_id": self.job_id, "status": self._status, "result": self._result}
-
-
-class _StubJobsService:
-    name = "jobs"
-
-    def __init__(self, jobs=None):
-        self._jobs = jobs or {}
-
-    def list(self, limit=10):
-        return list(self._jobs.values())[:limit]
-
-    def get(self, job_id):
-        return self._jobs.get(job_id)
-
-    def submit(self, func, **kwargs):
-        return "stub-job-id"
-
-
-def _make_services_with_jobs(jobs=None):
-    reg = StubServiceRegistry()
-    _replace_service(reg, "jobs", _StubJobsService(jobs))
-    return reg
 
 
 # ── Undo ────────────────────────────────────────────────────
@@ -819,85 +785,6 @@ class TestSetDocumentProtection:
         result = tool.execute(ctx, enabled=False)
         assert result["status"] == "ok"
         assert result["protected"] is False
-
-
-# ── ListJobs ─────────────────────────────────────────────────
-
-
-class TestListJobs:
-    def test_execute_happy_path(self):
-        jobs_svc = _StubJobsService({"j1": _JobStub("j1", "completed", {"x": 1})})
-        svc = _make_services_with_jobs(jobs_svc._jobs)
-        _replace_service(svc, "jobs", jobs_svc)
-        ctx = _make_ctx(WriterDocStub(), "writer", svc)
-        tool = ListJobs()
-        result = tool.execute(ctx)
-        assert result["status"] == "ok"
-        assert len(result["jobs"]) == 1
-
-    def test_execute_empty(self):
-        svc = _make_services_with_jobs()
-        ctx = _make_ctx(WriterDocStub(), "writer", svc)
-        tool = ListJobs()
-        result = tool.execute(ctx)
-        assert result["status"] == "ok"
-        assert result["jobs"] == []
-
-    def test_execute_limit(self):
-        jobs_svc = _StubJobsService({"j%d" % i: _JobStub("j%d" % i) for i in range(20)})
-        svc = _make_services_with_jobs()
-        _replace_service(svc, "jobs", jobs_svc)
-        ctx = _make_ctx(WriterDocStub(), "writer", svc)
-        tool = ListJobs()
-        result = tool.execute(ctx, limit=5)
-        assert result["status"] == "ok"
-        assert len(result["jobs"]) == 5
-
-    def test_is_not_mutation(self):
-        assert ListJobs().detects_mutation() is False
-
-    def test_doc_types_universal(self):
-        assert ListJobs.doc_types is None
-
-    def test_no_required_params(self):
-        tool = ListJobs()
-        ok, _ = tool.validate()
-        assert ok is True
-
-
-# ── GetJob ───────────────────────────────────────────────────
-
-
-class TestGetJob:
-    def test_execute_happy_path(self):
-        job = _JobStub("j42", "completed", {"output": "done"})
-        jobs_svc = _StubJobsService({"j42": job})
-        svc = _make_services_with_jobs()
-        _replace_service(svc, "jobs", jobs_svc)
-        ctx = _make_ctx(WriterDocStub(), "writer", svc)
-        tool = GetJob()
-        result = tool.execute(ctx, job_id="j42")
-        assert result["job_id"] == "j42"
-        assert "status" in result
-
-    def test_execute_not_found(self):
-        svc = _make_services_with_jobs()
-        ctx = _make_ctx(WriterDocStub(), "writer", svc)
-        tool = GetJob()
-        result = tool.execute(ctx, job_id="missing")
-        assert result["status"] == "error"
-
-    def test_job_id_required(self):
-        tool = GetJob()
-        ok, err = tool.validate()
-        assert ok is False
-        assert "job_id" in err
-
-    def test_is_not_mutation(self):
-        assert GetJob().detects_mutation() is False
-
-    def test_doc_types_universal(self):
-        assert GetJob.doc_types is None
 
 
 # ── ExecuteBatch ─────────────────────────────────────────────
